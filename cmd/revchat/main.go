@@ -9,16 +9,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
-	altsrc "github.com/urfave/cli-altsrc/v3"
 	"github.com/urfave/cli/v3"
 
+	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/temporal"
-	"github.com/tzrikka/xdg"
-)
-
-const (
-	DirName        = "revchat"
-	ConfigFileName = "config.toml"
 )
 
 func main() {
@@ -28,7 +22,7 @@ func main() {
 		Name:    "revchat",
 		Usage:   "Manage code reviews in dedicated chat channels",
 		Version: bi.Main.Version,
-		Flags:   flags(),
+		Flags:   config.Flags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			initLog(cmd.Bool("dev"))
 			return temporal.Run(log.Logger, cmd)
@@ -39,30 +33,6 @@ func main() {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-func flags() []cli.Flag {
-	fs := []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "dev",
-			Usage: "simple setup, but unsafe for production",
-		},
-	}
-
-	path := configFile()
-	fs = append(fs, temporal.Flags(path)...)
-
-	return fs
-}
-
-// configFile returns the path to the app's configuration file.
-// It also creates an empty file if it doesn't already exist.
-func configFile() altsrc.StringSourcer {
-	path, err := xdg.CreateFile(xdg.ConfigHome, DirName, ConfigFileName)
-	if err != nil {
-		log.Fatal().Err(err).Caller().Send()
-	}
-	return altsrc.StringSourcer(path)
 }
 
 // initLog initializes the logger for Timpani's HTTP server and Temporal

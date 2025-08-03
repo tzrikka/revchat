@@ -8,6 +8,8 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
+
+	"github.com/tzrikka/revchat/pkg/revchat"
 )
 
 // Run initializes the Temporal worker, and blocks.
@@ -25,7 +27,9 @@ func Run(l zerolog.Logger, cmd *cli.Command) error {
 	}
 	defer c.Close()
 
-	w := worker.New(c, cmd.String("temporal-task-queue"), worker.Options{})
+	w := worker.New(c, cmd.String("temporal-task-queue-revchat"), worker.Options{})
+	revchat.RegisterGitHubWorkflows(w, cmd)
+	revchat.RegisterSlackWorkflows(w, cmd)
 
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		return fmt.Errorf("failed to start Temporal worker: %w", err)
