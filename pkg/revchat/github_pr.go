@@ -137,7 +137,7 @@ func (g GitHub) prReviewRequestedPerson(ctx workflow.Context, channel string, re
 
 func (g GitHub) prReviewRequestedTeam(ctx workflow.Context, channel string, team Team, sender User) {
 	msg := fmt.Sprintf("added the <%s|%s> team as a reviewer", team.HTMLURL, team.Name)
-	g.mentionUserInMessage(ctx, channel, sender, "%s "+msg)
+	_, _ = g.mentionUserInMessage(ctx, channel, sender, "%s "+msg)
 }
 
 // A request for review by a person or team was removed from a PR.
@@ -161,7 +161,7 @@ func (g GitHub) prReviewRequestRemovedPerson(ctx workflow.Context, channel strin
 
 func (g GitHub) prReviewRequestRemovedTeam(ctx workflow.Context, channel string, team Team, sender User) {
 	msg := fmt.Sprintf("removed the <%s|%s> team as a reviewer", team.HTMLURL, team.Name)
-	g.mentionUserInMessage(ctx, channel, sender, "%s "+msg)
+	_, _ = g.mentionUserInMessage(ctx, channel, sender, "%s "+msg)
 }
 
 // A PR was assigned to a user.
@@ -201,7 +201,7 @@ func (g GitHub) prSynchronized(ctx workflow.Context, action string, pr PullReque
 	}
 
 	msg := fmt.Sprintf("updated the head branch (see the [PR commits](%s/commits))", pr.User.HTMLURL)
-	g.mentionUserInMessage(ctx, channel, sender, "%s "+msg)
+	_, _ = g.mentionUserInMessage(ctx, channel, sender, "%s "+msg)
 }
 
 // Conversation on a PR was locked. For more information, see "Locking conversations":
@@ -219,12 +219,8 @@ func (g GitHub) prUnlocked() {
 func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string, bool) {
 	l := workflow.GetLogger(ctx)
 
-	switch {
-	case pr.Draft:
+	if pr.Draft {
 		l.Debug("ignoring GitHub event - the PR is a draft", "action", action, "url", pr.HTMLURL)
-		return "", false
-	case pr.State != "open":
-		l.Debug("ignoring GitHub event - the PR isn't open", "action", action, "url", pr.HTMLURL)
 		return "", false
 	}
 

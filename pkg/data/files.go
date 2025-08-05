@@ -23,7 +23,7 @@ func dataPath(filename string) string {
 }
 
 func readJSON(path string) (map[string]string, error) {
-	f, err := os.ReadFile(path)
+	f, err := os.ReadFile(path) //gosec:disable G304 -- user-specified path by design
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func readJSON(path string) (map[string]string, error) {
 }
 
 func writeSON(path string, m map[string]string) error {
-	f, err := os.OpenFile(path, os.O_TRUNC|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}

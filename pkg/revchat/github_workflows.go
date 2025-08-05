@@ -8,6 +8,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/temporal"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/slack"
 )
 
 // Signals is a list of all the Temporal signals that
@@ -37,31 +38,31 @@ func (g GitHub) EventsWorkflow(ctx workflow.Context) error {
 	more := true
 
 	selector.AddReceive(ch[0], func(c workflow.ReceiveChannel, _ bool) {
-		event := PullRequestEvent{}
-		more = c.Receive(ctx, &event)
-		l.Debug("received signal", "signal", ch[0].Name(), "action", event.Action)
-		g.handlePullRequestEvent(ctx, event)
+		e := PullRequestEvent{}
+		more = c.Receive(ctx, &e)
+		l.Debug("received signal", "signal", ch[0].Name(), "action", e.Action)
+		g.handlePullRequestEvent(ctx, e)
 	})
 
 	// selector.AddReceive(ch[1], func(c workflow.ReceiveChannel, _ bool) {
-	// 	event := PullRequestReviewEvent{}
-	// 	more = c.Receive(ctx, &event)
-	// 	l.Debug("received signal", "signal", ch[1].Name(), "action", event.Action)
-	// 	g.handlePullRequestReviewEvent(ctx, event)
+	// 	e := PullRequestReviewEvent{}
+	// 	more = c.Receive(ctx, &e)
+	// 	l.Debug("received signal", "signal", ch[1].Name(), "action", e.Action)
+	// 	g.handlePullRequestReviewEvent(ctx, e)
 	// })
 
 	// selector.AddReceive(ch[2], func(c workflow.ReceiveChannel, _ bool) {
-	// 	event := PullRequestReviewCommentEvent{}
-	// 	more = c.Receive(ctx, &event)
-	// 	l.Debug("received signal", "signal", ch[2].Name(), "action", event.Action)
-	// 	g.handlePullRequestReviewCommentEvent(ctx, event)
+	// 	e := PullRequestReviewCommentEvent{}
+	// 	more = c.Receive(ctx, &e)
+	// 	l.Debug("received signal", "signal", ch[2].Name(), "action", e.Action)
+	// 	g.handlePullRequestReviewCommentEvent(ctx, e)
 	// })
 
 	// selector.AddReceive(ch[3], func(c workflow.ReceiveChannel, _ bool) {
-	// 	event := PullRequestReviewThreadEvent{}
-	// 	more = c.Receive(ctx, &event)
-	// 	l.Debug("received signal", "signal", ch[3].Name(), "action", event.Action)
-	// 	g.handlePullRequestReviewThreadEvent(ctx, event)
+	// 	e := PullRequestReviewThreadEvent{}
+	// 	more = c.Receive(ctx, &e)
+	// 	l.Debug("received signal", "signal", ch[3].Name(), "action", e.Action)
+	// 	g.handlePullRequestReviewThreadEvent(ctx, e)
 	// })
 
 	for more {
@@ -72,19 +73,19 @@ func (g GitHub) EventsWorkflow(ctx workflow.Context) error {
 }
 
 func (g GitHub) InitChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	channel, err := g.createChannel(ctx, event.PullRequest)
+	channel, err := g.createChannel(ctx, event.PullRequest, event.Sender)
 	if err != nil {
 		return err
 	}
 
-	// Cosmetics.
-	g.setChannelTopic(ctx, channel, event.PullRequest)
-	g.setChannelDescription(ctx, channel, event.PullRequest)
-	g.postIntroMessage(ctx, channel, event)
+	// Channel cosmetics.
+	url := event.PullRequest.HTMLURL
+	g.setChannelTopic(ctx, channel, url)
+	g.setChannelDescription(ctx, channel, event.PullRequest.Title, url)
+	g.postIntroMessage(ctx, channel, event.Action, event, event.Sender)
 
 	// Map between the GitHub PR and the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
-	url := event.PullRequest.HTMLURL
 	if err := data.MapURLToChannel(url, channel); err != nil {
 		msg := "failed to map GitHub PR URL to Slack channel"
 		l.Error(msg, "error", err.Error(), "channel", channel, "url", url)
@@ -94,17 +95,16 @@ func (g GitHub) InitChannelWorkflow(ctx workflow.Context, event PullRequestEvent
 	return nil
 }
 
-func (g GitHub) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
+func (g GitHub) createChannel(ctx workflow.Context, pr PullRequest, sender User) (string, error) {
 	a := g.executeRevChatWorkflow(ctx, "slack.createChannel", pr)
 
 	var channel string
 	if err := a.Get(ctx, &channel); err != nil {
-		user := "TODO"
+		user := sender.Login
 
-		g.executeTimpaniActivity(ctx, ChatPostMessageActivity, ChatPostMessageRequest{
-			Channel:      user,
-			MarkdownText: "Failed to create Slack channel for " + pr.HTMLURL,
-		})
+		msg := "Failed to create Slack channel for " + pr.HTMLURL
+		req := slack.ChatPostMessageRequest{Channel: user, MarkdownText: msg}
+		g.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 
 		return "", err
 	}
@@ -116,36 +116,35 @@ const (
 	maxMetadataLen = 250
 )
 
-func (g GitHub) setChannelTopic(ctx workflow.Context, channel string, pr PullRequest) {
-	url := pr.HTMLURL
-	if len(url) > maxMetadataLen {
-		url = url[:maxMetadataLen-4] + " ..."
+func (g GitHub) setChannelTopic(ctx workflow.Context, channel, url string) {
+	t := url
+	if len(t) > maxMetadataLen {
+		t = t[:maxMetadataLen-4] + " ..."
 	}
 
-	req := ConversationsSetTopicRequest{Channel: channel, Topic: url}
-	a := g.executeTimpaniActivity(ctx, ConversationsSetTopicActivity, req)
+	req := slack.ConversationsSetTopicRequest{Channel: channel, Topic: t}
+	a := g.executeTimpaniActivity(ctx, slack.ConversationsSetTopicActivity, req)
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel topic"
-		workflow.GetLogger(ctx).Error(msg, "error", err.Error(), "channel", channel, "url", pr.HTMLURL)
+		workflow.GetLogger(ctx).Error(msg, "error", err.Error(), "channel", channel, "url", url)
 	}
 }
 
-func (g GitHub) setChannelDescription(ctx workflow.Context, channel string, pr PullRequest) {
-	title := fmt.Sprintf("`%s`", pr.Title)
-	if len(title) > maxMetadataLen {
-		title = title[:maxMetadataLen-4] + "`..."
+func (g GitHub) setChannelDescription(ctx workflow.Context, channel, title, url string) {
+	t := fmt.Sprintf("`%s`", title)
+	if len(t) > maxMetadataLen {
+		t = t[:maxMetadataLen-4] + "`..."
 	}
 
-	req := ConversationsSetPurposeRequest{Channel: channel, Purpose: title}
-	a := g.executeTimpaniActivity(ctx, ConversationsSetPurposeActivity, req)
+	req := slack.ConversationsSetPurposeRequest{Channel: channel, Purpose: t}
+	a := g.executeTimpaniActivity(ctx, slack.ConversationsSetPurposeActivity, req)
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel description"
-		workflow.GetLogger(ctx).Error(msg, "error", err.Error(), "channel", channel, "url", pr.HTMLURL)
+		workflow.GetLogger(ctx).Error(msg, "error", err.Error(), "channel", channel, "url", url)
 	}
 }
 
-func (g GitHub) postIntroMessage(ctx workflow.Context, channel string, event PullRequestEvent) {
-	action := event.Action
+func (g GitHub) postIntroMessage(ctx workflow.Context, channel, action string, event PullRequestEvent, sender User) {
 	if action == "ready_for_review" {
 		action = "marked as ready for review"
 	}
@@ -156,7 +155,7 @@ func (g GitHub) postIntroMessage(ctx workflow.Context, channel string, event Pul
 		msg += "\n\n"
 	}
 
-	g.mentionUserInMessage(ctx, channel, event.Sender, msg)
+	_, _ = g.mentionUserInMessage(ctx, channel, sender, msg)
 }
 
 func (g GitHub) mentionUserInMessage(ctx workflow.Context, channel string, user User, msg string) (string, error) {
