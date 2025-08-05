@@ -50,12 +50,12 @@ func (g GitHub) handlePullRequestEvent(ctx workflow.Context, event PullRequestEv
 	//  - milestoned, demilestoned
 }
 
-// A new PR was created (or reopened, or marked as ready for review). See
-// also [GitHub.prReopened] and [GitHub.prReadyForReview] which wrap this one.
+// A new PR was created (or reopened, or marked as ready for review).
+// See also [GitHub.prReopened] and [GitHub.prReadyForReview] which wrap it.
 func (g GitHub) prOpened(ctx workflow.Context, action string, pr PullRequest, sender User) {
 	// Ignore drafts until they're marked as ready for review.
 	if pr.Draft {
-		msg := "ignoring GitHub PR event - the PR is a draft"
+		msg := "ignoring GitHub event - the PR is a draft"
 		workflow.GetLogger(ctx).Debug(msg, "action", action, "url", pr.HTMLURL)
 		return
 	}
@@ -70,7 +70,7 @@ func (g GitHub) prOpened(ctx workflow.Context, action string, pr PullRequest, se
 func (g GitHub) prClosed(ctx workflow.Context, action string, pr PullRequest, sender User) {
 	// Ignore drafts - they don't have an active Slack channel anyway.
 	if pr.Draft {
-		msg := "ignoring GitHub PR event - the PR is a draft"
+		msg := "ignoring GitHub event - the PR is a draft"
 		workflow.GetLogger(ctx).Debug(msg, "action", action, "url", pr.HTMLURL)
 		return
 	}
@@ -83,7 +83,7 @@ func (g GitHub) prClosed(ctx workflow.Context, action string, pr PullRequest, se
 func (g GitHub) prReopened(ctx workflow.Context, action string, pr PullRequest, sender User) {
 	// Ignore drafts - they don't have an active Slack channel anyway.
 	if pr.Draft {
-		msg := "ignoring GitHub PR event - the PR is a draft"
+		msg := "ignoring GitHub event - the PR is a draft"
 		workflow.GetLogger(ctx).Debug(msg, "action", action, "url", pr.HTMLURL)
 		return
 	}
@@ -221,10 +221,10 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 
 	switch {
 	case pr.Draft:
-		l.Debug("ignoring GitHub PR event - the PR is a draft", "action", action, "url", pr.HTMLURL)
+		l.Debug("ignoring GitHub event - the PR is a draft", "action", action, "url", pr.HTMLURL)
 		return "", false
 	case pr.State != "open":
-		l.Debug("ignoring GitHub PR event - PR isn't open", "action", action, "url", pr.HTMLURL)
+		l.Debug("ignoring GitHub event - the PR isn't open", "action", action, "url", pr.HTMLURL)
 		return "", false
 	}
 

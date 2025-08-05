@@ -1,23 +1,12 @@
-package revchat
+package slack
 
 import (
 	"testing"
 
-	"github.com/urfave/cli/v3"
-
 	"github.com/tzrikka/revchat/pkg/config"
 )
 
-func TestSlackNormalizeChannelName(t *testing.T) {
-	s := Slack{cmd: &cli.Command{
-		Flags: []cli.Flag{
-			&cli.IntFlag{
-				Name:  "slack-max-channel-name-length",
-				Value: config.DefaultMaxChannelNameLength,
-			},
-		},
-	}}
-
+func TestNormalizeChannelName(t *testing.T) {
 	tests := []struct {
 		name string
 		s    string
@@ -70,8 +59,9 @@ func TestSlackNormalizeChannelName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := s.normalizeChannelName(tt.s); got != tt.want {
-				t.Errorf("normalizeChannelName() = %q, want %q", got, tt.want)
+			maxLen := config.DefaultMaxChannelNameLength
+			if got := NormalizeChannelName(tt.s, maxLen); got != tt.want {
+				t.Errorf("NormalizeChannelName() = %q, want %q", got, tt.want)
 			}
 		})
 	}

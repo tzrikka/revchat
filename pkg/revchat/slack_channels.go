@@ -2,12 +2,13 @@ package revchat
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/pkg/slack"
 )
 
 func (s Slack) ArchiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
@@ -49,7 +50,7 @@ func (s Slack) ArchiveChannelWorkflow(ctx workflow.Context, event PullRequestEve
 }
 
 func (s Slack) CreateChannelWorkflow(ctx workflow.Context, pr PullRequest) (*string, error) {
-	title := s.normalizeChannelName(pr.Title)
+	title := slack.NormalizeChannelName(pr.Title, s.cmd.Int("slack-max-channel-name-length"))
 	l := workflow.GetLogger(ctx)
 
 	for i := 1; i < 10; i++ {
@@ -94,32 +95,4 @@ func (s Slack) CreateChannelWorkflow(ctx workflow.Context, pr PullRequest) (*str
 	msg := "too many failed attempts to create Slack channel for GitHub PR"
 	l.Error(msg, "url", pr.HTMLURL)
 	return nil, temporal.NewNonRetryableApplicationError(msg, "error", nil, pr.HTMLURL)
-}
-
-// normalizeChannelName transforms arbitrary text into a valid Slack channel name.
-// Based on: https://docs.slack.dev/reference/methods/conversations.create#naming.
-func (s Slack) normalizeChannelName(name string) string {
-	if name == "" {
-		return name
-	}
-
-	name = regexp.MustCompile(`\[[\w -]*\]`).ReplaceAllString(name, "") // Remove annotations.
-
-	name = strings.ToLower(name)
-	name = strings.TrimSpace(name)
-	name = regexp.MustCompile("['`]").ReplaceAllString(name, "")          // Remove apostrophes.
-	name = regexp.MustCompile(`[^a-z0-9_-]+`).ReplaceAllString(name, "-") // Replace invalid characters.
-	name = regexp.MustCompile(`[_-]{2,}`).ReplaceAllString(name, "-")     // Minimize "-" separators.
-
-	name = strings.TrimPrefix(name, "-")
-	name = strings.TrimPrefix(name, "_")
-
-	if maxLen := s.cmd.Int("slack-max-channel-name-length"); len(name) > maxLen {
-		name = name[:maxLen]
-	}
-
-	name = strings.TrimSuffix(name, "-")
-	name = strings.TrimSuffix(name, "_")
-
-	return name
 }
