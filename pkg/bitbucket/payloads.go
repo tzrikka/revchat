@@ -122,7 +122,7 @@ type PullRequest struct {
 	Reason       string        `json:"reason"`
 
 	CloseSourceBranch bool    `json:"close_source_branch"`
-	MergeCommit       *string `json:"merge_commit"`
+	MergeCommit       *Commit `json:"merge_commit"`
 
 	Links map[string]Link `json:"links"`
 }

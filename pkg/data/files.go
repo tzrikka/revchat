@@ -73,3 +73,15 @@ func ConvertURLToChannel(url string) (string, error) {
 	}
 	return m[url], nil
 }
+
+func RemoveURLToChannelMapping(url string) error {
+	path := dataPath(urlsFileName)
+
+	m, err := readJSON(path)
+	if err != nil {
+		return err
+	}
+
+	delete(m, url)
+	return writeSON(path, m)
+}
