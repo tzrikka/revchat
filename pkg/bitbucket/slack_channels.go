@@ -22,6 +22,9 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
+	url := event.PullRequest.Links["html"].HRef
+	data.RemoveURLToChannelMapping(url)
+
 	state := "closed this PR"
 	switch event.Type {
 	case "pullrequest.fulfilled":
@@ -38,7 +41,6 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 	if err := a.Get(ctx, nil); err != nil {
 		l := workflow.GetLogger(ctx)
 		msg := "failed to archive Slack channel"
-		url := event.PullRequest.Links["html"].HRef
 		l.Error(msg, "error", err.Error(), "event_type", event.Type, "channel", channel, "url", url)
 
 		state = strings.Replace(state, " this PR", "", 1)
@@ -57,12 +59,7 @@ func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEv
 
 	channel, err := b.createChannel(ctx, event.PullRequest)
 	if err != nil {
-		user := event.Actor.AccountID
-
-		msg := "Failed to create Slack channel for " + url
-		req := slack.ChatPostMessageRequest{Channel: user, MarkdownText: msg}
-		b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
-
+		b.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
 		return err
 	}
 
@@ -129,6 +126,31 @@ func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, 
 	msg := "too many failed attempts to create Slack channel"
 	l.Error(msg, "url", url)
 	return "", errors.New(msg)
+}
+
+func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, id, url string) {
+	l := workflow.GetLogger(ctx)
+
+	email, err := data.BitbucketUserEmailByID(id)
+	if err != nil {
+		l.Error("failed to read Bitbucket user email", "error", err.Error())
+		return
+	}
+
+	// Don't send a DM to the user if they're opted-out.
+	if email == "" {
+		return
+	}
+
+	user, err := data.SlackUserIDByEmail(email)
+	if err != nil {
+		l.Error("failed to read Slack user ID", "error", err.Error())
+		return
+	}
+
+	msg := "Failed to create Slack channel for " + url
+	req := slack.ChatPostMessageRequest{Channel: user, MarkdownText: msg}
+	b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 }
 
 func (b Bitbucket) setChannelTopic(ctx workflow.Context, channel, url string) {
