@@ -8,6 +8,7 @@ const (
 	ConversationsSetPurposeActivity = "slack.conversations.setPurpose"
 	ConversationsSetTopicActivity   = "slack.conversations.setTopic"
 	ConversationsUnarchiveActivity  = "slack.conversations.unarchive"
+	UsersLookupByEmailActivity      = "slack.users.lookupByEmail"
 )
 
 // https://docs.slack.dev/reference/methods/chat.postMessage
@@ -100,6 +101,18 @@ type ConversationsUnarchiveRequest struct {
 // https://docs.slack.dev/reference/methods/conversations.unarchive
 type ConversationsUnarchiveResponse struct {
 	slackResponse
+}
+
+// https://docs.slack.dev/reference/methods/users.lookupByEmail
+type UsersLookupByEmailRequest struct {
+	Email string `json:"email"`
+}
+
+// https://docs.slack.dev/reference/methods/users.lookupByEmail
+type UsersLookupByEmailResponse struct {
+	slackResponse
+
+	User map[string]any `json:"user,omitempty"`
 }
 
 type slackResponse struct {

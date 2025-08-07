@@ -144,8 +144,8 @@ func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, id, url str
 	}
 
 	user, err := data.SlackUserIDByEmail(email)
-	if err != nil {
-		l.Error("failed to read Slack user ID", "error", err)
+	if err != nil || user == "" {
+		l.Error("failed to read Slack user ID", "error", err, "email", email)
 		return
 	}
 

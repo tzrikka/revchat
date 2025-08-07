@@ -117,7 +117,7 @@ func userIDByEmail(prefix, email string) (string, error) {
 		return "", err
 	}
 
-	return m["email"][fmt.Sprintf("%s/%s", prefix, email)], nil
+	return m["emails"][fmt.Sprintf("%s/%s", prefix, email)], nil
 }
 
 func removeUser(prefix, email string) error {
