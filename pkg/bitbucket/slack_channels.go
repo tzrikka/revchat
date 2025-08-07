@@ -9,6 +9,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
 )
 
@@ -41,7 +42,7 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 	if err := a.Get(ctx, nil); err != nil {
 		l := workflow.GetLogger(ctx)
 		msg := "failed to archive Slack channel"
-		l.Error(msg, "error", err.Error(), "event_type", event.Type, "channel", channel, "url", url)
+		l.Error(msg, "error", err, "event_type", event.Type, "channel", channel, "url", url)
 
 		state = strings.Replace(state, " this PR", "", 1)
 		msg = "Failed to archive this channel, even though its PR was " + state
@@ -72,7 +73,7 @@ func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEv
 	l := workflow.GetLogger(ctx)
 	if err := data.MapURLToChannel(url, channel); err != nil {
 		msg := "failed to map PR to Slack channel"
-		l.Error(msg, "error", err.Error(), "channel", channel, "url", url)
+		l.Error(msg, "error", err, "channel", channel, "url", url)
 		return err
 	}
 
@@ -97,7 +98,7 @@ func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, 
 		if err := a.Get(ctx, resp); err != nil {
 			msg := "failed to create Slack channel"
 			if !strings.Contains(err.Error(), "name_taken") {
-				l.Error(msg, "error", err.Error(), "name", name, "url", url)
+				l.Error(msg, "error", err, "name", name, "url", url)
 				return "", err
 			}
 
@@ -133,7 +134,7 @@ func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, id, url str
 
 	email, err := data.BitbucketUserEmailByID(id)
 	if err != nil {
-		l.Error("failed to read Bitbucket user email", "error", err.Error())
+		l.Error("failed to read Bitbucket user email", "error", err)
 		return
 	}
 
@@ -144,7 +145,7 @@ func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, id, url str
 
 	user, err := data.SlackUserIDByEmail(email)
 	if err != nil {
-		l.Error("failed to read Slack user ID", "error", err.Error())
+		l.Error("failed to read Slack user ID", "error", err)
 		return
 	}
 
@@ -164,7 +165,7 @@ func (b Bitbucket) setChannelTopic(ctx workflow.Context, channel, url string) {
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel topic"
-		workflow.GetLogger(ctx).Error(msg, "error", err.Error(), "channel", channel, "url", url)
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel", channel, "url", url)
 	}
 }
 
@@ -179,7 +180,7 @@ func (b Bitbucket) setChannelDescription(ctx workflow.Context, channel, title, u
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel description"
-		workflow.GetLogger(ctx).Error(msg, "error", err.Error(), "channel", channel, "url", url)
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel", channel, "url", url)
 	}
 }
 
@@ -191,7 +192,7 @@ func (b Bitbucket) postIntroMessage(ctx workflow.Context, channel, eventType str
 
 	msg := fmt.Sprintf("%%s %s %s: `%s`", action, pr.Links["html"].HRef, pr.Title)
 	if strings.TrimSpace(pr.Description) != "" {
-		msg += "\n\n"
+		msg += "\n\n" + markdown.BitbucketToSlack(pr.Description)
 	}
 
 	_, _ = b.mentionUserInMessage(ctx, channel, actor, msg)
