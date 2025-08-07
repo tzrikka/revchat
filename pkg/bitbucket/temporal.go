@@ -13,7 +13,7 @@ type Bitbucket struct {
 	cmd *cli.Command
 }
 
-func RegisterBitbucketWorkflows(w worker.Worker, cmd *cli.Command) {
+func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
 	b := Bitbucket{cmd: cmd}
 	w.RegisterWorkflowWithOptions(b.eventsWorkflow, workflow.RegisterOptions{Name: "bitbucket.events"})
 	w.RegisterWorkflowWithOptions(b.archiveChannelWorkflow, workflow.RegisterOptions{Name: "bitbucket.archiveChannel"})

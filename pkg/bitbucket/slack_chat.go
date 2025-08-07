@@ -17,7 +17,7 @@ func (b Bitbucket) mentionUserInMessage(ctx workflow.Context, channel string, us
 	resp := slack.ChatPostMessageResponse{}
 	if err := a.Get(ctx, &resp); err != nil {
 		msg := "failed to post Slack message"
-		workflow.GetLogger(ctx).Error(msg, "error", err.Error(), "channel", channel)
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel", channel)
 		return "", err
 	}
 

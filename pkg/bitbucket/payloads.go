@@ -149,7 +149,7 @@ type Repository struct {
 	UUID     string `json:"uuid"`
 
 	SCM       string  `json:"scm"`
-	IsPrivate string  `json:"is_private"`
+	IsPrivate bool    `json:"is_private"`
 	Website   *string `json:"website"`
 
 	Workspace Workspace `json:"workspace"`

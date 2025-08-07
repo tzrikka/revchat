@@ -86,7 +86,7 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 	channel, err := data.ConvertURLToChannel(url)
 	if err != nil {
 		msg := "failed to retrieve Bitbucket PR's Slack channel ID"
-		l.Error(msg, "error", err.Error(), "event_type", eventType, "url", url)
+		l.Error(msg, "error", err, "event_type", eventType, "url", url)
 		return "", false
 	}
 

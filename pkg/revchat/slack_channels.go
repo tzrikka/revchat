@@ -37,7 +37,7 @@ func (s Slack) ArchiveChannelWorkflow(ctx workflow.Context, event PullRequestEve
 	if err := a.Get(ctx, nil); err != nil {
 		l := workflow.GetLogger(ctx)
 		msg := "failed to archive Slack channel"
-		l.Error(msg, "error", err.Error(), "action", event.Action, "channel", channel, "url", event.PullRequest.HTMLURL)
+		l.Error(msg, "error", err, "action", event.Action, "channel", channel, "url", event.PullRequest.HTMLURL)
 
 		state = strings.Replace(state, " this PR", "", 1)
 		msg = fmt.Sprintf("Failed to archive this channel, even though its PR was %s: %s", state, err.Error())
@@ -66,7 +66,7 @@ func (s Slack) CreateChannelWorkflow(ctx workflow.Context, pr PullRequest) (*str
 		if err := a.Get(ctx, resp); err != nil {
 			msg := "failed to create Slack channel"
 			if !strings.Contains(err.Error(), "name_taken") {
-				l.Error(msg, "error", err.Error(), "name", name, "url", pr.HTMLURL)
+				l.Error(msg, "error", err, "name", name, "url", pr.HTMLURL)
 				return nil, temporal.NewNonRetryableApplicationError(msg, fmt.Sprintf("%T", err), err)
 			}
 

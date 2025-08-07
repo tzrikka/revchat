@@ -9,6 +9,7 @@ import (
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
+	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/revchat"
 )
 
@@ -28,6 +29,7 @@ func Run(l zerolog.Logger, cmd *cli.Command) error {
 	defer c.Close()
 
 	w := worker.New(c, cmd.String("temporal-task-queue-revchat"), worker.Options{})
+	bitbucket.RegisterWorkflows(w, cmd)
 	revchat.RegisterGitHubWorkflows(w, cmd)
 	revchat.RegisterSlackWorkflows(w, cmd)
 
