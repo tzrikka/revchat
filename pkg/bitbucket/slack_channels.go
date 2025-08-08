@@ -14,7 +14,7 @@ import (
 )
 
 func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	channel, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil // If we're not tracking the PR, there's no channel to archive.
 	}
@@ -34,19 +34,19 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 		state = "converted this PR to a draft"
 	}
 
-	_, _ = b.mentionUserInMessage(ctx, channel, event.Actor, "%s "+state)
+	_, _ = b.mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
-	req := slack.ConversationsArchiveRequest{Channel: channel}
+	req := slack.ConversationsArchiveRequest{Channel: channelID}
 	a := b.executeTimpaniActivity(ctx, slack.ConversationsArchiveActivity, req)
 
 	if err := a.Get(ctx, nil); err != nil {
 		l := workflow.GetLogger(ctx)
 		msg := "failed to archive Slack channel"
-		l.Error(msg, "error", err, "event_type", event.Type, "channel", channel, "url", url)
+		l.Error(msg, "error", err, "event_type", event.Type, "channel_id", channelID, "pr_url", url)
 
 		state = strings.Replace(state, " this PR", "", 1)
 		msg = "Failed to archive this channel, even though its PR was " + state
-		req := slack.ChatPostMessageRequest{Channel: channel, MarkdownText: msg}
+		req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
 		b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 
 		return err
@@ -58,22 +58,22 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	url := event.PullRequest.Links["html"].HRef
 
-	channel, err := b.createChannel(ctx, event.PullRequest)
+	channelID, err := b.createChannel(ctx, event.PullRequest)
 	if err != nil {
 		b.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
 		return err
 	}
 
 	// Channel cosmetics.
-	b.setChannelTopic(ctx, channel, url)
-	b.setChannelDescription(ctx, channel, event.PullRequest.Title, url)
-	b.postIntroMessage(ctx, channel, event.Type, event.PullRequest, event.Actor)
+	b.setChannelTopic(ctx, channelID, url)
+	b.setChannelDescription(ctx, channelID, event.PullRequest.Title, url)
+	b.postIntroMessage(ctx, channelID, event.Type, event.PullRequest, event.Actor)
 
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
-	if err := data.MapURLToChannel(url, channel); err != nil {
+	if err := data.MapURLToChannel(url, channelID); err != nil {
 		msg := "failed to map PR to Slack channel"
-		l.Error(msg, "error", err, "channel", channel, "url", url)
+		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
 		return err
 	}
 
@@ -98,7 +98,7 @@ func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, 
 		if err := a.Get(ctx, resp); err != nil {
 			msg := "failed to create Slack channel"
 			if !strings.Contains(err.Error(), "name_taken") {
-				l.Error(msg, "error", err, "name", name, "url", url)
+				l.Error(msg, "error", err, "name", name, "pr_url", url)
 				return "", err
 			}
 
@@ -106,33 +106,33 @@ func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, 
 			continue // Retry with a different name.
 		}
 
-		channel, ok := resp.Channel["id"]
+		channelID, ok := resp.Channel["id"]
 		if !ok {
 			msg := "created Slack channel without ID"
 			l.Error(msg, "resp", resp)
 			return "", errors.New(msg)
 		}
 
-		id, ok := channel.(string)
+		id, ok := channelID.(string)
 		if !ok || len(id) == 0 {
 			msg := "created Slack channel with invalid ID"
 			l.Error(msg, "resp", resp)
 			return "", errors.New(msg)
 		}
 
-		l.Info("created Slack channel", "channel_id", id, "channel_name", name, "url", url)
+		l.Info("created Slack channel", "channel_id", id, "channel_name", name, "pr_url", url)
 		return id, nil
 	}
 
 	msg := "too many failed attempts to create Slack channel"
-	l.Error(msg, "url", url)
+	l.Error(msg, "pr_url", url)
 	return "", errors.New(msg)
 }
 
-func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, id, url string) {
+func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
 	l := workflow.GetLogger(ctx)
 
-	email, err := data.BitbucketUserEmailByID(id)
+	email, err := data.BitbucketUserEmailByID(accountID)
 	if err != nil {
 		l.Error("failed to read Bitbucket user email", "error", err)
 		return
@@ -154,37 +154,37 @@ func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, id, url str
 	b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 }
 
-func (b Bitbucket) setChannelTopic(ctx workflow.Context, channel, url string) {
+func (b Bitbucket) setChannelTopic(ctx workflow.Context, channelID, url string) {
 	t := url
 	if len(t) > slack.MaxMetadataLen {
 		t = t[:slack.MaxMetadataLen-4] + " ..."
 	}
 
-	req := slack.ConversationsSetTopicRequest{Channel: channel, Topic: t}
+	req := slack.ConversationsSetTopicRequest{Channel: channelID, Topic: t}
 	a := b.executeTimpaniActivity(ctx, slack.ConversationsSetTopicActivity, req)
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel topic"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel", channel, "url", url)
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
 	}
 }
 
-func (b Bitbucket) setChannelDescription(ctx workflow.Context, channel, title, url string) {
+func (b Bitbucket) setChannelDescription(ctx workflow.Context, channelID, title, url string) {
 	t := fmt.Sprintf("`%s`", title)
 	if len(t) > slack.MaxMetadataLen {
 		t = t[:slack.MaxMetadataLen-4] + "`..."
 	}
 
-	req := slack.ConversationsSetPurposeRequest{Channel: channel, Purpose: t}
+	req := slack.ConversationsSetPurposeRequest{Channel: channelID, Purpose: t}
 	a := b.executeTimpaniActivity(ctx, slack.ConversationsSetPurposeActivity, req)
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel description"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel", channel, "url", url)
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
 	}
 }
 
-func (b Bitbucket) postIntroMessage(ctx workflow.Context, channel, eventType string, pr PullRequest, actor Account) {
+func (b Bitbucket) postIntroMessage(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
 	action := "created"
 	if eventType == "pullrequest.updated" {
 		action = "marked as ready for review"
@@ -195,5 +195,5 @@ func (b Bitbucket) postIntroMessage(ctx workflow.Context, channel, eventType str
 		msg += "\n\n" + markdown.BitbucketToSlack(pr.Description)
 	}
 
-	_, _ = b.mentionUserInMessage(ctx, channel, actor, msg)
+	_, _ = b.mentionUserInMsg(ctx, channelID, actor, msg)
 }

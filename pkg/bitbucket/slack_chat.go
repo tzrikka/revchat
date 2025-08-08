@@ -9,16 +9,16 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack"
 )
 
-func (b Bitbucket) mentionUserInMessage(ctx workflow.Context, channel string, user Account, msg string) (string, error) {
+func (b Bitbucket) mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) (string, error) {
 	msg = fmt.Sprintf(msg, b.slackUserRef(ctx, user))
 
-	req := slack.ChatPostMessageRequest{Channel: channel, MarkdownText: msg}
+	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
 	a := b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 
 	resp := slack.ChatPostMessageResponse{}
 	if err := a.Get(ctx, &resp); err != nil {
 		msg := "failed to post Slack message"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel", channel)
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID)
 		return "", err
 	}
 
@@ -34,6 +34,7 @@ func (b Bitbucket) slackUserRef(ctx workflow.Context, user Account) string {
 		return user.DisplayName
 	}
 
+	// Opted-out user: use their name, not a Slack user mention.
 	if email == "" {
 		return user.DisplayName
 	}

@@ -42,7 +42,7 @@ func (b Bitbucket) prCreated(ctx workflow.Context, eventType string, pr PullRequ
 	// Ignore drafts until they're marked as ready for review.
 	if pr.Draft {
 		msg := "ignoring Bitbucket event - the PR is a draft"
-		workflow.GetLogger(ctx).Debug(msg, "event_type", eventType, "url", pr.Links["html"].HRef)
+		workflow.GetLogger(ctx).Debug(msg, "event_type", eventType, "pr_url", pr.Links["html"].HRef)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (b Bitbucket) prClosed(ctx workflow.Context, eventType string, pr PullReque
 	// Ignore drafts - they don't have an active Slack channel anyway.
 	if pr.Draft {
 		msg := "ignoring Bitbucket event - the PR is a draft"
-		workflow.GetLogger(ctx).Debug(msg, "event_type", eventType, "url", pr.Links["html"].HRef)
+		workflow.GetLogger(ctx).Debug(msg, "event_type", eventType, "pr_url", pr.Links["html"].HRef)
 		return
 	}
 
@@ -79,22 +79,22 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 	url := pr.Links["html"].HRef
 
 	if pr.Draft {
-		l.Debug("ignoring Bitbucket event - the PR is a draft", "event_type", eventType, "url", url)
+		l.Debug("ignoring Bitbucket event - the PR is a draft", "event_type", eventType, "pr_url", url)
 		return "", false
 	}
 
-	channel, err := data.ConvertURLToChannel(url)
+	channelID, err := data.ConvertURLToChannel(url)
 	if err != nil {
 		msg := "failed to retrieve Bitbucket PR's Slack channel ID"
-		l.Error(msg, "error", err, "event_type", eventType, "url", url)
+		l.Error(msg, "error", err, "event_type", eventType, "pr_url", url)
 		return "", false
 	}
 
-	if channel == "" {
+	if channelID == "" {
 		msg := "Bitbucket PR's Slack channel ID is empty"
-		l.Debug(msg, "event_type", eventType, "url", url)
+		l.Debug(msg, "event_type", eventType, "pr_url", url)
 		return "", false
 	}
 
-	return channel, true
+	return channelID, true
 }
