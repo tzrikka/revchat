@@ -1,5 +1,7 @@
 # Bitbucket
 
+Detailed instructions: https://github.com/tzrikka/thrippy/tree/main/docs/atlassian/bitbucket/README.md
+
 ## OAuth Consumer Permissions
 
 - Account: read
@@ -24,7 +26,19 @@
   - Comment resolved
   - Comment reopened
 
-## Issues
+## Thrippy Link
+
+Example - using a Bitbucket workspace's OAuth consumer:
+
+```shell
+$ thrippy create-link --template bitbucket-app-oauth --client-id "..." --client-secret "..."
+New link ID: <Thrippy link ID>
+
+$ thrippy start-oauth <Thrippy link ID>
+Opening a browser with this URL: http://localhost:14470/start?id=<Thrippy link ID>
+```
+
+## Known Limitations
 
 Bitbucket has the following issues, which affect RevChat:
 
