@@ -23,8 +23,13 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
+	l := workflow.GetLogger(ctx)
 	url := event.PullRequest.Links["html"].HRef
-	data.RemoveURLToChannelMapping(url)
+	if err := data.RemoveURLToChannelMapping(url); err != nil {
+		msg := "failed to remove PR URL / Slack channel mapping"
+		l.Error(msg, "error", err, "event_type", event.Type, "channel_id", channelID, "pr_url", url)
+		// Ignore this error, don't abort.
+	}
 
 	state := "closed this PR"
 	switch event.Type {
@@ -40,7 +45,6 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 	a := b.executeTimpaniActivity(ctx, slack.ConversationsArchiveActivity, req)
 
 	if err := a.Get(ctx, nil); err != nil {
-		l := workflow.GetLogger(ctx)
 		msg := "failed to archive Slack channel"
 		l.Error(msg, "error", err, "event_type", event.Type, "channel_id", channelID, "pr_url", url)
 

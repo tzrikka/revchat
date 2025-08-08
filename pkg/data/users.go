@@ -92,6 +92,12 @@ func addUser(prefix, id, email string) error {
 		return err
 	}
 
+	if ids := m["ids"]; ids == nil {
+		m["ids"] = map[string]string{}
+	}
+	if ids := m["emails"]; ids == nil {
+		m["emails"] = map[string]string{}
+	}
 	m["ids"][fmt.Sprintf("%s/%s", prefix, id)] = email
 	m["emails"][fmt.Sprintf("%s/%s", prefix, email)] = id
 
