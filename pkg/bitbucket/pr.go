@@ -13,17 +13,12 @@ func (b Bitbucket) handlePullRequestEvent(ctx workflow.Context, event PullReques
 	case "pullrequest.updated":
 		b.prUpdated(ctx, event)
 
-	case "pullrequest.approved":
-		b.prApproved(ctx, event)
-	case "pullrequest.unapproved": // A.k.a. approval removed.
-		b.prUnapproved(ctx, event)
+	case "pullrequest.approved", "pullrequest.unapproved":
+		b.prReviewed(ctx, event.Type, event.PullRequest, event.Actor)
+	case "pullrequest.changes_request_created", "pullrequest.changes_request_removed":
+		b.prReviewed(ctx, event.Type, event.PullRequest, event.Actor)
 
-	case "pullrequest.changes_request_created":
-	case "pullrequest.changes_request_removed":
-
-	case "pullrequest.fulfilled": // A.k.a. merged.
-		b.prClosed(ctx, event.Type, event.PullRequest, event.Actor)
-	case "pullrequest.rejected": // A.k.a. declined.
+	case "pullrequest.fulfilled", "pullrequest.rejected":
 		b.prClosed(ctx, event.Type, event.PullRequest, event.Actor)
 
 	case "pullrequest.comment_created":
@@ -31,6 +26,8 @@ func (b Bitbucket) handlePullRequestEvent(ctx workflow.Context, event PullReques
 	case "pullrequest.comment_deleted":
 	case "pullrequest.comment_resolved":
 	case "pullrequest.comment_reopened":
+
+	case "repo.commit_comment_created":
 
 	default:
 		workflow.GetLogger(ctx).Error("unrecognized Bitbucket PR event type", "event_type", event.Type)
@@ -53,10 +50,27 @@ func (b Bitbucket) prCreated(ctx workflow.Context, eventType string, pr PullRequ
 func (b Bitbucket) prUpdated(ctx workflow.Context, event PullRequestEvent) {
 }
 
-func (b Bitbucket) prApproved(ctx workflow.Context, event PullRequestEvent) {
-}
+func (b Bitbucket) prReviewed(ctx workflow.Context, eventType string, pr PullRequest, actor Account) {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	channelID, found := lookupChannel(ctx, eventType, pr)
+	if !found {
+		return
+	}
 
-func (b Bitbucket) prUnapproved(ctx workflow.Context, event PullRequestEvent) {
+	msg := "%s "
+	switch eventType {
+	case "pullrequest.approved":
+		msg += "approved this PR :+1:"
+	case "pullrequest.unapproved":
+		msg += "unapproved this PR :-1:"
+	case "pullrequest.changes_request_created":
+		msg += "requested changes in this PR :warning:"
+	}
+	// Not useful?
+	// case "pullrequest.changes_request_removed":
+	// 	   msg += "unrequested changes in this PR"
+
+	_, _ = b.mentionUserInMsg(ctx, channelID, actor, msg)
 }
 
 // A PR was closed, i.e. merged or rejected (possibly a draft).

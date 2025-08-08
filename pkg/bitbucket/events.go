@@ -15,16 +15,19 @@ var Signals = []string{
 	"bitbucket.events.pullrequest.created",
 	"bitbucket.events.pullrequest.updated",
 	"bitbucket.events.pullrequest.approved",
-	"bitbucket.events.pullrequest.unapproved", // A.k.a. approval removed.
+	"bitbucket.events.pullrequest.unapproved",
 	"bitbucket.events.pullrequest.changes_request_created",
 	"bitbucket.events.pullrequest.changes_request_removed",
-	"bitbucket.events.pullrequest.fulfilled", // A.k.a. merged.
-	"bitbucket.events.pullrequest.rejected",  // A.k.a. declined.
+	"bitbucket.events.pullrequest.fulfilled", // a.k.a. merged.
+	"bitbucket.events.pullrequest.rejected",  // a.k.a. declined.
+
 	"bitbucket.events.pullrequest.comment_created",
 	"bitbucket.events.pullrequest.comment_updated",
 	"bitbucket.events.pullrequest.comment_deleted",
 	"bitbucket.events.pullrequest.comment_resolved",
 	"bitbucket.events.pullrequest.comment_reopened",
+
+	"bitbucket.events.repo.commit_comment_created",
 }
 
 // eventsWorkflow is an always-running Temporal workflow that handles
