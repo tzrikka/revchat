@@ -30,7 +30,7 @@ var Signals = []string{
 // eventsWorkflow is an always-running Temporal workflow that handles
 // all types of PR events, which are received as signals from Timpani.
 func (b Bitbucket) eventsWorkflow(ctx workflow.Context) error {
-	ch, err := temporal.GetSignalChannels(ctx, Signals)
+	chs, err := temporal.GetSignalChannels(ctx, Signals)
 	if err != nil {
 		return err
 	}
@@ -39,19 +39,21 @@ func (b Bitbucket) eventsWorkflow(ctx workflow.Context) error {
 	l := workflow.GetLogger(ctx)
 	more := true
 
-	selector.AddReceive(ch[0], func(c workflow.ReceiveChannel, _ bool) {
-		e := PullRequestEvent{}
-		more = c.Receive(ctx, &e)
+	for _, ch := range chs {
+		selector.AddReceive(ch, func(c workflow.ReceiveChannel, _ bool) {
+			e := PullRequestEvent{}
+			more = c.Receive(ctx, &e)
 
-		var found bool
-		signal := ch[0].Name()
-		if _, e.Type, found = strings.Cut(signal, "events."); !found {
-			e.Type = signal
-		}
+			var found bool
+			signal := ch.Name()
+			if _, e.Type, found = strings.Cut(signal, "events."); !found {
+				e.Type = signal
+			}
 
-		l.Debug("received signal", "signal", signal)
-		b.handlePullRequestEvent(ctx, e)
-	})
+			l.Debug("received signal", "signal", signal)
+			b.handlePullRequestEvent(ctx, e)
+		})
+	}
 
 	for more {
 		selector.Select(ctx)
