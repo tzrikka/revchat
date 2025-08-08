@@ -14,9 +14,10 @@ import (
 )
 
 func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	// If we're not tracking this PR, there's no channel to archive.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
-		return nil // If we're not tracking the PR, there's no channel to archive.
+		return nil
 	}
 
 	// Wait for a few seconds to handle other asynchronous events

@@ -25,6 +25,8 @@ Detailed instructions: https://github.com/tzrikka/thrippy/tree/main/docs/atlassi
   - Comment deleted
   - Comment resolved
   - Comment reopened
+- Repo
+  - Commit comment created
 
 ## Thrippy Link
 
