@@ -4,7 +4,7 @@ import "testing"
 
 func TestUsers(t *testing.T) {
 	d := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", d)
+	t.Setenv("XDG_DATA_HOME", d)
 
 	id := "user_id"
 	email := "email@example.com"
