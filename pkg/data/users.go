@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	usersFileName = "users.json"
+	usersFile = "users.json"
 
 	bitbucketPrefix = "bitbucket"
 	githubPrefix    = "github"
@@ -85,7 +85,7 @@ func RemoveSlackUser(email string) error {
 }
 
 func addUser(prefix, id, email string) error {
-	path := dataPath(usersFileName)
+	path := dataPath(usersFile)
 
 	m, err := readJSONMaps(path)
 	if err != nil {
@@ -105,7 +105,7 @@ func addUser(prefix, id, email string) error {
 }
 
 func userEmailByID(prefix, id string) (string, error) {
-	path := dataPath(usersFileName)
+	path := dataPath(usersFile)
 
 	m, err := readJSONMaps(path)
 	if err != nil {
@@ -116,7 +116,7 @@ func userEmailByID(prefix, id string) (string, error) {
 }
 
 func userIDByEmail(prefix, email string) (string, error) {
-	path := dataPath(usersFileName)
+	path := dataPath(usersFile)
 
 	m, err := readJSONMaps(path)
 	if err != nil {
@@ -127,7 +127,7 @@ func userIDByEmail(prefix, email string) (string, error) {
 }
 
 func removeUser(prefix, email string) error {
-	path := dataPath(usersFileName)
+	path := dataPath(usersFile)
 
 	m, err := readJSONMaps(path)
 	if err != nil {

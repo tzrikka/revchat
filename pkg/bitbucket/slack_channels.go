@@ -102,7 +102,7 @@ func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEv
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
 	if err := data.MapURLToChannel(url, channelID); err != nil {
-		msg := "failed to map PR to Slack channel"
+		msg := "failed to save PR URL / Slack channel mapping"
 		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
 		return err
 	}
@@ -164,23 +164,28 @@ func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, accountID, 
 
 	email, err := data.BitbucketUserEmailByID(accountID)
 	if err != nil {
-		l.Error("failed to read Bitbucket user email", "error", err)
+		l.Error("failed to load Bitbucket user email", "error", err, "account_id", accountID)
 		return
 	}
 
 	// Don't send a DM to the user if they're opted-out.
-	if email == "" {
+	optedIn, err := data.IsOptedIn(email)
+	if err != nil {
+		l.Error("failed to load user opt-in status", "error", err, "email", email)
+		return
+	}
+	if !optedIn {
 		return
 	}
 
-	user, err := data.SlackUserIDByEmail(email)
-	if err != nil || user == "" {
-		l.Error("failed to read Slack user ID", "error", err, "email", email)
+	userID, err := data.SlackUserIDByEmail(email)
+	if err != nil || userID == "" {
+		l.Error("failed to load Slack user ID", "error", err, "email", email)
 		return
 	}
 
 	msg := "Failed to create Slack channel for " + url
-	req := slack.ChatPostMessageRequest{Channel: user, MarkdownText: msg}
+	req := slack.ChatPostMessageRequest{Channel: userID, MarkdownText: msg}
 	b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 }
 
