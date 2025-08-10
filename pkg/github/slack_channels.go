@@ -1,4 +1,4 @@
-package bitbucket
+package github
 
 import (
 	"errors"
@@ -13,9 +13,9 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack"
 )
 
-func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func (g GitHub) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
-	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	channelID, found := lookupChannel(ctx, event.Action, event.PullRequest)
 	if !found {
 		return nil
 	}
@@ -25,34 +25,34 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
 	l := workflow.GetLogger(ctx)
-	url := event.PullRequest.Links["html"].HRef
+	url := event.PullRequest.HTMLURL
 	if err := data.RemoveURLToChannelMapping(url); err != nil {
 		msg := "failed to remove PR URL / Slack channel mapping"
-		l.Error(msg, "error", err, "event_type", event.Type, "channel_id", channelID, "pr_url", url)
+		l.Error(msg, "error", err, "action", event.Action, "channel_id", channelID, "pr_url", url)
 		// Ignore this error, don't abort.
 	}
 
-	state := "closed this PR"
-	switch event.Type {
-	case "pullrequest.fulfilled":
+	state := event.Action + " this PR"
+	if event.Action == "closed" && event.PullRequest.Merged {
 		state = "merged this PR"
-	case "pullrequest.updated":
+	}
+	if event.Action == "converted_to_draft" {
 		state = "converted this PR to a draft"
 	}
 
-	_, _ = b.mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
+	_, _ = g.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+state)
 
 	req := slack.ConversationsArchiveRequest{Channel: channelID}
-	a := b.executeTimpaniActivity(ctx, slack.ConversationsArchiveActivity, req)
+	a := g.executeTimpaniActivity(ctx, slack.ConversationsArchiveActivity, req)
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to archive Slack channel"
-		l.Error(msg, "error", err, "event_type", event.Type, "channel_id", channelID, "pr_url", url)
+		l.Error(msg, "error", err, "action", event.Action, "channel_id", channelID, "pr_url", url)
 
 		state = strings.Replace(state, " this PR", "", 1)
 		msg = "Failed to archive this channel, even though its PR was " + state
 		req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
-		b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
+		g.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 
 		return err
 	}
@@ -62,73 +62,72 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 
 // lookupChannel returns the ID of a channel associated
 // with a PR, if the PR is active and the channel is found.
-func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (string, bool) {
+func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string, bool) {
 	l := workflow.GetLogger(ctx)
-	url := pr.Links["html"].HRef
 
 	if pr.Draft {
-		l.Debug("ignoring Bitbucket event - the PR is a draft", "event_type", eventType, "pr_url", url)
+		l.Debug("ignoring GitHub event - the PR is a draft", "action", action, "pr_url", pr.HTMLURL)
 		return "", false
 	}
+	// case pr.State != "open":
+	// 	l.Debug("ignoring GitHub event - the PR isn't open", "action", action, "url", pr.HTMLURL)
+	// 	return "", false
 
-	channelID, err := data.ConvertURLToChannel(url)
+	channelID, err := data.ConvertURLToChannel(pr.HTMLURL)
 	if err != nil {
-		l.Error("failed to retrieve Bitbucket PR's Slack channel ID", "error", err, "event_type", eventType, "pr_url", url)
+		l.Error("failed to retrieve GitHub PR's Slack channel ID", "error", err, "action", action, "pr_url", pr.HTMLURL)
 		return "", false
 	}
 
 	if channelID == "" {
-		l.Debug("Bitbucket PR's Slack channel ID is empty", "event_type", eventType, "pr_url", url)
+		l.Debug("GitHub PR's Slack channel ID is empty", "action", action, "pr_url", pr.HTMLURL)
 		return "", false
 	}
 
 	return channelID, true
 }
 
-func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	url := event.PullRequest.Links["html"].HRef
-
-	channelID, err := b.createChannel(ctx, event.PullRequest)
+func (g GitHub) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	channelID, err := g.createChannel(ctx, event.PullRequest)
 	if err != nil {
-		b.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		g.reportCreationErrorToAuthor(ctx, event.Sender.Login, event.PullRequest.HTMLURL)
 		return err
 	}
 
 	// Channel cosmetics.
-	b.setChannelTopic(ctx, channelID, url)
-	b.setChannelDescription(ctx, channelID, event.PullRequest.Title, url)
-	b.postIntroMessage(ctx, channelID, event.Type, event.PullRequest, event.Actor)
+	g.setChannelTopic(ctx, channelID, event.PullRequest.HTMLURL)
+	g.setChannelDescription(ctx, channelID, event.PullRequest.Title, event.PullRequest.HTMLURL)
+	g.postIntroMessage(ctx, channelID, event.Action, event.PullRequest, event.Sender)
 
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
-	if err := data.MapURLToChannel(url, channelID); err != nil {
+	if err := data.MapURLToChannel(event.PullRequest.HTMLURL, channelID); err != nil {
 		msg := "failed to map PR to Slack channel"
-		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
+		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", event.PullRequest.HTMLURL)
 		return err
 	}
 
 	return nil
 }
 
-func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
-	title := slack.NormalizeChannelName(pr.Title, b.cmd.Int("slack-max-channel-name-length"))
-	url := pr.Links["html"].HRef
+func (g GitHub) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
+	title := slack.NormalizeChannelName(pr.Title, g.cmd.Int("slack-max-channel-name-length"))
 	l := workflow.GetLogger(ctx)
 
 	for i := 1; i < 100; i++ {
-		name := fmt.Sprintf("%s_%s", b.cmd.String("slack-channel-name-prefix"), title)
+		name := fmt.Sprintf("%s_%s", g.cmd.String("slack-channel-name-prefix"), title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
 		req := slack.ConversationsCreateRequest{Name: name}
-		a := b.executeTimpaniActivity(ctx, slack.ConversationsCreateActivity, req)
+		a := g.executeTimpaniActivity(ctx, slack.ConversationsCreateActivity, req)
 
 		resp := &slack.ConversationsCreateResponse{}
 		if err := a.Get(ctx, resp); err != nil {
 			msg := "failed to create Slack channel"
 			if !strings.Contains(err.Error(), "name_taken") {
-				l.Error(msg, "error", err, "name", name, "pr_url", url)
+				l.Error(msg, "error", err, "name", name, "pr_url", pr.HTMLURL)
 				return "", err
 			}
 
@@ -150,21 +149,21 @@ func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, 
 			return "", errors.New(msg)
 		}
 
-		l.Info("created Slack channel", "channel_id", id, "channel_name", name, "pr_url", url)
+		l.Info("created Slack channel", "channel_id", id, "channel_name", name, "pr_url", pr.HTMLURL)
 		return id, nil
 	}
 
 	msg := "too many failed attempts to create Slack channel"
-	l.Error(msg, "pr_url", url)
+	l.Error(msg, "pr_url", pr.HTMLURL)
 	return "", errors.New(msg)
 }
 
-func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
+func (g GitHub) reportCreationErrorToAuthor(ctx workflow.Context, login, url string) {
 	l := workflow.GetLogger(ctx)
 
-	email, err := data.BitbucketUserEmailByID(accountID)
+	email, err := data.GitHubUserEmailByID(login)
 	if err != nil {
-		l.Error("failed to read Bitbucket user email", "error", err)
+		l.Error("failed to read GitHub user email", "error", err)
 		return
 	}
 
@@ -181,17 +180,17 @@ func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, accountID, 
 
 	msg := "Failed to create Slack channel for " + url
 	req := slack.ChatPostMessageRequest{Channel: user, MarkdownText: msg}
-	b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
+	g.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 }
 
-func (b Bitbucket) setChannelTopic(ctx workflow.Context, channelID, url string) {
+func (g GitHub) setChannelTopic(ctx workflow.Context, channelID, url string) {
 	t := url
 	if len(t) > slack.MaxMetadataLen {
 		t = t[:slack.MaxMetadataLen-4] + " ..."
 	}
 
 	req := slack.ConversationsSetTopicRequest{Channel: channelID, Topic: t}
-	a := b.executeTimpaniActivity(ctx, slack.ConversationsSetTopicActivity, req)
+	a := g.executeTimpaniActivity(ctx, slack.ConversationsSetTopicActivity, req)
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel topic"
@@ -199,14 +198,14 @@ func (b Bitbucket) setChannelTopic(ctx workflow.Context, channelID, url string) 
 	}
 }
 
-func (b Bitbucket) setChannelDescription(ctx workflow.Context, channelID, title, url string) {
+func (g GitHub) setChannelDescription(ctx workflow.Context, channelID, title, url string) {
 	t := fmt.Sprintf("`%s`", title)
 	if len(t) > slack.MaxMetadataLen {
 		t = t[:slack.MaxMetadataLen-4] + "`..."
 	}
 
 	req := slack.ConversationsSetPurposeRequest{Channel: channelID, Purpose: t}
-	a := b.executeTimpaniActivity(ctx, slack.ConversationsSetPurposeActivity, req)
+	a := g.executeTimpaniActivity(ctx, slack.ConversationsSetPurposeActivity, req)
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel description"
@@ -214,16 +213,15 @@ func (b Bitbucket) setChannelDescription(ctx workflow.Context, channelID, title,
 	}
 }
 
-func (b Bitbucket) postIntroMessage(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
-	action := "created"
-	if eventType == "pullrequest.updated" {
+func (g GitHub) postIntroMessage(ctx workflow.Context, channelID, action string, pr PullRequest, sender User) {
+	if action == "ready_for_review" {
 		action = "marked as ready for review"
 	}
 
-	msg := fmt.Sprintf("%%s %s %s: `%s`", action, pr.Links["html"].HRef, pr.Title)
-	if text := strings.TrimSpace(pr.Description); text != "" {
-		msg += "\n\n" + markdown.BitbucketToSlack(ctx, b.cmd, text)
+	msg := fmt.Sprintf("%%s %s %s: `%s`", action, pr.HTMLURL, pr.Title)
+	if text := strings.TrimSpace(*pr.Body); text != "" {
+		msg += "\n\n" + markdown.GitHubToSlack(ctx, g.cmd, text, pr.HTMLURL)
 	}
 
-	_, _ = b.mentionUserInMsg(ctx, channelID, actor, msg)
+	_, _ = g.mentionUserInMsg(ctx, channelID, sender, msg)
 }

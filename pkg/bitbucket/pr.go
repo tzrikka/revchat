@@ -2,8 +2,6 @@ package bitbucket
 
 import (
 	"go.temporal.io/sdk/workflow"
-
-	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func (b Bitbucket) handlePullRequestEvent(ctx workflow.Context, event PullRequestEvent) {
@@ -66,9 +64,7 @@ func (b Bitbucket) prReviewed(ctx workflow.Context, eventType string, pr PullReq
 	case "pullrequest.changes_request_created":
 		msg += "requested changes in this PR :warning:"
 	}
-	// Not useful?
-	// case "pullrequest.changes_request_removed":
-	// 	   msg += "unrequested changes in this PR"
+	// Ignored event type: pullrequest.changes_request_removed.
 
 	_, _ = b.mentionUserInMsg(ctx, channelID, actor, msg)
 }
@@ -84,31 +80,4 @@ func (b Bitbucket) prClosed(ctx workflow.Context, eventType string, pr PullReque
 
 	req := PullRequestEvent{Type: eventType, PullRequest: pr, Actor: actor}
 	b.executeRevChatWorkflow(ctx, "bitbucket.archiveChannel", req)
-}
-
-// lookupChannel returns the ID of a channel associated
-// with a PR, if the PR is active and the channel is found.
-func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (string, bool) {
-	l := workflow.GetLogger(ctx)
-	url := pr.Links["html"].HRef
-
-	if pr.Draft {
-		l.Debug("ignoring Bitbucket event - the PR is a draft", "event_type", eventType, "pr_url", url)
-		return "", false
-	}
-
-	channelID, err := data.ConvertURLToChannel(url)
-	if err != nil {
-		msg := "failed to retrieve Bitbucket PR's Slack channel ID"
-		l.Error(msg, "error", err, "event_type", eventType, "pr_url", url)
-		return "", false
-	}
-
-	if channelID == "" {
-		msg := "Bitbucket PR's Slack channel ID is empty"
-		l.Debug(msg, "event_type", eventType, "pr_url", url)
-		return "", false
-	}
-
-	return channelID, true
 }

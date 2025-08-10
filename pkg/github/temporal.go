@@ -1,4 +1,4 @@
-package bitbucket
+package github
 
 import (
 	"github.com/urfave/cli/v3"
@@ -9,19 +9,19 @@ import (
 	"github.com/tzrikka/revchat/pkg/config"
 )
 
-type Bitbucket struct {
+type GitHub struct {
 	cmd *cli.Command
 }
 
 func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
-	b := Bitbucket{cmd: cmd}
-	w.RegisterWorkflowWithOptions(b.eventsWorkflow, workflow.RegisterOptions{Name: "bitbucket.events"})
-	w.RegisterWorkflowWithOptions(b.archiveChannelWorkflow, workflow.RegisterOptions{Name: "bitbucket.archiveChannel"})
-	w.RegisterWorkflowWithOptions(b.initChannelWorkflow, workflow.RegisterOptions{Name: "bitbucket.initChannel"})
+	g := GitHub{cmd: cmd}
+	w.RegisterWorkflowWithOptions(g.eventsWorkflow, workflow.RegisterOptions{Name: "github.events"})
+	w.RegisterWorkflowWithOptions(g.archiveChannelWorkflow, workflow.RegisterOptions{Name: "github.archiveChannel"})
+	w.RegisterWorkflowWithOptions(g.initChannelWorkflow, workflow.RegisterOptions{Name: "github.initChannel"})
 }
 
-func (b Bitbucket) executeRevChatWorkflow(ctx workflow.Context, name string, req any) workflow.ChildWorkflowFuture {
-	tq := b.cmd.String("temporal-task-queue-revchat")
+func (g GitHub) executeRevChatWorkflow(ctx workflow.Context, name string, req any) workflow.ChildWorkflowFuture {
+	tq := g.cmd.String("temporal-task-queue-revchat")
 	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: tq})
 	return workflow.ExecuteChildWorkflow(ctx, name, req)
 }
@@ -30,9 +30,9 @@ func (b Bitbucket) executeRevChatWorkflow(ctx workflow.Context, name string, req
 // a Temporal workflow, with preconfigured activity options related to timeouts and retries.
 //
 // [Timpani]: https://github.com/tzrikka/timpani/tree/main/pkg/api
-func (b Bitbucket) executeTimpaniActivity(ctx workflow.Context, name string, req any) workflow.Future {
+func (g GitHub) executeTimpaniActivity(ctx workflow.Context, name string, req any) workflow.Future {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		TaskQueue:              b.cmd.String("temporal-task-queue-timpani"),
+		TaskQueue:              g.cmd.String("temporal-task-queue-timpani"),
 		ScheduleToStartTimeout: config.ScheduleToStartTimeout,
 		StartToCloseTimeout:    config.StartToCloseTimeout,
 		RetryPolicy: &temporal.RetryPolicy{

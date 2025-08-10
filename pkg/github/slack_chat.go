@@ -1,4 +1,4 @@
-package bitbucket
+package github
 
 import (
 	"fmt"
@@ -9,11 +9,11 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-func (b Bitbucket) mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) (string, error) {
-	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, b.cmd, user.AccountID, user.DisplayName))
+func (g GitHub) mentionUserInMsg(ctx workflow.Context, channelID string, u User, msg string) (string, error) {
+	msg = fmt.Sprintf(msg, users.GitHubToSlackRef(ctx, g.cmd, u.Login, u.HTMLURL))
 
 	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
-	a := b.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
+	a := g.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 
 	resp := slack.ChatPostMessageResponse{}
 	if err := a.Get(ctx, &resp); err != nil {
@@ -24,3 +24,7 @@ func (b Bitbucket) mentionUserInMsg(ctx workflow.Context, channelID string, user
 
 	return resp.TS, nil
 }
+
+// func (g GitHub) mentionUserInReply(ctx workflow.Context, channelID, commentURL string, user User, msg string) string {
+// 	return ""
+// }
