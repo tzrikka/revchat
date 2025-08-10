@@ -37,7 +37,9 @@ func bitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 		return ""
 	}
 
-	if email == "" {
+	// Note: unlike GitHub, we can't see user emails unless we know them in advance.
+
+	if email == "" || email == "bot" {
 		return ""
 	}
 

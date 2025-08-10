@@ -102,7 +102,7 @@ func (g GitHub) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
 	if err := data.MapURLToChannel(event.PullRequest.HTMLURL, channelID); err != nil {
-		msg := "failed to map PR to Slack channel"
+		msg := "failed to save PR URL / Slack channel mapping"
 		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", event.PullRequest.HTMLURL)
 		return err
 	}
@@ -158,28 +158,33 @@ func (g GitHub) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 	return "", errors.New(msg)
 }
 
-func (g GitHub) reportCreationErrorToAuthor(ctx workflow.Context, login, url string) {
+func (g GitHub) reportCreationErrorToAuthor(ctx workflow.Context, username, url string) {
 	l := workflow.GetLogger(ctx)
 
-	email, err := data.GitHubUserEmailByID(login)
+	email, err := data.GitHubUserEmailByID(username)
 	if err != nil {
-		l.Error("failed to read GitHub user email", "error", err)
+		l.Error("failed to load GitHub user email", "error", err, "username", username)
 		return
 	}
 
 	// Don't send a DM to the user if they're opted-out.
-	if email == "" {
+	optedIn, err := data.IsOptedIn(email)
+	if err != nil {
+		l.Error("failed to load user opt-in status", "error", err, "email", email)
+		return
+	}
+	if !optedIn {
 		return
 	}
 
-	user, err := data.SlackUserIDByEmail(email)
-	if err != nil || user == "" {
-		l.Error("failed to read Slack user ID", "error", err, "email", email)
+	userID, err := data.SlackUserIDByEmail(email)
+	if err != nil || userID == "" {
+		l.Error("failed to load Slack user ID", "error", err, "email", email)
 		return
 	}
 
 	msg := "Failed to create Slack channel for " + url
-	req := slack.ChatPostMessageRequest{Channel: user, MarkdownText: msg}
+	req := slack.ChatPostMessageRequest{Channel: userID, MarkdownText: msg}
 	g.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
 }
 

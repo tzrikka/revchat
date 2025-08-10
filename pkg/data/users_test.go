@@ -1,6 +1,8 @@
 package data
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestUsers(t *testing.T) {
 	d := t.TempDir()
@@ -10,12 +12,12 @@ func TestUsers(t *testing.T) {
 	email := "email@example.com"
 
 	// Before adding the user.
-	gotEmail, err := BitbucketUserEmailByID(id)
+	got, err := BitbucketUserEmailByID(id)
 	if err != nil {
 		t.Fatalf("BitbucketUserEmail() error = %v", err)
 	}
-	if gotEmail != "" {
-		t.Fatalf("BitbucketUserEmail() = %q, want %q", gotEmail, email)
+	if got != "" {
+		t.Fatalf("BitbucketUserEmail() = %q, want %q", got, "")
 	}
 
 	// Add the user.
@@ -24,28 +26,28 @@ func TestUsers(t *testing.T) {
 	}
 
 	// After adding the user.
-	gotEmail, err = BitbucketUserEmailByID(id)
+	got, err = BitbucketUserEmailByID(id)
 	if err != nil {
 		t.Errorf("BitbucketUserEmail() error = %v", err)
 	}
-	if gotEmail != email {
-		t.Errorf("BitbucketUserEmail() = %q, want %q", gotEmail, email)
+	if got != email {
+		t.Errorf("BitbucketUserEmail() = %q, want %q", got, email)
 	}
 
-	gotEmail, err = GitHubUserEmailByID(id)
+	got, err = GitHubUserEmailByID(id)
 	if err != nil {
 		t.Errorf("GitHubUserEmail() error = %v", err)
 	}
-	if gotEmail != "" {
-		t.Errorf("GitHubUserEmail() = %q, want %q", gotEmail, email)
+	if got != "" {
+		t.Errorf("GitHubUserEmail() = %q, want %q", got, "")
 	}
 
-	gotEmail, err = SlackUserEmailByID(id)
+	got, err = SlackUserEmailByID(id)
 	if err != nil {
 		t.Errorf("SlackUserEmail() error = %v", err)
 	}
-	if gotEmail != "" {
-		t.Errorf("SlackUserEmail() = %q, want %q", gotEmail, email)
+	if got != "" {
+		t.Errorf("SlackUserEmail() = %q, want %q", got, "")
 	}
 
 	// Remove the user.
@@ -54,27 +56,27 @@ func TestUsers(t *testing.T) {
 	}
 
 	// After removing the usr.
-	gotEmail, err = BitbucketUserEmailByID(id)
+	got, err = BitbucketUserEmailByID(id)
 	if err != nil {
 		t.Errorf("BitbucketUserEmail() error = %v", err)
 	}
-	if gotEmail != "" {
-		t.Errorf("BitbucketUserEmail() = %q, want %q", gotEmail, email)
+	if got != "" {
+		t.Errorf("BitbucketUserEmail() = %q, want %q", got, "")
 	}
 
-	gotEmail, err = GitHubUserEmailByID(id)
+	got, err = GitHubUserEmailByID(id)
 	if err != nil {
 		t.Errorf("GitHubUserEmail() error = %v", err)
 	}
-	if gotEmail != "" {
-		t.Errorf("GitHubUserEmail() = %q, want %q", gotEmail, email)
+	if got != "" {
+		t.Errorf("GitHubUserEmail() = %q, want %q", got, "")
 	}
 
-	gotEmail, err = SlackUserEmailByID(id)
+	got, err = SlackUserEmailByID(id)
 	if err != nil {
 		t.Errorf("SlackUserEmail() error = %v", err)
 	}
-	if gotEmail != "" {
-		t.Errorf("SlackUserEmail() = %q, want %q", gotEmail, email)
+	if got != "" {
+		t.Errorf("SlackUserEmail() = %q, want %q", got, "")
 	}
 }
