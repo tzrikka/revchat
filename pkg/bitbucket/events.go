@@ -31,7 +31,10 @@ var Signals = []string{
 }
 
 // eventsWorkflow is an always-running Temporal workflow that handles
-// all types of PR events, which are received as signals from Timpani.
+// all types of [PR events], which are received as signals from [Timpani].
+//
+// [PR events]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/
+// [Timpani]: https://pkg.go.dev/github.com/tzrikka/timpani/pkg/listeners/bitbucket
 func (b Bitbucket) eventsWorkflow(ctx workflow.Context) error {
 	chs, err := temporal.GetSignalChannels(ctx, Signals)
 	if err != nil {
