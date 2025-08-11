@@ -15,7 +15,7 @@ import (
 // This function returns a GitHub profile link (in Slack markdown format)
 // if the user is not found in Slack, or if it belongs to a GitHub team or app.
 func GitHubToSlackRef(ctx workflow.Context, cmd *cli.Command, username, url string) string {
-	id := githubToSlackID(ctx, cmd, username)
+	id := GitHubToSlackID(ctx, cmd, username, false)
 	if id != "" {
 		return fmt.Sprintf("<@%s>", id)
 	}
@@ -24,10 +24,10 @@ func GitHubToSlackRef(ctx workflow.Context, cmd *cli.Command, username, url stri
 	return fmt.Sprintf("<%s|@%s>", url, username)
 }
 
-// githubToSlackID converts a GitHub username into a Slack user ID. This depends on
+// GitHubToSlackID converts a GitHub username into a Slack user ID. This depends on
 // the user's email address being the same in both systems. This function returns an
 // empty string if the username is not found, or if it belongs to a GitHub team or app.
-func githubToSlackID(ctx workflow.Context, cmd *cli.Command, username string) string {
+func GitHubToSlackID(ctx workflow.Context, cmd *cli.Command, username string, checkOptIn bool) string {
 	l := workflow.GetLogger(ctx)
 
 	// Don't even check GitHub teams, only individual users.
@@ -43,6 +43,17 @@ func githubToSlackID(ctx workflow.Context, cmd *cli.Command, username string) st
 
 	if email == "" || email == "bot" {
 		return ""
+	}
+
+	if checkOptIn {
+		optedIn, err := data.IsOptedIn(email)
+		if err != nil {
+			l.Error("failed to load user opt-in status", "error", err, "email", email)
+			return ""
+		}
+		if !optedIn {
+			return ""
+		}
 	}
 
 	id, err := data.SlackUserIDByEmail(email)

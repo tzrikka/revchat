@@ -64,7 +64,7 @@ type ConversationsCreateResponse struct {
 }
 
 // https://docs.slack.dev/reference/methods/conversations.invite
-type ConversationsInviteRequest struct {
+type conversationsInviteRequest struct {
 	Channel string `json:"channel"`
 	Users   string `json:"users"`
 
@@ -72,7 +72,7 @@ type ConversationsInviteRequest struct {
 }
 
 // https://docs.slack.dev/reference/methods/conversations.invite
-type ConversationsInviteResponse struct {
+type conversationsInviteResponse struct {
 	slackResponse
 
 	Channel map[string]any   `json:"channel,omitempty"`
@@ -129,9 +129,36 @@ func CreateChannelActivity(ctx workflow.Context, cmd *cli.Command, name, url str
 	return id, false, nil
 }
 
-const (
-	ConversationsInviteActivity = "slack.conversations.invite"
-)
+// https://docs.slack.dev/reference/methods/conversations.invite
+func InviteUsersToChannelActivity(ctx workflow.Context, cmd *cli.Command, channelID string, userIDs []string) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	l := workflow.GetLogger(ctx)
+	if len(userIDs) > 1000 { // API limitation.
+		msg := "trying to add more than 1000 users to Slack channel"
+		l.Warn(msg, "channel_id", channelID, "users_len", len(userIDs))
+		userIDs = userIDs[:1000]
+	}
+
+	ids := strings.Join(userIDs, ",")
+	req := conversationsInviteRequest{Channel: channelID, Users: ids, Force: true}
+	a := executeTimpaniActivity(ctx, cmd, "slack.conversations.invite", req)
+
+	resp := &conversationsInviteResponse{}
+	if err := a.Get(ctx, resp); err != nil {
+		msg := "failed to add user(s) to Slack channel"
+		if strings.Contains(err.Error(), "already_in_channel") {
+			l.Debug(msg+" - already in channel", "error", err, "resp", resp, "users_len", len(userIDs))
+			return nil
+		}
+		l.Error(msg, "error", err, "channel_id", channelID, "users_len", len(userIDs))
+		return err
+	}
+
+	return nil
+}
 
 // https://docs.slack.dev/reference/methods/conversations.setPurpose
 func SetChannelDescriptionActivity(ctx workflow.Context, cmd *cli.Command, channelID, title, url string) {
