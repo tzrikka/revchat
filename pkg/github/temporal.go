@@ -29,7 +29,7 @@ func (g GitHub) executeRevChatWorkflow(ctx workflow.Context, name string, req an
 // executeTimpaniActivity requests the execution of a [Timpani] activity in the context of
 // a Temporal workflow, with preconfigured activity options related to timeouts and retries.
 //
-// [Timpani]: https://github.com/tzrikka/timpani/tree/main/pkg/api
+// [Timpani]: https://github.com/tzrikka/timpani/tree/main/pkg/api/github
 func (g GitHub) executeTimpaniActivity(ctx workflow.Context, name string, req any) workflow.Future {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		TaskQueue:              g.cmd.String("temporal-task-queue-timpani"),

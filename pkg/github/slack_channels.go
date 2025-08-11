@@ -94,11 +94,6 @@ func (g GitHub) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent
 		return err
 	}
 
-	// Channel cosmetics.
-	g.setChannelTopic(ctx, channelID, event.PullRequest.HTMLURL)
-	g.setChannelDescription(ctx, channelID, event.PullRequest.Title, event.PullRequest.HTMLURL)
-	g.postIntroMessage(ctx, channelID, event.Action, event.PullRequest, event.Sender)
-
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
 	if err := data.MapURLToChannel(event.PullRequest.HTMLURL, channelID); err != nil {
@@ -106,6 +101,13 @@ func (g GitHub) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent
 		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", event.PullRequest.HTMLURL)
 		return err
 	}
+
+	// Channel cosmetics.
+	g.setChannelTopic(ctx, channelID, event.PullRequest.HTMLURL)
+	g.setChannelDescription(ctx, channelID, event.PullRequest.Title, event.PullRequest.HTMLURL)
+	g.setChannelBookmarks(ctx, channelID, event.PullRequest.HTMLURL, event.PullRequest)
+
+	g.postIntroMessage(ctx, channelID, event.Action, event.PullRequest, event.Sender)
 
 	return nil
 }
@@ -216,6 +218,16 @@ func (g GitHub) setChannelDescription(ctx workflow.Context, channelID, title, ur
 		msg := "failed to set Slack channel description"
 		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
 	}
+}
+
+func (g GitHub) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
+	checks := 0
+
+	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Conversation (%d)", pr.Comments), url)
+	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits")
+	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks")
+	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files")
+	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff")
 }
 
 func (g GitHub) postIntroMessage(ctx workflow.Context, channelID, action string, pr PullRequest, sender User) {
