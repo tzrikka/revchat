@@ -4,6 +4,9 @@ import (
 	"fmt"
 
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/users"
 )
 
 func (g GitHub) handlePullRequestEvent(ctx workflow.Context, event PullRequestEvent) {
@@ -61,7 +64,7 @@ func (g GitHub) prOpened(ctx workflow.Context, action string, pr PullRequest, se
 	// Wait for workflow completion before returning, to ensure we handle
 	// subsequent PR initialization events appropriately (e.g. check states).
 	req := PullRequestEvent{Action: action, PullRequest: pr, Sender: sender}
-	_ = g.executeRevChatWorkflow(ctx, "github.initChannel", req).Get(ctx, nil)
+	_ = g.executeWorkflow(ctx, "github.initChannel", req).Get(ctx, nil)
 }
 
 // A PR (possibly a draft) was closed.
@@ -76,7 +79,7 @@ func (g GitHub) prClosed(ctx workflow.Context, action string, pr PullRequest, se
 	}
 
 	req := PullRequestEvent{Action: action, PullRequest: pr, Sender: sender}
-	g.executeRevChatWorkflow(ctx, "github.archiveChannel", req)
+	g.executeWorkflow(ctx, "github.archiveChannel", req)
 }
 
 // A previously closed PR (possibly a draft) was reopened.
@@ -100,7 +103,7 @@ func (g GitHub) prReopened(ctx workflow.Context, action string, pr PullRequest, 
 // https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request
 func (g GitHub) prConvertedToDraft(ctx workflow.Context, action string, pr PullRequest, sender User) {
 	req := PullRequestEvent{Action: action, PullRequest: pr, Sender: sender}
-	g.executeRevChatWorkflow(ctx, "github.archiveChannel", req)
+	g.executeWorkflow(ctx, "github.archiveChannel", req)
 }
 
 // A draft PR was marked as ready for review.
@@ -128,8 +131,10 @@ func (g GitHub) prReviewRequested(ctx workflow.Context, event PullRequestEvent) 
 		g.prReviewRequestedUser(ctx, channelID, *reviewer, event.Sender, "reviewer")
 	}
 	if team := event.RequestedTeam; team != nil {
-		msg := fmt.Sprintf("added the <%s|%s> team as a reviewer", team.HTMLURL, team.Name)
-		_, _ = g.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
+		ref := users.GitHubToSlackRef(ctx, g.cmd, event.Sender.Login, event.Sender.HTMLURL)
+		msg := fmt.Sprintf("%s added the <%s|%s> team as a reviewer", ref, team.HTMLURL, team.Name)
+		req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
+		slack.PostChatMessageActivityAsync(ctx, g.cmd, req)
 	}
 }
 
@@ -148,8 +153,10 @@ func (g GitHub) prReviewRequestRemoved(ctx workflow.Context, event PullRequestEv
 		g.prReviewRequestRemovedUser(ctx, channelID, *reviewer, event.Sender, "reviewer")
 	}
 	if team := event.RequestedTeam; team != nil {
-		msg := fmt.Sprintf("removed the <%s|%s> team as a reviewer", team.HTMLURL, team.Name)
-		_, _ = g.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
+		ref := users.GitHubToSlackRef(ctx, g.cmd, event.Sender.Login, event.Sender.HTMLURL)
+		msg := fmt.Sprintf("%s removed the <%s|%s> team as a reviewer", ref, team.HTMLURL, team.Name)
+		req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
+		slack.PostChatMessageActivityAsync(ctx, g.cmd, req)
 	}
 }
 
@@ -191,8 +198,10 @@ func (g GitHub) prSynchronized(ctx workflow.Context, action string, pr PullReque
 		return
 	}
 
-	msg := fmt.Sprintf("updated the head branch (see the [PR commits](%s/commits))", pr.HTMLURL)
-	_, _ = g.mentionUserInMsg(ctx, channelID, sender, "%s "+msg)
+	ref := users.GitHubToSlackRef(ctx, g.cmd, sender.Login, sender.HTMLURL)
+	msg := fmt.Sprintf("%s updated the head branch (see the [PR commits](%s/commits))", ref, pr.HTMLURL)
+	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
+	slack.PostChatMessageActivityAsync(ctx, g.cmd, req)
 }
 
 // Conversation on a PR was locked. For more information, see "Locking conversations":

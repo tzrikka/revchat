@@ -2,6 +2,9 @@ package bitbucket
 
 import (
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/users"
 )
 
 func (b Bitbucket) handlePullRequestEvent(ctx workflow.Context, event PullRequestEvent) {
@@ -44,7 +47,7 @@ func (b Bitbucket) prCreated(ctx workflow.Context, eventType string, pr PullRequ
 	// Wait for workflow completion before returning, to ensure we handle
 	// subsequent PR initialization events appropriately (e.g. check states).
 	req := PullRequestEvent{Type: eventType, PullRequest: pr, Actor: actor}
-	_ = b.executeRevChatWorkflow(ctx, "bitbucket.initChannel", req).Get(ctx, nil)
+	_ = b.executeWorkflow(ctx, "bitbucket.initChannel", req).Get(ctx, nil)
 }
 
 func (b Bitbucket) prUpdated(ctx workflow.Context, event PullRequestEvent) {
@@ -57,18 +60,19 @@ func (b Bitbucket) prReviewed(ctx workflow.Context, eventType string, pr PullReq
 		return
 	}
 
-	msg := "%s "
+	msg := users.BitbucketToSlackRef(ctx, b.cmd, actor.AccountID, actor.DisplayName)
 	switch eventType {
 	case "pullrequest.approved":
-		msg += "approved this PR :+1:"
+		msg += " approved this PR :+1:"
 	case "pullrequest.unapproved":
-		msg += "unapproved this PR :-1:"
+		msg += " unapproved this PR :-1:"
 	case "pullrequest.changes_request_created":
-		msg += "requested changes in this PR :warning:"
+		msg += " requested changes in this PR :warning:"
 	}
 	// Ignored event type: pullrequest.changes_request_removed.
 
-	_, _ = b.mentionUserInMsg(ctx, channelID, actor, msg)
+	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
+	slack.PostChatMessageActivityAsync(ctx, b.cmd, req)
 }
 
 // A PR was closed, i.e. merged or rejected (possibly a draft).
@@ -81,5 +85,5 @@ func (b Bitbucket) prClosed(ctx workflow.Context, eventType string, pr PullReque
 	}
 
 	req := PullRequestEvent{Type: eventType, PullRequest: pr, Actor: actor}
-	b.executeRevChatWorkflow(ctx, "bitbucket.archiveChannel", req)
+	b.executeWorkflow(ctx, "bitbucket.archiveChannel", req)
 }
