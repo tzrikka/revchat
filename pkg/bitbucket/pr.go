@@ -41,8 +41,10 @@ func (b Bitbucket) prCreated(ctx workflow.Context, eventType string, pr PullRequ
 		return
 	}
 
+	// Wait for workflow completion before returning, to ensure we handle
+	// subsequent PR initialization events appropriately (e.g. check states).
 	req := PullRequestEvent{Type: eventType, PullRequest: pr, Actor: actor}
-	b.executeRevChatWorkflow(ctx, "bitbucket.initChannel", req)
+	_ = b.executeRevChatWorkflow(ctx, "bitbucket.initChannel", req).Get(ctx, nil)
 }
 
 func (b Bitbucket) prUpdated(ctx workflow.Context, event PullRequestEvent) {

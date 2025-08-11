@@ -19,19 +19,11 @@ type bookmarksAddRequest struct {
 }
 
 // https://docs.slack.dev/reference/methods/bookmarks.add
-type bookmarksAddResponse struct {
-	slackResponse
-
-	Bookmark map[string]any `json:"bookmark,omitempty"`
-}
-
-// https://docs.slack.dev/reference/methods/bookmarks.add
-func BookmarksAddActivity(ctx workflow.Context, cmd *cli.Command, channelID, title, url string) {
+func AddBookmarkActivity(ctx workflow.Context, cmd *cli.Command, channelID, title, url string) {
 	req := bookmarksAddRequest{ChannelID: channelID, Title: title, Type: "link", Link: url}
 	a := executeTimpaniActivity(ctx, cmd, "slack.bookmarks.add", req)
 
-	resp := bookmarksAddResponse{}
-	if err := a.Get(ctx, &resp); err != nil {
+	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to add new bookmark in Slack channel"
 		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "title", title)
 	}

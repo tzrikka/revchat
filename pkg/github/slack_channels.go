@@ -42,17 +42,11 @@ func (g GitHub) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEv
 
 	_, _ = g.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+state)
 
-	req := slack.ConversationsArchiveRequest{Channel: channelID}
-	a := g.executeTimpaniActivity(ctx, slack.ConversationsArchiveActivity, req)
-
-	if err := a.Get(ctx, nil); err != nil {
-		msg := "failed to archive Slack channel"
-		l.Error(msg, "error", err, "action", event.Action, "channel_id", channelID, "pr_url", url)
-
+	if err := slack.ArchiveChannelActivity(ctx, g.cmd, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
-		msg = "Failed to archive this channel, even though its PR was " + state
+		msg := "Failed to archive this channel, even though its PR was " + state
 		req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
-		g.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
+		slack.PostChatMessageActivityAsync(ctx, g.cmd, req)
 
 		return err
 	}
@@ -88,26 +82,27 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 }
 
 func (g GitHub) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	channelID, err := g.createChannel(ctx, event.PullRequest)
+	pr := event.PullRequest
+	channelID, err := g.createChannel(ctx, pr)
 	if err != nil {
-		g.reportCreationErrorToAuthor(ctx, event.Sender.Login, event.PullRequest.HTMLURL)
+		g.reportCreationErrorToAuthor(ctx, event.Sender.Login, pr.HTMLURL)
 		return err
 	}
 
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
-	if err := data.MapURLToChannel(event.PullRequest.HTMLURL, channelID); err != nil {
+	if err := data.MapURLToChannel(pr.HTMLURL, channelID); err != nil {
 		msg := "failed to save PR URL / Slack channel mapping"
-		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", event.PullRequest.HTMLURL)
+		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", pr.HTMLURL)
 		return err
 	}
 
 	// Channel cosmetics.
-	g.setChannelTopic(ctx, channelID, event.PullRequest.HTMLURL)
-	g.setChannelDescription(ctx, channelID, event.PullRequest.Title, event.PullRequest.HTMLURL)
-	g.setChannelBookmarks(ctx, channelID, event.PullRequest.HTMLURL, event.PullRequest)
+	slack.SetChannelTopicActivity(ctx, g.cmd, channelID, pr.HTMLURL)
+	slack.SetChannelDescriptionActivity(ctx, g.cmd, channelID, pr.Title, pr.HTMLURL)
+	g.setChannelBookmarks(ctx, channelID, pr.HTMLURL, pr)
 
-	g.postIntroMessage(ctx, channelID, event.Action, event.PullRequest, event.Sender)
+	g.postIntroMessage(ctx, channelID, event.Action, pr, event.Sender)
 
 	return nil
 }
@@ -122,36 +117,15 @@ func (g GitHub) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		req := slack.ConversationsCreateRequest{Name: name}
-		a := g.executeTimpaniActivity(ctx, slack.ConversationsCreateActivity, req)
-
-		resp := &slack.ConversationsCreateResponse{}
-		if err := a.Get(ctx, resp); err != nil {
-			msg := "failed to create Slack channel"
-			if !strings.Contains(err.Error(), "name_taken") {
-				l.Error(msg, "error", err, "name", name, "pr_url", pr.HTMLURL)
+		id, retry, err := slack.CreateChannelActivity(ctx, g.cmd, name, pr.HTMLURL)
+		if err != nil {
+			if retry {
+				continue
+			} else {
 				return "", err
 			}
-
-			l.Debug(msg+" - already exists", "name", name)
-			continue // Retry with a different name.
 		}
 
-		channelID, ok := resp.Channel["id"]
-		if !ok {
-			msg := "created Slack channel without ID"
-			l.Error(msg, "resp", resp)
-			return "", errors.New(msg)
-		}
-
-		id, ok := channelID.(string)
-		if !ok || len(id) == 0 {
-			msg := "created Slack channel with invalid ID"
-			l.Error(msg, "resp", resp)
-			return "", errors.New(msg)
-		}
-
-		l.Info("created Slack channel", "channel_id", id, "channel_name", name, "pr_url", pr.HTMLURL)
 		return id, nil
 	}
 
@@ -187,47 +161,17 @@ func (g GitHub) reportCreationErrorToAuthor(ctx workflow.Context, username, url 
 
 	msg := "Failed to create Slack channel for " + url
 	req := slack.ChatPostMessageRequest{Channel: userID, MarkdownText: msg}
-	g.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
-}
-
-func (g GitHub) setChannelTopic(ctx workflow.Context, channelID, url string) {
-	t := url
-	if len(t) > slack.MaxMetadataLen {
-		t = t[:slack.MaxMetadataLen-4] + " ..."
-	}
-
-	req := slack.ConversationsSetTopicRequest{Channel: channelID, Topic: t}
-	a := g.executeTimpaniActivity(ctx, slack.ConversationsSetTopicActivity, req)
-
-	if err := a.Get(ctx, nil); err != nil {
-		msg := "failed to set Slack channel topic"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
-	}
-}
-
-func (g GitHub) setChannelDescription(ctx workflow.Context, channelID, title, url string) {
-	t := fmt.Sprintf("`%s`", title)
-	if len(t) > slack.MaxMetadataLen {
-		t = t[:slack.MaxMetadataLen-4] + "`..."
-	}
-
-	req := slack.ConversationsSetPurposeRequest{Channel: channelID, Purpose: t}
-	a := g.executeTimpaniActivity(ctx, slack.ConversationsSetPurposeActivity, req)
-
-	if err := a.Get(ctx, nil); err != nil {
-		msg := "failed to set Slack channel description"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
-	}
+	slack.PostChatMessageActivityAsync(ctx, g.cmd, req)
 }
 
 func (g GitHub) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
 	checks := 0
 
-	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Conversation (%d)", pr.Comments), url)
-	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits")
-	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks")
-	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files")
-	slack.BookmarksAddActivity(ctx, g.cmd, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff")
+	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Conversation (%d)", pr.Comments), url)
+	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits")
+	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks")
+	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files")
+	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff")
 }
 
 func (g GitHub) postIntroMessage(ctx workflow.Context, channelID, action string, pr PullRequest, sender User) {

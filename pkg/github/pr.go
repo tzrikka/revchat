@@ -58,8 +58,10 @@ func (g GitHub) prOpened(ctx workflow.Context, action string, pr PullRequest, se
 		return
 	}
 
+	// Wait for workflow completion before returning, to ensure we handle
+	// subsequent PR initialization events appropriately (e.g. check states).
 	req := PullRequestEvent{Action: action, PullRequest: pr, Sender: sender}
-	g.executeRevChatWorkflow(ctx, "github.initChannel", req)
+	_ = g.executeRevChatWorkflow(ctx, "github.initChannel", req).Get(ctx, nil)
 }
 
 // A PR (possibly a draft) was closed.

@@ -10,16 +10,67 @@ import (
 // EmailToSlackID looks up a Slack user based on the given email address.
 // This function assumes a mapping does not exist, so it adds it if found.
 func EmailToSlackID(ctx workflow.Context, cmd *cli.Command, email string) string {
-	user := slackUsersLookupByEmailActivity(ctx, cmd, email)
+	user := slackLookupUserByEmailActivity(ctx, cmd, email)
 	if user == nil {
 		return ""
 	}
 
-	id := user["id"].(string)
-	if err := data.AddSlackUser(id, email); err != nil {
+	if err := data.AddSlackUser(user.ID, email); err != nil {
 		msg := "failed to save Slack user ID/email mapping"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "user_id", id, "email", email)
+		workflow.GetLogger(ctx).Error(msg, "error", err, "user_id", user.ID, "email", email)
 	}
 
-	return id
+	return user.ID
+}
+
+// https://docs.slack.dev/reference/methods/users.lookupByEmail
+type slackUsersLookupByEmailRequest struct {
+	Email string `json:"email"`
+}
+
+// https://docs.slack.dev/reference/methods/users.lookupByEmail
+type slackUsersLookupByEmailResponse struct {
+	slackResponse
+
+	User *slackUser `json:"user,omitempty"`
+}
+
+// https://docs.slack.dev/reference/objects/user-object/
+type slackUser struct {
+	ID     string `json:"id"`
+	TeamID string `json:"team_id"`
+
+	RealName string `json:"real_name,omitempty"`
+	IsBot    bool   `json:"is_bot,omitempty"`
+
+	// Reminder: profile is also available here, if needed.
+}
+
+type slackResponse struct {
+	OK               bool              `json:"ok"`
+	Error            string            `json:"error,omitempty"`
+	Needed           string            `json:"needed,omitempty"`   // Scope errors (undocumented).
+	Provided         string            `json:"provided,omitempty"` // Scope errors (undocumented).
+	Warning          string            `json:"warning,omitempty"`
+	ResponseMetadata *responseMetadata `json:"response_metadata,omitempty"`
+}
+
+type responseMetadata struct {
+	Messages   []string `json:"messages,omitempty"`
+	Warnings   []string `json:"warnings,omitempty"`
+	NextCursor string   `json:"next_cursor,omitempty"`
+}
+
+// https://docs.slack.dev/reference/methods/users.lookupByEmail
+func slackLookupUserByEmailActivity(ctx workflow.Context, cmd *cli.Command, email string) *slackUser {
+	req := slackUsersLookupByEmailRequest{Email: email}
+	a := executeTimpaniActivity(ctx, cmd, "slack.users.lookupByEmail", req)
+
+	resp := slackUsersLookupByEmailResponse{}
+	if err := a.Get(ctx, &resp); err != nil {
+		workflow.GetLogger(ctx).Error("failed to lookup Slack user by email", "error", err, "email", email)
+		return nil
+	}
+
+	return resp.User
 }
