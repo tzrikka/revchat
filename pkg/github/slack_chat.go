@@ -13,12 +13,8 @@ func (g GitHub) mentionUserInMsg(ctx workflow.Context, channelID string, u User,
 	msg = fmt.Sprintf(msg, users.GitHubToSlackRef(ctx, g.cmd, u.Login, u.HTMLURL))
 
 	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
-	a := g.executeTimpaniActivity(ctx, slack.ChatPostMessageActivity, req)
-
-	resp := slack.ChatPostMessageResponse{}
-	if err := a.Get(ctx, &resp); err != nil {
-		msg := "failed to post Slack message"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID)
+	resp, err := slack.PostChatMessageActivity(ctx, g.cmd, req)
+	if err != nil {
 		return "", err
 	}
 
