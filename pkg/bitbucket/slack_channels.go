@@ -94,11 +94,6 @@ func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEv
 		return err
 	}
 
-	// Channel cosmetics.
-	b.setChannelTopic(ctx, channelID, url)
-	b.setChannelDescription(ctx, channelID, event.PullRequest.Title, url)
-	b.postIntroMessage(ctx, channelID, event.Type, event.PullRequest, event.Actor)
-
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
 	if err := data.MapURLToChannel(url, channelID); err != nil {
@@ -106,6 +101,13 @@ func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEv
 		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
 		return err
 	}
+
+	// Channel cosmetics.
+	b.setChannelTopic(ctx, channelID, url)
+	b.setChannelDescription(ctx, channelID, event.PullRequest.Title, url)
+	b.setChannelBookmarks(ctx, channelID, url, event.PullRequest)
+
+	b.postIntroMessage(ctx, channelID, event.Type, event.PullRequest, event.Actor)
 
 	return nil
 }
@@ -217,6 +219,15 @@ func (b Bitbucket) setChannelDescription(ctx workflow.Context, channelID, title,
 		msg := "failed to set Slack channel description"
 		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
 	}
+}
+
+func (b Bitbucket) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
+	files := 0
+	commits := 0
+
+	slack.BookmarksAddActivity(ctx, b.cmd, channelID, fmt.Sprintf("Conversation (%d)", pr.CommentCount), url+"/overview")
+	slack.BookmarksAddActivity(ctx, b.cmd, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff")
+	slack.BookmarksAddActivity(ctx, b.cmd, channelID, fmt.Sprintf("Commits (%d)", commits), url+"/commits")
 }
 
 func (b Bitbucket) postIntroMessage(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
