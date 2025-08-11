@@ -13,7 +13,7 @@ import (
 // This depends on the user's email address being the same in both systems.
 // This function returns the display name if the user is not found in Slack.
 func BitbucketToSlackRef(ctx workflow.Context, cmd *cli.Command, accountID, displayName string) string {
-	id := bitbucketToSlackID(ctx, cmd, accountID)
+	id := BitbucketToSlackID(ctx, cmd, accountID, false)
 	if id != "" {
 		return fmt.Sprintf("<@%s>", id)
 	}
@@ -25,10 +25,10 @@ func BitbucketToSlackRef(ctx workflow.Context, cmd *cli.Command, accountID, disp
 	return displayName
 }
 
-// bitbucketToSlackID converts a Bitbucket account ID into a Slack user ID.
+// BitbucketToSlackID converts a Bitbucket account ID into a Slack user ID.
 // This depends on the user's email address being the same in both systems.
 // This function returns an empty string if the account ID is not found.
-func bitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string) string {
+func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string, checkOptIn bool) string {
 	l := workflow.GetLogger(ctx)
 
 	email, err := data.BitbucketUserEmailByID(accountID)
@@ -41,6 +41,17 @@ func bitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 
 	if email == "" || email == "bot" {
 		return ""
+	}
+
+	if checkOptIn {
+		optedIn, err := data.IsOptedIn(email)
+		if err != nil {
+			l.Error("failed to load user opt-in status", "error", err, "email", email)
+			return ""
+		}
+		if !optedIn {
+			return ""
+		}
 	}
 
 	id, err := data.SlackUserIDByEmail(email)

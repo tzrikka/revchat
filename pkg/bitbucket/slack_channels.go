@@ -3,6 +3,7 @@ package bitbucket
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/users"
 )
 
 func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
@@ -38,6 +40,10 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 		state = "merged this PR"
 	case "pullrequest.updated":
 		state = "converted this PR to a draft"
+	}
+
+	if reason := event.PullRequest.Reason; reason != "" {
+		state = fmt.Sprintf("%s with this reason: `%s`", state, reason)
 	}
 
 	_, _ = b.mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
@@ -103,8 +109,7 @@ func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEv
 	b.setChannelBookmarks(ctx, channelID, url, pr)
 
 	b.postIntroMessage(ctx, channelID, event.Type, pr, event.Actor)
-
-	return nil
+	return slack.InviteUsersToChannelActivity(ctx, b.cmd, channelID, b.prParticipants(ctx, pr))
 }
 
 func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
@@ -136,27 +141,9 @@ func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, 
 }
 
 func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
-	l := workflow.GetLogger(ctx)
-
-	email, err := data.BitbucketUserEmailByID(accountID)
-	if err != nil {
-		l.Error("failed to load Bitbucket user email", "error", err, "account_id", accountID)
-		return
-	}
-
-	// Don't send a DM to the user if they're opted-out.
-	optedIn, err := data.IsOptedIn(email)
-	if err != nil {
-		l.Error("failed to load user opt-in status", "error", err, "email", email)
-		return
-	}
-	if !optedIn {
-		return
-	}
-
-	userID, err := data.SlackUserIDByEmail(email)
-	if err != nil || userID == "" {
-		l.Error("failed to load Slack user ID", "error", err, "email", email)
+	// True = don't send a DM to the user if they're opted-out.
+	userID := users.BitbucketToSlackID(ctx, b.cmd, accountID, true)
+	if userID == "" {
 		return
 	}
 
@@ -186,4 +173,32 @@ func (b Bitbucket) postIntroMessage(ctx workflow.Context, channelID, eventType s
 	}
 
 	_, _ = b.mentionUserInMsg(ctx, channelID, actor, msg)
+}
+
+// prParticipants returns a list of opted-in Slack user IDs (author/participants/reviewers).
+// The output is guaranteed to be sorted, without teams/apps, and without repetitions.
+func (b Bitbucket) prParticipants(ctx workflow.Context, pr PullRequest) []string {
+	accounts := append([]Account{pr.Author}, pr.Reviewers...)
+	for _, p := range pr.Participants {
+		accounts = append(accounts, p.User)
+	}
+
+	accountIDs := []string{}
+	for _, a := range accounts {
+		if a.Type == "user" {
+			accountIDs = append(accountIDs, a.AccountID)
+		}
+	}
+
+	slackIDs := []string{}
+	for _, aid := range accountIDs {
+		// True = don't include opted-out users. They will still be mentioned
+		// in the channel, but as non-members they won't be notified about it.
+		if sid := users.BitbucketToSlackID(ctx, b.cmd, aid, true); sid != "" {
+			slackIDs = append(slackIDs, sid)
+		}
+	}
+
+	slices.Sort(slackIDs)
+	return slices.Compact(slackIDs)
 }

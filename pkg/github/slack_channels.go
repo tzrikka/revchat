@@ -3,6 +3,7 @@ package github
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/users"
 )
 
 func (g GitHub) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
@@ -103,8 +105,7 @@ func (g GitHub) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent
 	g.setChannelBookmarks(ctx, channelID, pr.HTMLURL, pr)
 
 	g.postIntroMessage(ctx, channelID, event.Action, pr, event.Sender)
-
-	return nil
+	return slack.InviteUsersToChannelActivity(ctx, g.cmd, channelID, g.prParticipants(ctx, pr))
 }
 
 func (g GitHub) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
@@ -135,27 +136,9 @@ func (g GitHub) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 }
 
 func (g GitHub) reportCreationErrorToAuthor(ctx workflow.Context, username, url string) {
-	l := workflow.GetLogger(ctx)
-
-	email, err := data.GitHubUserEmailByID(username)
-	if err != nil {
-		l.Error("failed to load GitHub user email", "error", err, "username", username)
-		return
-	}
-
-	// Don't send a DM to the user if they're opted-out.
-	optedIn, err := data.IsOptedIn(email)
-	if err != nil {
-		l.Error("failed to load user opt-in status", "error", err, "email", email)
-		return
-	}
-	if !optedIn {
-		return
-	}
-
-	userID, err := data.SlackUserIDByEmail(email)
-	if err != nil || userID == "" {
-		l.Error("failed to load Slack user ID", "error", err, "email", email)
+	// True = don't send a DM to the user if they're opted-out.
+	userID := users.GitHubToSlackID(ctx, g.cmd, username, true)
+	if userID == "" {
 		return
 	}
 
@@ -185,4 +168,28 @@ func (g GitHub) postIntroMessage(ctx workflow.Context, channelID, action string,
 	}
 
 	_, _ = g.mentionUserInMsg(ctx, channelID, sender, msg)
+}
+
+// prParticipants returns a list of opted-in Slack user IDs (author/reviewers/assignees).
+// The output is guaranteed to be sorted, without teams, and without repetitions.
+func (g GitHub) prParticipants(ctx workflow.Context, pr PullRequest) []string {
+	ghUsers := append(append([]User{pr.User}, pr.RequestedReviewers...), pr.Assignees...)
+	usernames := []string{}
+	for _, u := range ghUsers {
+		if u.Type == "User" {
+			usernames = append(usernames, u.Login)
+		}
+	}
+
+	slackIDs := []string{}
+	for _, u := range usernames {
+		// True = don't include opted-out users. They will still be mentioned
+		// in the channel, but as non-members they won't be notified about it.
+		if id := users.GitHubToSlackID(ctx, g.cmd, u, true); id != "" {
+			slackIDs = append(slackIDs, id)
+		}
+	}
+
+	slices.Sort(slackIDs)
+	return slices.Compact(slackIDs)
 }
