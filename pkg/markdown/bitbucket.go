@@ -18,6 +18,8 @@ import (
 //   - https://bitbucket.org/tutorials/markdowndemo/src/master/
 //   - https://docs.slack.dev/messaging/formatting-message-text/
 func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text string) string {
+	text = strings.TrimSpace(text)
+
 	// Header lines --> bold lines.
 	text = regexp.MustCompile(`(?m)^#+\s+(.+)`).ReplaceAllString(text, "**${1}**")
 
@@ -54,7 +56,7 @@ func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text string) strin
 	for _, bbRef := range regexp.MustCompile(`@\{[\w:-]+\}`).FindAllString(text, -1) {
 		accountID := strings.TrimSuffix(bbRef[2:], "}")
 		slackRef := users.BitbucketToSlackRef(ctx, cmd, accountID, "")
-		text = regexp.MustCompile(bbRef).ReplaceAllString(text, slackRef)
+		text = strings.ReplaceAll(text, bbRef, slackRef)
 	}
 
 	return text

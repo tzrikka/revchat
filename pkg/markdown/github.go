@@ -18,6 +18,8 @@ import (
 //   - https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
 //   - https://docs.slack.dev/messaging/formatting-message-text/
 func GitHubToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string) string {
+	text = strings.TrimSpace(text)
+
 	// Header lines --> bold lines.
 	text = regexp.MustCompile(`(?m)^#+\s+(.+)`).ReplaceAllString(text, "**${1}**")
 
@@ -55,11 +57,15 @@ func GitHubToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string) s
 		if err != nil {
 			break
 		}
-		username := strings.Replace(ghRef[1:], "/", "/teams/", 1)
+
+		username := ghRef[1:]
+		if strings.Contains(username, "/") {
+			username = "orgs/" + strings.Replace(username, "/", "/teams/", 1)
+		}
+
 		profile := fmt.Sprintf("%s://%s/%s", u.Scheme, u.Host, username)
 		slackRef := users.GitHubToSlackRef(ctx, cmd, username, profile)
-
-		text = regexp.MustCompile(ghRef).ReplaceAllString(text, slackRef)
+		text = strings.ReplaceAll(text, ghRef, slackRef)
 	}
 
 	// PR references: "#123" --> "<PR URL|#123>" (works for issues too).
