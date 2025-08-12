@@ -163,8 +163,8 @@ func (g GitHub) postIntroMessage(ctx workflow.Context, channelID, action string,
 	}
 
 	msg := fmt.Sprintf("%%s %s %s: `%s`", action, pr.HTMLURL, pr.Title)
-	if text := strings.TrimSpace(*pr.Body); text != "" {
-		msg += "\n\n" + markdown.GitHubToSlack(ctx, g.cmd, text, pr.HTMLURL)
+	if pr.Body != nil && strings.TrimSpace(*pr.Body) != "" {
+		msg += "\n\n" + markdown.GitHubToSlack(ctx, g.cmd, *pr.Body, pr.HTMLURL)
 	}
 
 	_, _ = g.mentionUserInMsg(ctx, channelID, sender, msg)
