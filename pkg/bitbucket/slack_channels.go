@@ -118,7 +118,7 @@ func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, 
 	l := workflow.GetLogger(ctx)
 
 	for i := 1; i < 100; i++ {
-		name := fmt.Sprintf("%s_%s", b.cmd.String("slack-channel-name-prefix"), title)
+		name := fmt.Sprintf("%s_%d_%s", b.cmd.String("slack-channel-name-prefix"), pr.ID, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}

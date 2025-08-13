@@ -76,7 +76,7 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 	}
 
 	if channelID == "" {
-		l.Debug("GitHub PR's Slack channel ID is empty", "action", action, "pr_url", pr.HTMLURL)
+		l.Debug("GitHub PR's Slack channel ID not found", "action", action, "pr_url", pr.HTMLURL)
 		return "", false
 	}
 
@@ -113,7 +113,7 @@ func (g GitHub) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 	l := workflow.GetLogger(ctx)
 
 	for i := 1; i < 100; i++ {
-		name := fmt.Sprintf("%s_%s", g.cmd.String("slack-channel-name-prefix"), title)
+		name := fmt.Sprintf("%s_%d_%s", g.cmd.String("slack-channel-name-prefix"), pr.Number, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
