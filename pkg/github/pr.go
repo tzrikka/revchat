@@ -9,19 +9,21 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
+// https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request
+// https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests
 func (g GitHub) handlePullRequestEvent(ctx workflow.Context, event PullRequestEvent) {
 	switch event.Action {
 	case "opened":
-		g.prOpened(ctx, event.Action, event.PullRequest, event.Sender)
+		g.prOpened(ctx, event)
 	case "closed":
-		g.prClosed(ctx, event.Action, event.PullRequest, event.Sender)
+		g.prClosed(ctx, event)
 	case "reopened":
-		g.prReopened(ctx, event.Action, event.PullRequest, event.Sender)
+		g.prReopened(ctx, event)
 
 	case "converted_to_draft":
-		g.prConvertedToDraft(ctx, event.Action, event.PullRequest, event.Sender)
+		g.prConvertedToDraft(ctx, event)
 	case "ready_for_review":
-		g.prReadyForReview(ctx, event.Action, event.PullRequest, event.Sender)
+		g.prReadyForReview(ctx, event)
 
 	case "review_requested":
 		g.prReviewRequested(ctx, event)
@@ -29,65 +31,66 @@ func (g GitHub) handlePullRequestEvent(ctx workflow.Context, event PullRequestEv
 		g.prReviewRequestRemoved(ctx, event)
 
 	case "assigned":
-		g.prAssigned(ctx, event.Action, event.PullRequest, *event.Assignee, event.Sender)
+		g.prAssigned(ctx, event)
 	case "unassigned":
-		g.prUnassigned(ctx, event.Action, event.PullRequest, *event.Assignee, event.Sender)
+		g.prUnassigned(ctx, event)
 
 	case "edited": // Title, body, base branch.
-		g.prEdited(ctx, event.Action, event.PullRequest, *event.Changes, event.Sender)
+		g.prEdited(ctx, event)
 	case "synchronize": // Head branch.
-		g.prSynchronized(ctx, event.Action, event.PullRequest, event.Sender)
+		g.prSynchronized(ctx, event)
 
 	case "locked":
 		g.prLocked()
 	case "unlocked":
 		g.prUnlocked()
-	}
 
-	// Ignored actions:
-	//  - auto_merge_enabled, auto_merge_disabled
-	//  - enqueued, dequeued
-	//  - labeled, unlabeled
-	//  - milestoned, demilestoned
+	// Ignored actions.
+	case "auto_merge_enabled", "auto_merge_disabled":
+	case "enqueued", "dequeued":
+	case "labeled", "unlabeled":
+	case "milestoned", "demilestoned":
+
+	default:
+		workflow.GetLogger(ctx).Error("unrecognized GitHub PR event action", "action", event.Action)
+	}
 }
 
 // A new PR was created (or reopened, or marked as ready for review).
 // See also [GitHub.prReopened] and [GitHub.prReadyForReview] which wrap it.
-func (g GitHub) prOpened(ctx workflow.Context, action string, pr PullRequest, sender User) {
+func (g GitHub) prOpened(ctx workflow.Context, event PullRequestEvent) {
 	// Ignore drafts until they're marked as ready for review.
-	if pr.Draft {
+	if event.PullRequest.Draft {
 		msg := "ignoring GitHub event - the PR is a draft"
-		workflow.GetLogger(ctx).Debug(msg, "action", action, "pr_url", pr.HTMLURL)
+		workflow.GetLogger(ctx).Debug(msg, "action", event.Action, "pr_url", event.PullRequest.HTMLURL)
 		return
 	}
 
 	// Wait for workflow completion before returning, to ensure we handle
 	// subsequent PR initialization events appropriately (e.g. check states).
-	req := PullRequestEvent{Action: action, PullRequest: pr, Sender: sender}
-	_ = g.executeWorkflow(ctx, "github.initChannel", req).Get(ctx, nil)
+	_ = g.executeWorkflow(ctx, "github.initChannel", event).Get(ctx, nil)
 }
 
 // A PR (possibly a draft) was closed.
 // If "merged" is false in the webhook payload, the PR was
 // closed with unmerged commits. Otherwise, the PR was merged.
-func (g GitHub) prClosed(ctx workflow.Context, action string, pr PullRequest, sender User) {
+func (g GitHub) prClosed(ctx workflow.Context, event PullRequestEvent) {
 	// Ignore drafts - they don't have an active Slack channel anyway.
-	if pr.Draft {
+	if event.PullRequest.Draft {
 		msg := "ignoring GitHub event - the PR is a draft"
-		workflow.GetLogger(ctx).Debug(msg, "action", action, "pr_url", pr.HTMLURL)
+		workflow.GetLogger(ctx).Debug(msg, "action", event.Action, "pr_url", event.PullRequest.HTMLURL)
 		return
 	}
 
-	req := PullRequestEvent{Action: action, PullRequest: pr, Sender: sender}
-	g.executeWorkflow(ctx, "github.archiveChannel", req)
+	g.executeWorkflow(ctx, "github.archiveChannel", event)
 }
 
 // A previously closed PR (possibly a draft) was reopened.
-func (g GitHub) prReopened(ctx workflow.Context, action string, pr PullRequest, sender User) {
+func (g GitHub) prReopened(ctx workflow.Context, event PullRequestEvent) {
 	// Ignore drafts - they don't have an active Slack channel anyway.
-	if pr.Draft {
+	if event.PullRequest.Draft {
 		msg := "ignoring GitHub event - the PR is a draft"
-		workflow.GetLogger(ctx).Debug(msg, "action", action, "pr_url", pr.HTMLURL)
+		workflow.GetLogger(ctx).Debug(msg, "action", event.Action, "pr_url", event.PullRequest.HTMLURL)
 		return
 	}
 
@@ -95,26 +98,25 @@ func (g GitHub) prReopened(ctx workflow.Context, action string, pr PullRequest, 
 	// bot tokens ("xoxb-...") cannot currently be used to unarchive conversations. For now,
 	// use a user token ("xoxp-...") to unarchive the conversation rather than a bot token.
 	// Workaround for the Slack unarchive bug: treat this as a new PR.
-	g.prOpened(ctx, action, pr, sender)
+	g.prOpened(ctx, event)
 }
 
 // A PR was converted to a draft.
 // For more information, see "Changing the stage of a pull request":
 // https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request
-func (g GitHub) prConvertedToDraft(ctx workflow.Context, action string, pr PullRequest, sender User) {
-	req := PullRequestEvent{Action: action, PullRequest: pr, Sender: sender}
-	g.executeWorkflow(ctx, "github.archiveChannel", req)
+func (g GitHub) prConvertedToDraft(ctx workflow.Context, event PullRequestEvent) {
+	g.executeWorkflow(ctx, "github.archiveChannel", event)
 }
 
 // A draft PR was marked as ready for review.
 // For more information, see "Changing the stage of a pull request":
 // https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request
-func (g GitHub) prReadyForReview(ctx workflow.Context, action string, pr PullRequest, sender User) {
+func (g GitHub) prReadyForReview(ctx workflow.Context, event PullRequestEvent) {
 	// Slack bug notice from https://docs.slack.dev/reference/methods/conversations.unarchive:
 	// bot tokens ("xoxb-...") cannot currently be used to unarchive conversations. For now,
 	// use a user token ("xoxp-...") to unarchive the conversation rather than a bot token.
 	// Workaround for the Slack unarchive bug: treat this as a new PR.
-	g.prOpened(ctx, action, pr, sender)
+	g.prOpened(ctx, event)
 }
 
 // Review by a person or team was requested for a PR.
@@ -164,42 +166,42 @@ func (g GitHub) prReviewRequestRemovedUser(ctx workflow.Context, channelID strin
 }
 
 // A PR was assigned to a user.
-func (g GitHub) prAssigned(ctx workflow.Context, action string, pr PullRequest, assignee, sender User) {
+func (g GitHub) prAssigned(ctx workflow.Context, event PullRequestEvent) {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := lookupChannel(ctx, action, pr)
+	channelID, found := lookupChannel(ctx, event.Action, event.PullRequest)
 	if !found {
 		return
 	}
 
-	g.prReviewRequestedUser(ctx, channelID, assignee, sender, "assignee")
+	g.prReviewRequestedUser(ctx, channelID, *event.Assignee, event.Sender, "assignee")
 }
 
 // A user was unassigned from a PR.
-func (g GitHub) prUnassigned(ctx workflow.Context, action string, pr PullRequest, assignee, sender User) {
+func (g GitHub) prUnassigned(ctx workflow.Context, event PullRequestEvent) {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := lookupChannel(ctx, action, pr)
+	channelID, found := lookupChannel(ctx, event.Action, event.PullRequest)
 	if !found {
 		return
 	}
 
-	g.prReviewRequestRemovedUser(ctx, channelID, assignee, sender, "assignee")
+	g.prReviewRequestRemovedUser(ctx, channelID, *event.Assignee, event.Sender, "assignee")
 }
 
 // The title or body of a PR was edited, or the base branch was changed.
-func (g GitHub) prEdited(ctx workflow.Context, action string, pr PullRequest, changes Changes, sender User) {
+func (g GitHub) prEdited(ctx workflow.Context, event PullRequestEvent) {
 }
 
 // A PR's head branch was updated. For example, the head branch was updated
 // from the base branch or new commits were pushed to the head branch.
-func (g GitHub) prSynchronized(ctx workflow.Context, action string, pr PullRequest, sender User) {
+func (g GitHub) prSynchronized(ctx workflow.Context, event PullRequestEvent) {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := lookupChannel(ctx, action, pr)
+	channelID, found := lookupChannel(ctx, event.Action, event.PullRequest)
 	if !found {
 		return
 	}
 
-	ref := users.GitHubToSlackRef(ctx, g.cmd, sender.Login, sender.HTMLURL)
-	msg := fmt.Sprintf("%s updated the head branch (see the [PR commits](%s/commits))", ref, pr.HTMLURL)
+	ref := users.GitHubToSlackRef(ctx, g.cmd, event.Sender.Login, event.Sender.HTMLURL)
+	msg := fmt.Sprintf("%s updated the head branch (see the [PR commits](%s/commits))", ref, event.PullRequest.HTMLURL)
 	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
 	slack.PostChatMessageActivityAsync(ctx, g.cmd, req)
 }

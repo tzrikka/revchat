@@ -27,6 +27,8 @@ Detailed instructions: https://github.com/tzrikka/thrippy/tree/main/docs/atlassi
   - Comment reopened
 - Repo
   - Commit comment created
+  - Build status created
+  - Build status updated
 
 ## Thrippy Link
 

@@ -2,21 +2,77 @@ package github
 
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request
 type PullRequestEvent struct {
-	Action       string       `json:"action"`
-	Installation Installation `json:"installation"`
-	Number       int          `json:"number"`
-	Organization Organization `json:"organization"`
-	PullRequest  PullRequest  `json:"pull_request"`
-	Repository   Repository   `json:"repository"`
-	Sender       User         `json:"sender"`
+	Action      string      `json:"action"`
+	Number      int         `json:"number"`
+	PullRequest PullRequest `json:"pull_request"`
+	Sender      User        `json:"sender"`
 
-	Assignee          *User `json:"assignee"`
-	RequestedReviewer *User `json:"requested_reviewer"`
-	RequestedTeam     *Team `json:"requested_team"`
+	Assignee          *User `json:"assignee,omitempty"`
+	RequestedReviewer *User `json:"requested_reviewer,omitempty"`
+	RequestedTeam     *Team `json:"requested_team,omitempty"`
 
-	Changes *Changes `json:"changes"`
-	Before  *string  `json:"before"`
-	After   *string  `json:"after"`
+	Changes *Changes `json:"changes,omitempty"`
+	Before  *string  `json:"before,omitempty"`
+	After   *string  `json:"after,omitempty"`
+
+	// Repository   `json:"repository"`
+	// Organization `json:"organization"`
+	// Installation `json:"installation"`
+}
+
+// https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request_review
+type PullRequestReviewEvent struct {
+	Action      string      `json:"action"`
+	PullRequest PullRequest `json:"pull_request"`
+	Sender      User        `json:"sender"`
+
+	Review  Review   `json:"review"`
+	Changes *Changes `json:"changes,omitempty"`
+
+	// Repository   `json:"repository"`
+	// Organization `json:"organization"`
+	// Installation `json:"installation"`
+}
+
+// https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request_review_comment
+type PullRequestReviewCommentEvent struct {
+	Action      string      `json:"action"`
+	PullRequest PullRequest `json:"pull_request"`
+	Sender      User        `json:"sender"`
+
+	Comment Comment  `json:"comment"`
+	Changes *Changes `json:"changes,omitempty"`
+
+	// Repository   `json:"repository"`
+	// Organization `json:"organization"`
+	// Installation `json:"installation"`
+}
+
+// https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request_review_thread
+type PullRequestReviewThreadEvent struct {
+	Action      string      `json:"action"`
+	PullRequest PullRequest `json:"pull_request"`
+	Sender      User        `json:"sender"`
+
+	Thread Thread `json:"thread"`
+
+	// Repository   `json:"repository"`
+	// Organization `json:"organization"`
+	// Installation `json:"installation"`
+}
+
+// https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_comment
+type IssueCommentEvent struct {
+	Action string `json:"action"`
+	Issue  Issue  `json:"issue"`
+	Sender User   `json:"sender"`
+
+	Comment Comment  `json:"comment"`
+	Changes *Changes `json:"changes,omitempty"`
+
+	// Repository   `json:"repository"`
+	// Organization `json:"organization"`
+	// Installation `json:"installation"`
 }
 
 type AutoMerge struct {
@@ -47,9 +103,13 @@ type Change struct {
 	From string `json:"from"`
 }
 
+type Comment struct{}
+
 type Installation struct {
 	ID int64 `json:"id"`
 }
+
+type Issue struct{}
 
 type Organization struct {
 	ID    int64  `json:"id"`
@@ -110,6 +170,8 @@ type Repository struct {
 	Owner    User   `json:"owner"`
 }
 
+type Review struct{}
+
 type Team struct {
 	ID          int64   `json:"id"`
 	Slug        string  `json:"slug"`
@@ -117,6 +179,8 @@ type Team struct {
 	Description *string `json:"description"`
 	HTMLURL     string  `json:"html_url"`
 }
+
+type Thread struct{}
 
 type User struct {
 	ID        int64  `json:"id"`
