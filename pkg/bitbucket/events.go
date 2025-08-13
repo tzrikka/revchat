@@ -28,6 +28,9 @@ var Signals = []string{
 	"bitbucket.events.pullrequest.comment_reopened",
 
 	"bitbucket.events.repo.commit_comment_created",
+
+	"bitbucket.events.repo.build_status_created",
+	"bitbucket.events.repo.build_status_updated",
 }
 
 // eventsWorkflow is an always-running Temporal workflow that handles
@@ -45,19 +48,35 @@ func (b Bitbucket) eventsWorkflow(ctx workflow.Context) error {
 	l := workflow.GetLogger(ctx)
 	more := true
 
-	for _, ch := range chs {
-		selector.AddReceive(ch, func(c workflow.ReceiveChannel, _ bool) {
+	for i := range 13 {
+		selector.AddReceive(chs[i], func(c workflow.ReceiveChannel, _ bool) {
 			e := PullRequestEvent{}
 			more = c.Receive(ctx, &e)
 
 			var found bool
-			signal := ch.Name()
-			if _, e.Type, found = strings.Cut(signal, "events."); !found {
+			signal := chs[i].Name()
+			if _, e.Type, found = strings.Cut(signal, "pullrequest."); !found {
 				e.Type = signal
 			}
 
 			l.Debug("received signal", "signal", signal)
 			b.handlePullRequestEvent(ctx, e)
+		})
+	}
+
+	for i := 13; i < len(Signals); i++ {
+		selector.AddReceive(chs[i], func(c workflow.ReceiveChannel, _ bool) {
+			e := RepositoryEvent{}
+			more = c.Receive(ctx, &e)
+
+			var found bool
+			signal := chs[i].Name()
+			if _, e.Type, found = strings.Cut(signal, "repo."); !found {
+				e.Type = signal
+			}
+
+			l.Debug("received signal", "signal", signal)
+			b.handleRepositoryEvent(ctx, e)
 		})
 	}
 

@@ -14,6 +14,8 @@ var Signals = []string{
 	"github.events.pull_request_review",
 	"github.events.pull_request_review_comment",
 	"github.events.pull_request_review_thread",
+
+	"github.events.issue_comment",
 }
 
 // eventsWorkflow is an always-running Temporal workflow that handles
@@ -38,26 +40,33 @@ func (g GitHub) eventsWorkflow(ctx workflow.Context) error {
 		g.handlePullRequestEvent(ctx, e)
 	})
 
-	// selector.AddReceive(ch[1], func(c workflow.ReceiveChannel, _ bool) {
-	// 	e := PullRequestReviewEvent{}
-	// 	more = c.Receive(ctx, &e)
-	// 	l.Debug("received signal", "signal", ch[1].Name(), "action", e.Action)
-	// 	g.handlePullRequestReviewEvent(ctx, e)
-	// })
+	selector.AddReceive(ch[1], func(c workflow.ReceiveChannel, _ bool) {
+		e := PullRequestReviewEvent{}
+		more = c.Receive(ctx, &e)
+		l.Debug("received signal", "signal", ch[1].Name(), "action", e.Action)
+		g.handlePullRequestReviewEvent(ctx, e)
+	})
 
-	// selector.AddReceive(ch[2], func(c workflow.ReceiveChannel, _ bool) {
-	// 	e := PullRequestReviewCommentEvent{}
-	// 	more = c.Receive(ctx, &e)
-	// 	l.Debug("received signal", "signal", ch[2].Name(), "action", e.Action)
-	// 	g.handlePullRequestReviewCommentEvent(ctx, e)
-	// })
+	selector.AddReceive(ch[2], func(c workflow.ReceiveChannel, _ bool) {
+		e := PullRequestReviewCommentEvent{}
+		more = c.Receive(ctx, &e)
+		l.Debug("received signal", "signal", ch[2].Name(), "action", e.Action)
+		g.handlePullRequestReviewCommentEvent(ctx, e)
+	})
 
-	// selector.AddReceive(ch[3], func(c workflow.ReceiveChannel, _ bool) {
-	// 	e := PullRequestReviewThreadEvent{}
-	// 	more = c.Receive(ctx, &e)
-	// 	l.Debug("received signal", "signal", ch[3].Name(), "action", e.Action)
-	// 	g.handlePullRequestReviewThreadEvent(ctx, e)
-	// })
+	selector.AddReceive(ch[3], func(c workflow.ReceiveChannel, _ bool) {
+		e := PullRequestReviewThreadEvent{}
+		more = c.Receive(ctx, &e)
+		l.Debug("received signal", "signal", ch[3].Name(), "action", e.Action)
+		g.handlePullRequestReviewThreadEvent(ctx, e)
+	})
+
+	selector.AddReceive(ch[4], func(c workflow.ReceiveChannel, _ bool) {
+		e := IssueCommentEvent{}
+		more = c.Receive(ctx, &e)
+		l.Debug("received signal", "signal", ch[3].Name(), "action", e.Action)
+		g.handleIssueCommentEvent(ctx, e)
+	})
 
 	for more {
 		selector.Select(ctx)
