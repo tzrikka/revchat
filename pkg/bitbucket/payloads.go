@@ -9,9 +9,9 @@ type PullRequestEvent struct {
 	Repository  Repository  `json:"repository"`
 	Actor       Account     `json:"actor"`
 
-	Approval       *Review  `json:"approval,omiyempty"`
-	ChangesRequest *Review  `json:"changes_request,omiyempty"`
-	Comment        *Comment `json:"comment,omiyempty"`
+	Approval       *Review  `json:"approval,omitempty"`
+	ChangesRequest *Review  `json:"changes_request,omitempty"`
+	Comment        *Comment `json:"comment,omitempty"`
 }
 
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Repository-events
@@ -21,8 +21,8 @@ type RepositoryEvent struct {
 	Repository Repository `json:"repository"`
 	Actor      Account    `json:"actor"`
 
-	Commit  *Commit  `json:"commit,omiyempty"`
-	Comment *Comment `json:"comment,omiyempty"`
+	Commit  *Commit  `json:"commit,omitempty"`
+	Comment *Comment `json:"comment,omitempty"`
 }
 
 type Account struct {
