@@ -1,12 +1,12 @@
 module github.com/tzrikka/revchat
 
-go 1.24.5
+go 1.25
 
 require (
 	github.com/rs/zerolog v1.34.0
-	github.com/tzrikka/xdg v1.2.5
+	github.com/tzrikka/xdg v1.2.6
 	github.com/urfave/cli-altsrc/v3 v3.0.1
-	github.com/urfave/cli/v3 v3.3.8
+	github.com/urfave/cli/v3 v3.4.1
 	go.temporal.io/sdk v1.35.0
 )
 
@@ -27,15 +27,15 @@ require (
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
-	go.temporal.io/api v1.51.0 // indirect
-	golang.org/x/net v0.42.0 // indirect
+	go.temporal.io/api v1.52.0 // indirect
+	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250804133106-a7a43d27e69b // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250811230008-5f3141c8851a // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250811230008-5f3141c8851a // indirect
 	google.golang.org/grpc v1.74.2 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
