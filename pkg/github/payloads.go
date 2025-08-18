@@ -91,15 +91,17 @@ type Branch struct {
 }
 
 type Changes struct {
-	Base struct {
-		Ref Change `json:"ref"`
-		SHA Change `json:"sha"`
-	} `json:"base"`
-	Body  Change `json:"body"`
-	Title Change `json:"title"`
+	Base  *ChangeBase `json:"base,omitempty"`
+	Body  *ChangeFrom `json:"body,omitempty"`
+	Title *ChangeFrom `json:"title,omitempty"`
 }
 
-type Change struct {
+type ChangeBase struct {
+	Ref ChangeFrom `json:"ref"`
+	SHA ChangeFrom `json:"sha"`
+}
+
+type ChangeFrom struct {
 	From string `json:"from"`
 }
 

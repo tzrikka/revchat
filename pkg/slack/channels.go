@@ -79,6 +79,12 @@ type conversationsInviteResponse struct {
 	Errors  []map[string]any `json:"errors,omitempty"`
 }
 
+// https://docs.slack.dev/reference/methods/conversations.kick
+type conversationsKickRequest struct {
+	Channel string `json:"channel"`
+	User    string `json:"user"`
+}
+
 // https://docs.slack.dev/reference/methods/conversations.setPurpose
 type conversationsSetPurposeRequest struct {
 	Channel string `json:"channel"`
@@ -150,10 +156,24 @@ func InviteUsersToChannelActivity(ctx workflow.Context, cmd *cli.Command, channe
 	if err := a.Get(ctx, resp); err != nil {
 		msg := "failed to add user(s) to Slack channel"
 		if strings.Contains(err.Error(), "already_in_channel") {
-			l.Debug(msg+" - already in channel", "error", err, "resp", resp, "users_len", len(userIDs))
+			l.Debug(msg+" - already in channel", "error", err, "resp", resp, "user_ids", strings.Join(userIDs, ","))
 			return nil
 		}
-		l.Error(msg, "error", err, "channel_id", channelID, "users_len", len(userIDs))
+		l.Error(msg, "error", err, "channel_id", channelID, "user_ids", strings.Join(userIDs, ","))
+		return err
+	}
+
+	return nil
+}
+
+// https://docs.slack.dev/reference/methods/conversations.kick
+func KickUserFromChannelActivity(ctx workflow.Context, cmd *cli.Command, channelID, userID string) error {
+	req := conversationsKickRequest{Channel: channelID, User: userID}
+	a := executeTimpaniActivity(ctx, cmd, "slack.conversations.kick", req)
+
+	if err := a.Get(ctx, nil); err != nil {
+		msg := "failed to kick user from Slack channel"
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "user_id", userID)
 		return err
 	}
 

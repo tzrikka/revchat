@@ -65,9 +65,6 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 		l.Debug("ignoring GitHub event - the PR is a draft", "action", action, "pr_url", pr.HTMLURL)
 		return "", false
 	}
-	// case pr.State != "open":
-	// 	l.Debug("ignoring GitHub event - the PR isn't open", "action", action, "url", pr.HTMLURL)
-	// 	return "", false
 
 	channelID, err := data.ConvertURLToChannel(pr.HTMLURL)
 	if err != nil {
@@ -150,7 +147,7 @@ func (g GitHub) reportCreationErrorToAuthor(ctx workflow.Context, username, url 
 func (g GitHub) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
 	checks := 0
 
-	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Conversation (%d)", pr.Comments), url)
+	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Comments (%d)", pr.Comments), url)
 	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits")
 	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks")
 	slack.AddBookmarkActivity(ctx, g.cmd, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files")
