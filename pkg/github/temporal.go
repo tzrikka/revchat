@@ -15,6 +15,7 @@ func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
 	w.RegisterWorkflowWithOptions(g.eventsWorkflow, workflow.RegisterOptions{Name: "github.events"})
 	w.RegisterWorkflowWithOptions(g.archiveChannelWorkflow, workflow.RegisterOptions{Name: "github.archiveChannel"})
 	w.RegisterWorkflowWithOptions(g.initChannelWorkflow, workflow.RegisterOptions{Name: "github.initChannel"})
+	w.RegisterWorkflowWithOptions(g.updateMembersWorkflow, workflow.RegisterOptions{Name: "github.updateMembers"})
 }
 
 func (g GitHub) executeWorkflow(ctx workflow.Context, name string, req any) workflow.ChildWorkflowFuture {
