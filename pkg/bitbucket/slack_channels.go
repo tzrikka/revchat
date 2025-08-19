@@ -16,8 +16,10 @@ import (
 )
 
 func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	pr := event.PullRequest
+
 	// If we're not tracking this PR, there's no channel to archive.
-	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	channelID, found := lookupChannel(ctx, event.Type, pr)
 	if !found {
 		return nil
 	}
@@ -26,13 +28,8 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
-	l := workflow.GetLogger(ctx)
-	url := event.PullRequest.Links["html"].HRef
-	if err := data.RemoveURLToChannelMapping(url); err != nil {
-		msg := "failed to remove PR URL / Slack channel mapping"
-		l.Error(msg, "error", err, "event_type", event.Type, "channel_id", channelID, "pr_url", url)
-		// Ignore this error, don't abort.
-	}
+	url := pr.Links["html"].HRef
+	b.cleanupPRData(ctx, url)
 
 	state := "closed this PR"
 	switch event.Type {
@@ -71,7 +68,7 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 		return "", false
 	}
 
-	channelID, err := data.ConvertURLToChannel(url)
+	channelID, err := data.SwitchURLAndID(url)
 	if err != nil {
 		l.Error("failed to retrieve Bitbucket PR's Slack channel ID", "error", err, "event_type", eventType, "pr_url", url)
 		return "", false
@@ -85,6 +82,36 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 	return channelID, true
 }
 
+// cleanupPRData deletes all data associated with a PR. If there are errors,
+// they are logged but ignored, as they do not affect the overall workflow.
+func (b Bitbucket) cleanupPRData(ctx workflow.Context, url string) {
+	if err := data.DeleteBitbucketPR(url); err != nil {
+		workflow.GetLogger(ctx).Error("failed to delete PR snapshot", "error", err, "pr_url", url)
+	}
+
+	if err := data.DeleteURLAndIDMapping(url); err != nil {
+		workflow.GetLogger(ctx).Error("failed to delete PR URL / Slack channel mappings", "error", err, "pr_url", url)
+	}
+}
+
+// initPRData saves the initial state of a new PR: a snapshot of the
+// PR details, and mappings for 2-way syncs between Bitbucket and Slack.
+func (b Bitbucket) initPRData(ctx workflow.Context, url string, pr PullRequest, channelID string) bool {
+	l := workflow.GetLogger(ctx)
+
+	if err := data.StoreBitbucketPR(url, pr); err != nil {
+		l.Error("failed to save PR snapshot", "error", err, "channel_id", channelID, "pr_url", url)
+		return false
+	}
+
+	if err := data.MapURLAndID(url, channelID); err != nil {
+		l.Error("failed to save PR URL / Slack channel mapping", "error", err, "channel_id", channelID, "pr_url", url)
+		return false
+	}
+
+	return true
+}
+
 func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	pr := event.PullRequest
 	url := pr.Links["html"].HRef
@@ -95,21 +122,25 @@ func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEv
 		return err
 	}
 
-	// Map the PR to the Slack channel ID, for 2-way event syncs.
-	l := workflow.GetLogger(ctx)
-	if err := data.MapURLToChannel(url, channelID); err != nil {
-		msg := "failed to save PR URL / Slack channel mapping"
-		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
-		return err
+	if !b.initPRData(ctx, url, pr, channelID) {
+		b.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		b.cleanupPRData(ctx, url)
+		return errors.New("failed to initialize PR data")
 	}
 
 	// Channel cosmetics.
 	slack.SetChannelTopicActivity(ctx, b.cmd, channelID, url)
 	slack.SetChannelDescriptionActivity(ctx, b.cmd, channelID, pr.Title, url)
 	b.setChannelBookmarks(ctx, channelID, url, pr)
-
 	b.postIntroMessage(ctx, channelID, event.Type, pr, event.Actor)
-	return slack.InviteUsersToChannelActivity(ctx, b.cmd, channelID, b.prParticipants(ctx, pr))
+
+	err = slack.InviteUsersToChannelActivity(ctx, b.cmd, channelID, b.prParticipants(ctx, pr))
+	if err != nil {
+		b.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		b.cleanupPRData(ctx, url)
+	}
+
+	return err
 }
 
 func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
@@ -156,9 +187,9 @@ func (b Bitbucket) setChannelBookmarks(ctx workflow.Context, channelID, url stri
 	files := 0
 	commits := 0
 
-	slack.AddBookmarkActivity(ctx, b.cmd, channelID, fmt.Sprintf("Conversation (%d)", pr.CommentCount), url+"/overview")
-	slack.AddBookmarkActivity(ctx, b.cmd, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff")
+	slack.AddBookmarkActivity(ctx, b.cmd, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
 	slack.AddBookmarkActivity(ctx, b.cmd, channelID, fmt.Sprintf("Commits (%d)", commits), url+"/commits")
+	slack.AddBookmarkActivity(ctx, b.cmd, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff")
 }
 
 func (b Bitbucket) postIntroMessage(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {

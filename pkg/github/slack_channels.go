@@ -28,7 +28,7 @@ func (g GitHub) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEv
 
 	l := workflow.GetLogger(ctx)
 	url := event.PullRequest.HTMLURL
-	if err := data.RemoveURLToChannelMapping(url); err != nil {
+	if err := data.DeleteURLAndIDMapping(url); err != nil {
 		msg := "failed to remove PR URL / Slack channel mapping"
 		l.Error(msg, "error", err, "action", event.Action, "channel_id", channelID, "pr_url", url)
 		// Ignore this error, don't abort.
@@ -66,7 +66,7 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 		return "", false
 	}
 
-	channelID, err := data.ConvertURLToChannel(pr.HTMLURL)
+	channelID, err := data.SwitchURLAndID(pr.HTMLURL)
 	if err != nil {
 		l.Error("failed to retrieve GitHub PR's Slack channel ID", "error", err, "action", action, "pr_url", pr.HTMLURL)
 		return "", false
@@ -90,7 +90,7 @@ func (g GitHub) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent
 
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	l := workflow.GetLogger(ctx)
-	if err := data.MapURLToChannel(pr.HTMLURL, channelID); err != nil {
+	if err := data.MapURLAndID(pr.HTMLURL, channelID); err != nil {
 		msg := "failed to save PR URL / Slack channel mapping"
 		l.Error(msg, "error", err, "channel_id", channelID, "pr_url", pr.HTMLURL)
 		return err
@@ -100,8 +100,8 @@ func (g GitHub) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent
 	slack.SetChannelTopicActivity(ctx, g.cmd, channelID, pr.HTMLURL)
 	slack.SetChannelDescriptionActivity(ctx, g.cmd, channelID, pr.Title, pr.HTMLURL)
 	g.setChannelBookmarks(ctx, channelID, pr.HTMLURL, pr)
-
 	g.postIntroMessage(ctx, channelID, event.Action, pr, event.Sender)
+
 	return slack.InviteUsersToChannelActivity(ctx, g.cmd, channelID, g.prParticipants(ctx, pr))
 }
 

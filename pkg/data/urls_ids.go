@@ -7,10 +7,12 @@ import (
 )
 
 const (
-	urlsFile = "urls.json"
+	urlsFile = "urls_ids.json"
 )
 
-func MapURLToChannel(url, channel string) error {
+// MapURLAndID saves a 2-way mapping between a PR URL
+// and its dedicated chat channel or thread IDs.
+func MapURLAndID(url, id string) error {
 	path := dataPath(urlsFile)
 
 	m, err := readJSON(path)
@@ -18,20 +20,25 @@ func MapURLToChannel(url, channel string) error {
 		return err
 	}
 
-	m[url] = channel
+	m[url] = id
+	m[id] = url
 	return writeJSON(path, m)
 }
 
-func ConvertURLToChannel(url string) (string, error) {
+// SwitchURLAndID converts a PR URL to its mapped
+// chat channel or thread IDs, and vice versa.
+func SwitchURLAndID(key string) (string, error) {
 	m, err := readJSON(dataPath(urlsFile))
 	if err != nil {
 		return "", err
 	}
 
-	return m[url], nil
+	return m[key], nil
 }
 
-func RemoveURLToChannelMapping(url string) error {
+// DeleteURLAndIDMapping deletes the 2-way mapping between PR URLs and chat channel and thread
+// IDs when they become obsolete (i.e. when the PR is merged, closed, or marked as a draft).
+func DeleteURLAndIDMapping(key string) error {
 	path := dataPath(urlsFile)
 
 	m, err := readJSON(path)
@@ -39,7 +46,8 @@ func RemoveURLToChannelMapping(url string) error {
 		return err
 	}
 
-	delete(m, url)
+	delete(m, m[key])
+	delete(m, key)
 	return writeJSON(path, m)
 }
 
@@ -64,7 +72,7 @@ func readJSON(path string) (map[string]string, error) {
 }
 
 func writeJSON(path string, m map[string]string) error {
-	f, err := os.OpenFile(path, os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- user-specified by design
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- user-specified by design
 	if err != nil {
 		return err
 	}
