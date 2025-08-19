@@ -2,21 +2,11 @@ package data
 
 import (
 	"time"
-
-	"github.com/tzrikka/revchat/pkg/config"
-	"github.com/tzrikka/xdg"
 )
 
 const (
 	optInFile = "opt_in.json"
 )
-
-// dataPath returns the absolute path to the given data file.
-// It also creates an empty file if it doesn't already exist.
-func dataPath(filename string) string {
-	path, _ := xdg.CreateFile(xdg.DataHome, config.DirName, filename)
-	return path
-}
 
 func OptInBitbucketUser(slackUserID, accountID, email string) error {
 	if err := AddSlackUser(slackUserID, email); err != nil {

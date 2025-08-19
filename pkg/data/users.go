@@ -163,7 +163,7 @@ func readJSONMaps(path string) (map[string]map[string]string, error) {
 }
 
 func writeSONMaps(path string, m map[string]map[string]string) error {
-	f, err := os.OpenFile(path, os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- user-specified by design
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- user-specified by design
 	if err != nil {
 		return err
 	}
