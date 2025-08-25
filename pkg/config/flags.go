@@ -23,7 +23,7 @@ const (
 	StartToCloseTimeout    = 5 * time.Second
 	MaxRetryAttempts       = 3
 
-	DefaultChannelNamePrefix    = "pr"
+	DefaultChannelNamePrefix    = "_pr"
 	DefaultMaxChannelNameLength = 50 // Slack's hard limit = 80, but that's still too long.
 )
 
@@ -37,8 +37,8 @@ func configFile() altsrc.StringSourcer {
 	return altsrc.StringSourcer(path)
 }
 
-// Flags defines CLI flags to configure a Temporal worker. These flags can also
-// be set using environment variables and the application's configuration file.
+// Flags defines CLI flags to configure a Temporal worker. These flags are usually
+// set using environment variables or the application's configuration file.
 func Flags() []cli.Flag {
 	path := configFile()
 
