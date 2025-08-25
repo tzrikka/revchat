@@ -24,7 +24,7 @@ func main() {
 		Version: bi.Main.Version,
 		Flags:   config.Flags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			initLog(cmd.Bool("dev"))
+			initLog(cmd.Bool("dev") || cmd.Bool("pretty-log"))
 			return temporal.Run(log.Logger, cmd)
 		},
 	}
@@ -35,8 +35,8 @@ func main() {
 	}
 }
 
-// initLog initializes the logger for Timpani's HTTP server and Temporal
-// worker, based on whether it's running in development mode or not.
+// initLog initializes the logger for RevChat's Temporal worker,
+// based on whether it's running in development mode or not.
 func initLog(devMode bool) {
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
