@@ -8,7 +8,9 @@ Detailed instructions: https://github.com/tzrikka/thrippy/blob/main/docs/slack/R
 
 - [app_mentions:read](https://docs.slack.dev/reference/scopes/app_mentions.read)
 - [bookmarks:write](https://docs.slack.dev/reference/scopes/bookmarks.write)
-- [chat:write](https://docs.slack.dev/reference/scopes/chat.write)
+- Chat
+  - [chat:write](https://docs.slack.dev/reference/scopes/chat.write)
+  - [chat:write.customize](https://docs.slack.dev/reference/scopes/chat.write.customize)
 - Channels
   - [channels:history](https://docs.slack.dev/reference/scopes/channels.history)
   - [channels:manage](https://docs.slack.dev/reference/scopes/channels.manage)

@@ -84,7 +84,8 @@ type Link struct {
 }
 
 type Parent struct {
-	ID int `json:"id"`
+	ID    int             `json:"id"`
+	Links map[string]Link `json:"links"`
 }
 
 type Participant struct {

@@ -35,15 +35,13 @@ type slackUsersLookupByEmailResponse struct {
 	User *slackUser `json:"user,omitempty"`
 }
 
-// https://docs.slack.dev/reference/objects/user-object/
+// https://docs.slack.dev/reference/objects/user-object/.
+// A more complete version can be found in "pkg/slack/users.go".
 type slackUser struct {
-	ID     string `json:"id"`
-	TeamID string `json:"team_id"`
-
-	RealName string `json:"real_name,omitempty"`
-	IsBot    bool   `json:"is_bot,omitempty"`
-
-	// Reminder: profile is also available here, if needed.
+	ID       string `json:"id"`
+	TeamID   string `json:"team_id"`
+	RealName string `json:"real_name"`
+	IsBot    bool   `json:"is_bot"`
 }
 
 type slackResponse struct {
