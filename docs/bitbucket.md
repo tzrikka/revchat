@@ -44,9 +44,10 @@ Opening a browser with this URL: http://localhost:14470/start?id=<Thrippy link I
 
 ## Known Issues
 
-Bitbucket has several known issues which affect RevChat functionality:
-
-- Bitbucket does not send a webhook event when a user edits
-  - **PR** comments (as opposed to a file/commit comments)
-  - **Replies** to PR/file/commit comments
-- Bitbucket does not send a webhook event when a user un/likes a PR/file/commit comment/reply
+> [!IMPORTANT]
+> Bitbucket has a few known issues which affect RevChat functionality:
+> 
+> 1. Bitbucket does not send a webhook event when a user edits
+>    - **PR** comments (as opposed to a file/commit comments)
+>    - **Replies** to PR/file/commit comments
+> 2. Bitbucket does not send a webhook event when a user un/likes a PR/file/commit comment/reply
