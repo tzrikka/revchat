@@ -125,7 +125,9 @@ func (b Bitbucket) deleteMsg(ctx workflow.Context, url string) {
 	req := slack.ChatDeleteRequest{Channel: id[0], TS: id[len(id)-1]}
 	slack.DeleteChatMessageActivityAsync(ctx, b.cmd, req)
 
-	data.DeleteURLAndIDMapping(url)
+	if err := data.DeleteURLAndIDMapping(url); err != nil {
+		l.Error("failed to delete URL/Slack mappings", "error", err, "comment_url", url)
+	}
 }
 
 func (b Bitbucket) editMsg(ctx workflow.Context, url, msg string) {
