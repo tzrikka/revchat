@@ -47,15 +47,19 @@ func Flags() []cli.Flag {
 			Name:  "dev",
 			Usage: "simple setup, but unsafe for production",
 		},
+		&cli.BoolFlag{
+			Name:  "pretty-log",
+			Usage: "human-readable console logging, instead of JSON",
+		},
 
 		// https://pkg.go.dev/go.temporal.io/sdk/internal#ClientOptions
 		&cli.StringFlag{
-			Name:  "temporal-host-port",
+			Name:  "temporal-address",
 			Usage: "Temporal server address",
 			Value: client.DefaultHostPort,
 			Sources: cli.NewValueSourceChain(
-				cli.EnvVar("TEMPORAL_HOST_PORT"),
-				toml.TOML("temporal.host_port", path),
+				cli.EnvVar("TEMPORAL_ADDRESS"),
+				toml.TOML("temporal.address", path),
 			),
 		},
 		&cli.StringFlag{
