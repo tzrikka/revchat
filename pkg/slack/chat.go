@@ -5,24 +5,41 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
+// https://docs.slack.dev/reference/methods/chat.delete
+type ChatDeleteRequest struct {
+	Channel string `json:"channel"`
+	TS      string `json:"ts"`
+
+	AsUser bool `json:"as_user,omitempty"`
+}
+
+// https://docs.slack.dev/reference/methods/chat.delete
+func DeleteChatMessageActivityAsync(ctx workflow.Context, cmd *cli.Command, req ChatDeleteRequest) workflow.Future {
+	return executeTimpaniActivity(ctx, cmd, "slack.chat.delete", req)
+}
+
 // https://docs.slack.dev/reference/methods/chat.postMessage
 type ChatPostMessageRequest struct {
 	Channel string `json:"channel"`
 
-	Attachments  []map[string]any `json:"attachments,omitempty"`
 	Blocks       []map[string]any `json:"blocks,omitempty"`
-	IconEmoji    string           `json:"icon_emoji,omitempty"`
-	IconURL      string           `json:"icon_url,omitempty"`
-	LinkNames    bool             `json:"link_names,omitempty"`
+	Attachments  []map[string]any `json:"attachments,omitempty"`
 	MarkdownText string           `json:"markdown_text,omitempty"`
-	Metadata     map[string]any   `json:"metadata,omitempty"`
-	// Ignoring "mrkdwn" for now, because it has an unusual default value (true).
-	Parse          string `json:"parse,omitempty"`
-	ReplyBroadcast bool   `json:"reply_broadcast,omitempty"`
-	Text           string `json:"text,omitempty"`
+	Text         string           `json:"text,omitempty"`
+
 	ThreadTS       string `json:"thread_ts,omitempty"`
-	UnfurnLinks    bool   `json:"unfurl_links,omitempty"`
-	Username       string `json:"username,omitempty"`
+	ReplyBroadcast bool   `json:"reply_broadcast,omitempty"`
+
+	IconEmoji string         `json:"icon_emoji,omitempty"`
+	IconURL   string         `json:"icon_url,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+
+	LinkNames bool `json:"link_names,omitempty"`
+	// Ignoring "mrkdwn" for now, because it has an unusual default value (true).
+	Parse       string `json:"parse,omitempty"`
+	UnfurlLinks bool   `json:"unfurl_links,omitempty"`
+	UnfurlMedia bool   `json:"unfurl_media,omitempty"`
+	Username    string `json:"username,omitempty"`
 }
 
 // https://docs.slack.dev/reference/methods/chat.postMessage
@@ -51,6 +68,31 @@ func PostChatMessageActivity(ctx workflow.Context, cmd *cli.Command, req ChatPos
 	}
 
 	return resp, nil
+}
+
+// https://docs.slack.dev/reference/methods/chat.update
+//
+// https://docs.slack.dev/reference/methods/chat.postMessage#channels
+type ChatUpdateRequest struct {
+	Channel string `json:"channel"`
+	TS      string `json:"ts"`
+
+	Blocks       []map[string]any `json:"blocks,omitempty"`
+	Attachments  []map[string]any `json:"attachments,omitempty"`
+	MarkdownText string           `json:"markdown_text,omitempty"`
+	Text         string           `json:"text,omitempty"`
+
+	AsUser         bool           `json:"as_user,omitempty"`
+	FileIDs        []string       `json:"file_ids,omitempty"`
+	LinkNames      bool           `json:"link_names,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
+	Parse          string         `json:"parse,omitempty"`
+	ReplyBroadcast bool           `json:"reply_broadcast,omitempty"`
+}
+
+// https://docs.slack.dev/reference/methods/chat.update
+func UpdateChatMessageActivityAsync(ctx workflow.Context, cmd *cli.Command, req ChatUpdateRequest) workflow.Future {
+	return executeTimpaniActivity(ctx, cmd, "slack.chat.update", req)
 }
 
 type slackResponse struct {

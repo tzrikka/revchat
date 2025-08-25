@@ -42,9 +42,12 @@ $ thrippy start-oauth <Thrippy link ID>
 Opening a browser with this URL: http://localhost:14470/start?id=<Thrippy link ID>
 ```
 
-## Known Limitations
+## Known Issues
 
-Bitbucket has the following issues, which affect RevChat:
-
-- There is no webhook event when a user edits a **reply** to a PR/file/commit comment
-- There is no webhook event when a user un/likes a PR/file/commit comment/reply
+> [!IMPORTANT]
+> Bitbucket has a few known issues which affect RevChat functionality:
+> 
+> 1. Bitbucket does not send a webhook event when a user edits
+>    - **PR** comments (as opposed to a file/commit comments)
+>    - **Replies** to PR/file/commit comments
+> 2. Bitbucket does not send a webhook event when a user un/likes a PR/file/commit comment/reply

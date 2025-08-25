@@ -58,9 +58,11 @@ type conversationsCreateRequest struct {
 type ConversationsCreateResponse struct {
 	slackResponse
 
-	Channel struct {
-		ID string `json:"id"`
-	} `json:"channel"`
+	Channel *Channel `json:"channel,omitempty"`
+}
+
+type Channel struct {
+	ID string `json:"id"`
 }
 
 // https://docs.slack.dev/reference/methods/conversations.invite
