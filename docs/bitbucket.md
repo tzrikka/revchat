@@ -42,9 +42,9 @@ $ thrippy start-oauth <Thrippy link ID>
 Opening a browser with this URL: http://localhost:14470/start?id=<Thrippy link ID>
 ```
 
-## Known Limitations
+## Known Issues
 
-Bitbucket has the following issues, which affect some RevChat functionalities:
+Bitbucket has several known issues which affect RevChat functionality:
 
 - Bitbucket does not send a webhook event when a user edits
   - **PR** comments (as opposed to a file/commit comments)
