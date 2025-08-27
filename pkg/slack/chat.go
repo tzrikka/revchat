@@ -6,7 +6,7 @@ import (
 )
 
 // https://docs.slack.dev/reference/methods/chat.delete
-type ChatDeleteRequest struct {
+type chatDeleteRequest struct {
 	Channel string `json:"channel"`
 	TS      string `json:"ts"`
 
@@ -14,8 +14,16 @@ type ChatDeleteRequest struct {
 }
 
 // https://docs.slack.dev/reference/methods/chat.delete
-func DeleteChatMessageActivityAsync(ctx workflow.Context, cmd *cli.Command, req ChatDeleteRequest) workflow.Future {
-	return executeTimpaniActivity(ctx, cmd, "slack.chat.delete", req)
+func DeleteChatMessageActivity(ctx workflow.Context, cmd *cli.Command, channelID, timestamp string) error {
+	a := executeTimpaniActivity(ctx, cmd, "slack.chat.delete", chatDeleteRequest{Channel: channelID, TS: timestamp})
+
+	if err := a.Get(ctx, nil); err != nil {
+		msg := "failed to delete Slack message"
+		workflow.GetLogger(ctx).Error(msg, "error", err)
+		return err
+	}
+
+	return nil
 }
 
 // https://docs.slack.dev/reference/methods/chat.postMessage
@@ -52,13 +60,8 @@ type ChatPostMessageResponse struct {
 }
 
 // https://docs.slack.dev/reference/methods/chat.postMessage
-func PostChatMessageActivityAsync(ctx workflow.Context, cmd *cli.Command, req ChatPostMessageRequest) workflow.Future {
-	return executeTimpaniActivity(ctx, cmd, "slack.chat.postMessage", req)
-}
-
-// https://docs.slack.dev/reference/methods/chat.postMessage
 func PostChatMessageActivity(ctx workflow.Context, cmd *cli.Command, req ChatPostMessageRequest) (*ChatPostMessageResponse, error) {
-	a := PostChatMessageActivityAsync(ctx, cmd, req)
+	a := executeTimpaniActivity(ctx, cmd, "slack.chat.postMessage", req)
 
 	resp := &ChatPostMessageResponse{}
 	if err := a.Get(ctx, resp); err != nil {
@@ -91,8 +94,16 @@ type ChatUpdateRequest struct {
 }
 
 // https://docs.slack.dev/reference/methods/chat.update
-func UpdateChatMessageActivityAsync(ctx workflow.Context, cmd *cli.Command, req ChatUpdateRequest) workflow.Future {
-	return executeTimpaniActivity(ctx, cmd, "slack.chat.update", req)
+func UpdateChatMessageActivity(ctx workflow.Context, cmd *cli.Command, req ChatUpdateRequest) error {
+	a := executeTimpaniActivity(ctx, cmd, "slack.chat.update", req)
+
+	if err := a.Get(ctx, nil); err != nil {
+		msg := "failed to update Slack message"
+		workflow.GetLogger(ctx).Error(msg, "error", err)
+		return err
+	}
+
+	return nil
 }
 
 type slackResponse struct {

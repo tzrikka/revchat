@@ -1,33 +1,39 @@
 package github
 
 import (
+	"errors"
+
 	"go.temporal.io/sdk/workflow"
 )
 
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request_review_comment
 // https://docs.github.com/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#adding-line-comments-to-a-pull-request
-func (g GitHub) handlePullRequestReviewCommentEvent(ctx workflow.Context, event PullRequestReviewCommentEvent) {
+func (c Config) prReviewCommentWorkflow(ctx workflow.Context, event PullRequestReviewCommentEvent) error {
 	switch event.Action {
 	case "created":
-		g.reviewCommentCreated()
+		return c.reviewCommentCreated()
 	case "edited":
-		g.reviewCommentEdited()
+		return c.reviewCommentEdited()
 	case "deleted":
-		g.reviewCommentDeleted()
+		return c.reviewCommentDeleted()
 
 	default:
 		workflow.GetLogger(ctx).Error("unrecognized GitHub PR review comment event action", "action", event.Action)
+		return errors.New("unrecognized GitHub PR review comment event action: " + event.Action)
 	}
 }
 
 // A comment on a pull request diff was created.
-func (g GitHub) reviewCommentCreated() {
+func (c Config) reviewCommentCreated() error {
+	return nil
 }
 
 // The content of a comment on a pull request diff was changed.
-func (g GitHub) reviewCommentEdited() {
+func (c Config) reviewCommentEdited() error {
+	return nil
 }
 
 // A comment on a pull request diff was deleted.
-func (g GitHub) reviewCommentDeleted() {
+func (c Config) reviewCommentDeleted() error {
+	return nil
 }

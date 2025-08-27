@@ -6,19 +6,28 @@ import (
 )
 
 // https://docs.slack.dev/reference/methods/reactions.add
-type ReactionsAddRequest struct {
+type reactionsAddRequest struct {
 	Channel   string `json:"channel"`
 	Timestamp string `json:"timestamp"`
 	Name      string `json:"name"`
 }
 
 // https://docs.slack.dev/reference/methods/reactions.add
-func AddReactionActivityAsync(ctx workflow.Context, cmd *cli.Command, req ReactionsAddRequest) workflow.Future {
-	return executeTimpaniActivity(ctx, cmd, "slack.reactions.add", req)
+func AddReactionActivity(ctx workflow.Context, cmd *cli.Command, channelID, timestamp, emoji string) error {
+	req := reactionsAddRequest{Channel: channelID, Timestamp: timestamp, Name: emoji}
+	a := executeTimpaniActivity(ctx, cmd, "slack.reactions.add", req)
+
+	if err := a.Get(ctx, nil); err != nil {
+		msg := "failed to add reaction to Slack message"
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "timestamp", timestamp, "emoji", emoji)
+		return err
+	}
+
+	return nil
 }
 
 // https://docs.slack.dev/reference/methods/reactions.remove
-type ReactionsRemoveRequest struct {
+type reactionsRemoveRequest struct {
 	Name string `json:"name"`
 
 	Channel     string `json:"channel,omitempty"`
@@ -28,6 +37,15 @@ type ReactionsRemoveRequest struct {
 }
 
 // https://docs.slack.dev/reference/methods/reactions.remove
-func RemoveReactionActivityAsync(ctx workflow.Context, cmd *cli.Command, req ReactionsRemoveRequest) workflow.Future {
-	return executeTimpaniActivity(ctx, cmd, "slack.reactions.remove", req)
+func RemoveReactionActivity(ctx workflow.Context, cmd *cli.Command, channelID, timestamp, emoji string) error {
+	req := reactionsRemoveRequest{Channel: channelID, Timestamp: timestamp, Name: emoji}
+	a := executeTimpaniActivity(ctx, cmd, "slack.reactions.remove", req)
+
+	if err := a.Get(ctx, nil); err != nil {
+		msg := "failed to remove reaction from Slack message"
+		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "timestamp", timestamp, "emoji", emoji)
+		return err
+	}
+
+	return nil
 }

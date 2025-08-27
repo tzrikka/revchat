@@ -12,30 +12,32 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-func (g GitHub) updateMembersWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	// Already confirmed the Slack channel exists before starting this child workflow.
+func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) error {
+	// Already confirmed the Slack channel exists before calling this function.
 	channelID, _ := lookupChannel(ctx, event.Action, event.PullRequest)
 
 	// Individual assignee.
 	if user := event.Assignee; user != nil {
 		switch event.Action {
 		case "assigned":
-			g.addChannelMember(ctx, channelID, *user, event.Sender, "assignee")
+			return c.addChannelMember(ctx, channelID, *user, event.Sender, "assignee")
 		case "unassigned":
-			g.removeChannelMember(ctx, channelID, *user, event.Sender, "assignee")
+			return c.removeChannelMember(ctx, channelID, *user, event.Sender, "assignee")
+		default:
+			return nil
 		}
-		return nil
 	}
 
 	// Individual reviewer.
 	if user := event.RequestedReviewer; user != nil {
 		switch event.Action {
 		case "review_requested":
-			g.addChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
+			return c.addChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
 		case "review_request_removed":
-			g.removeChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
+			return c.removeChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
+		default:
+			return nil
 		}
-		return nil
 	}
 
 	// Reviewing team.
@@ -45,43 +47,49 @@ func (g GitHub) updateMembersWorkflow(ctx workflow.Context, event PullRequestEve
 	}
 	if team := event.RequestedTeam; team != nil {
 		msg := fmt.Sprintf("%s the <%s|%s> team as a reviewer", action, team.HTMLURL, team.Name)
-		g.mentionUserInMsgAsync(ctx, channelID, event.Sender, "%s "+msg)
+		return c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
 	}
+
 	return nil
 }
 
-func (g GitHub) addChannelMember(ctx workflow.Context, channelID string, reviewer, sender User, role string) {
-	slackUserID := g.announceUser(ctx, channelID, reviewer, sender, role, "added")
+func (c Config) addChannelMember(ctx workflow.Context, channelID string, reviewer, sender User, role string) error {
+	slackUserID := c.announceUser(ctx, channelID, reviewer, sender, role, "added")
 	if slackUserID == "" {
-		return
+		return nil
 	}
 
-	_ = slack.InviteUsersToChannelActivity(ctx, g.cmd, channelID, []string{slackUserID})
+	err := slack.InviteUsersToChannelActivity(ctx, c.Cmd, channelID, []string{slackUserID})
 
 	if reviewer.Login == sender.Login {
-		return // No need to also DM the user if they added themselves.
+		return err // No need to also DM the user if they added themselves.
 	}
 
 	// Send a DM to the reviewer with a reference to the Slack channel.
 	msg := fmt.Sprintf("added you as %s to a PR: <#%s>", role, channelID)
-	g.mentionUserInMsgAsync(ctx, slackUserID, sender, "%s "+msg)
+	_ = c.mentionUserInMsg(ctx, slackUserID, sender, "%s "+msg)
+
+	return err
 }
 
-func (g GitHub) removeChannelMember(ctx workflow.Context, channelID string, reviewer, sender User, role string) {
-	if slackUserID := g.announceUser(ctx, channelID, reviewer, sender, role, "removed"); slackUserID != "" {
-		_ = slack.KickUserFromChannelActivity(ctx, g.cmd, channelID, slackUserID)
+func (c Config) removeChannelMember(ctx workflow.Context, channelID string, reviewer, sender User, role string) error {
+	slackUserID := c.announceUser(ctx, channelID, reviewer, sender, role, "removed")
+	if slackUserID == "" {
+		return nil
 	}
+
+	return slack.KickUserFromChannelActivity(ctx, c.Cmd, channelID, slackUserID)
 }
 
-func (g GitHub) announceUser(ctx workflow.Context, channelID string, reviewer, sender User, role, action string) string {
-	slackRef := users.GitHubToSlackRef(ctx, g.cmd, reviewer.Login, reviewer.HTMLURL)
+func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, sender User, role, action string) string {
+	slackRef := users.GitHubToSlackRef(ctx, c.Cmd, reviewer.Login, reviewer.HTMLURL)
 
 	person := slackRef
 	if reviewer.Login == sender.Login {
 		person = "themselves"
 	}
 	msg := fmt.Sprintf("%s %s as %s", action, person, withArticle(role))
-	_, _ = g.mentionUserInMsg(ctx, channelID, sender, "%s "+msg)
+	_ = c.mentionUserInMsg(ctx, channelID, sender, "%s "+msg)
 
 	if !strings.HasPrefix(slackRef, "<@") {
 		return "" // Not a real Slack user ID - can't add it to the Slack channel.

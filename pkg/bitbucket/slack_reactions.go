@@ -1,6 +1,7 @@
 package bitbucket
 
 import (
+	"errors"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -9,38 +10,36 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack"
 )
 
-func (b Bitbucket) addReactionAsync(ctx workflow.Context, url, emoji string) {
+func (c Config) addReaction(ctx workflow.Context, url, emoji string) error {
 	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		l.Error("failed to retrieve PR comment's Slack IDs", "url", url, "error", err)
-		return
+		l.Error("failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
+		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		l.Error("can't add reaction to Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
-		return
+		return errors.New("missing/bad Slack IDs")
 	}
 
-	req := slack.ReactionsAddRequest{Channel: id[0], Timestamp: id[len(id)-1], Name: emoji}
-	slack.AddReactionActivityAsync(ctx, b.cmd, req)
+	return slack.AddReactionActivity(ctx, c.Cmd, id[0], id[len(id)-1], emoji)
 }
 
-func (b Bitbucket) removeReactionAsync(ctx workflow.Context, url, emoji string) {
+func (c Config) removeReaction(ctx workflow.Context, url, emoji string) error {
 	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
 		l.Error("failed to retrieve PR comment's Slack IDs", "url", url, "error", err)
-		return
+		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		l.Error("can't remove reaction from Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
-		return
+		return errors.New("missing/bad Slack IDs")
 	}
 
-	req := slack.ReactionsRemoveRequest{Channel: id[0], Timestamp: id[len(id)-1], Name: emoji}
-	slack.RemoveReactionActivityAsync(ctx, b.cmd, req)
+	return slack.RemoveReactionActivity(ctx, c.Cmd, id[0], id[len(id)-1], emoji)
 }

@@ -8,58 +8,25 @@ import (
 	"github.com/tzrikka/revchat/pkg/markdown"
 )
 
-// https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Pull-request-events
-func (b Bitbucket) handlePullRequestEvent(ctx workflow.Context, event PullRequestEvent) {
-	switch event.Type {
-	case "created":
-		b.prCreated(ctx, event)
-	case "updated":
-		b.prUpdated(ctx, event)
-
-	case "approved", "unapproved", "changes_request_created", "changes_request_removed":
-		b.prReviewed(ctx, event)
-
-	case "fulfilled", "rejected":
-		b.prClosed(ctx, event)
-
-	case "comment_created":
-		b.prCommentCreated(ctx, event)
-	case "comment_updated":
-		b.prCommentUpdated(ctx, event)
-	case "comment_deleted":
-		b.prCommentDeleted(ctx, event)
-	case "comment_resolved":
-		b.prCommentResolved(ctx, event)
-	case "comment_reopened":
-		b.prCommentReopened(ctx, event)
-
-	default:
-		workflow.GetLogger(ctx).Error("unrecognized Bitbucket PR event type", "event_type", event.Type)
-	}
-}
-
-// A new PR was created (or marked as ready for review - see [Bitbucket.prUpdated]).
-func (b Bitbucket) prCreated(ctx workflow.Context, event PullRequestEvent) {
+// A new PR was created (or marked as ready for review - see [Config.prUpdatedWorkflow]).
+func (c Config) prCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// Ignore drafts until they're marked as ready for review.
 	if event.PullRequest.Draft {
-		msg := "ignoring Bitbucket event - the PR is a draft"
-		workflow.GetLogger(ctx).Debug(msg, "event_type", event.Type, "pr_url", event.PullRequest.Links["html"].HRef)
-		return
+		return nil
 	}
 
-	// Wait for workflow completion before returning, to ensure we handle
-	// subsequent PR initialization events appropriately (e.g. check states).
-	_ = b.executeWorkflow(ctx, "bitbucket.initChannel", event).Get(ctx, nil)
+	return c.initChannel(ctx, event)
 }
 
-func (b Bitbucket) prUpdated(ctx workflow.Context, event PullRequestEvent) {
+func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	return nil
 }
 
-func (b Bitbucket) prReviewed(ctx workflow.Context, event PullRequestEvent) {
+func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
-		return
+		return nil
 	}
 
 	msg := "%s "
@@ -78,67 +45,94 @@ func (b Bitbucket) prReviewed(ctx workflow.Context, event PullRequestEvent) {
 		workflow.GetLogger(ctx).Error("unrecognized Bitbucket PR review event type", "event_type", event.Type)
 	}
 
-	b.mentionUserInMsgAsync(ctx, channelID, event.Actor, msg)
+	return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
 }
 
 // A PR was closed, i.e. merged or rejected (possibly a draft).
-func (b Bitbucket) prClosed(ctx workflow.Context, event PullRequestEvent) {
+func (c Config) prClosedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// Ignore drafts - they don't have an active Slack channel anyway.
 	if event.PullRequest.Draft {
-		msg := "ignoring Bitbucket event - the PR is a draft"
-		workflow.GetLogger(ctx).Debug(msg, "event_type", event.Type, "pr_url", event.PullRequest.Links["html"].HRef)
-		return
+		return nil
 	}
 
-	b.executeWorkflow(ctx, "bitbucket.archiveChannel", event)
+	return c.archiveChannel(ctx, event)
 }
 
-func (b Bitbucket) prCommentCreated(ctx workflow.Context, event PullRequestEvent) {
+func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
-		return
+		return nil
 	}
 
-	url := event.Comment.Links["html"].HRef
-	msg := markdown.BitbucketToSlack(ctx, b.cmd, event.Comment.Content.Raw)
+	url := htmlURL(event.Comment.Links)
+	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw)
 	if inline := event.Comment.Inline; inline != nil {
 		msg = inlineCommentPrefix(url, inline) + msg
 	}
 
+	var err error
 	if event.Comment.Parent == nil {
-		b.impersonateUserInMsg(ctx, url, channelID, event.Comment.User, msg)
+		err = c.impersonateUserInMsg(ctx, url, channelID, event.Comment.User, msg)
 	} else {
-		parentURL := event.Comment.Parent.Links["html"].HRef
-		b.impersonateUserInReply(ctx, url, parentURL, event.Comment.User, msg)
+		parentURL := htmlURL(event.Comment.Parent.Links)
+		err = c.impersonateUserInReply(ctx, url, parentURL, event.Comment.User, msg)
 	}
+	return err
 }
 
-func (b Bitbucket) prCommentUpdated(ctx workflow.Context, event PullRequestEvent) {
+func (c Config) prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
-		return
+		return nil
 	}
 
-	url := event.Comment.Links["html"].HRef
-	msg := markdown.BitbucketToSlack(ctx, b.cmd, event.Comment.Content.Raw)
+	url := htmlURL(event.Comment.Links)
+	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw)
 	if inline := event.Comment.Inline; inline != nil {
 		msg = inlineCommentPrefix(url, inline) + msg
 	}
 
-	b.editMsg(ctx, url, msg)
+	return c.editMsg(ctx, url, msg)
 }
 
-func (b Bitbucket) prCommentDeleted(ctx workflow.Context, event PullRequestEvent) {
+func (c Config) prCommentDeletedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
-		return
+		return nil
 	}
 
-	url := event.Comment.Links["html"].HRef
-	b.deleteMsg(ctx, url)
+	return c.deleteMsg(ctx, htmlURL(event.Comment.Links))
+}
+
+func (c Config) prCommentResolvedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	if !found {
+		return nil
+	}
+
+	url := htmlURL(event.Comment.Links)
+	_ = c.addReaction(ctx, url, "ok")
+	return c.mentionUserInReplyByURL(ctx, url, event.Actor, "%s resolved this comment :ok:")
+}
+
+func (c Config) prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	if !found {
+		return nil
+	}
+
+	url := htmlURL(event.Comment.Links)
+	_ = c.removeReaction(ctx, url, "ok")
+	return c.mentionUserInReplyByURL(ctx, url, event.Actor, "%s reopened this comment :no_good:")
+}
+
+func htmlURL(links map[string]Link) string {
+	return links["html"].HRef
 }
 
 func inlineCommentPrefix(url string, i *Inline) string {
@@ -155,28 +149,4 @@ func inlineCommentPrefix(url string, i *Inline) string {
 	}
 
 	return fmt.Sprintf("<%s|%s comment> in %s file `%s`:\n", url, subject, location, i.Path)
-}
-
-func (b Bitbucket) prCommentResolved(ctx workflow.Context, event PullRequestEvent) {
-	// If we're not tracking this PR, there's no need/way to announce this event.
-	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
-	if !found {
-		return
-	}
-
-	url := event.Comment.Links["html"].HRef
-	b.mentionUserInReplyAsync(ctx, url, event.Actor, "%s resolved this comment :ok:")
-	b.addReactionAsync(ctx, url, "ok")
-}
-
-func (b Bitbucket) prCommentReopened(ctx workflow.Context, event PullRequestEvent) {
-	// If we're not tracking this PR, there's no need/way to announce this event.
-	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
-	if !found {
-		return
-	}
-
-	url := event.Comment.Links["html"].HRef
-	b.mentionUserInReplyAsync(ctx, url, event.Actor, "%s reopened this comment :no_good:")
-	b.removeReactionAsync(ctx, url, "ok")
 }

@@ -1,32 +1,38 @@
 package github
 
 import (
+	"errors"
+
 	"go.temporal.io/sdk/workflow"
 )
 
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_comment
-func (g GitHub) handleIssueCommentEvent(ctx workflow.Context, event IssueCommentEvent) {
+func (c Config) issueCommentWorkflow(ctx workflow.Context, event IssueCommentEvent) error {
 	switch event.Action {
 	case "created":
-		g.issueCommentCreated()
+		return c.issueCommentCreated()
 	case "edited":
-		g.issueCommentEdited()
+		return c.issueCommentEdited()
 	case "deleted":
-		g.issueCommentDeleted()
+		return c.issueCommentDeleted()
 
 	default:
 		workflow.GetLogger(ctx).Error("unrecognized GitHub issue comment event action", "action", event.Action)
+		return errors.New("unrecognized GitHub issue comment event action: " + event.Action)
 	}
 }
 
 // A comment on an issue or pull request was created.
-func (g GitHub) issueCommentCreated() {
+func (c Config) issueCommentCreated() error {
+	return nil
 }
 
 // A comment on an issue or pull request was edited.
-func (g GitHub) issueCommentEdited() {
+func (c Config) issueCommentEdited() error {
+	return nil
 }
 
 // A comment on an issue or pull request was deleted.
-func (g GitHub) issueCommentDeleted() {
+func (c Config) issueCommentDeleted() error {
+	return nil
 }
