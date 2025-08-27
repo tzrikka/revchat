@@ -35,7 +35,7 @@ func Run(l zerolog.Logger, cmd *cli.Command) error {
 	github.RegisterWorkflows(w, cmd)
 
 	cfg := config{cmd: cmd}
-	w.RegisterWorkflowWithOptions(cfg.eventsDispatcherWorkflow, workflow.RegisterOptions{Name: "events.dispatcher"})
+	w.RegisterWorkflowWithOptions(cfg.eventDispatcherWorkflow, workflow.RegisterOptions{Name: "event.dispatcher"})
 
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		return fmt.Errorf("failed to start Temporal worker: %w", err)

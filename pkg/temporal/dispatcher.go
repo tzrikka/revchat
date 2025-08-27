@@ -11,11 +11,11 @@ type config struct {
 	cmd *cli.Command
 }
 
-// eventsDispatcherWorkflow is an always-running workflow that receives Temporal
+// eventDispatcherWorkflow is an always-running workflow that receives Temporal
 // signals from [Timpani] and spawns event-specific child workflows to handle them.
 //
 // [Timpani]: https://pkg.go.dev/github.com/tzrikka/timpani/pkg/listeners
-func (c config) eventsDispatcherWorkflow(ctx workflow.Context) error {
+func (c config) eventDispatcherWorkflow(ctx workflow.Context) error {
 	s := workflow.NewSelector(ctx)
 	tq := c.cmd.String("temporal-task-queue-revchat")
 
