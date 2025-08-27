@@ -1,10 +1,14 @@
 package temporal
 
 import (
+	"fmt"
+
 	"github.com/urfave/cli/v3"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/bitbucket"
+	"github.com/tzrikka/revchat/pkg/github"
 )
 
 type config struct {
@@ -16,17 +20,22 @@ type config struct {
 //
 // [Timpani]: https://pkg.go.dev/github.com/tzrikka/timpani/pkg/listeners
 func (c config) eventDispatcherWorkflow(ctx workflow.Context) error {
-	s := workflow.NewSelector(ctx)
-	tq := c.cmd.String("temporal-task-queue-revchat")
+	sig := append(bitbucket.PullRequestSignals, bitbucket.RepositorySignals...)
+	sig = append(sig, github.Signals...)
 
-	if err := bitbucket.RegisterPullRequestSignals(ctx, s, tq); err != nil {
-		return err
+	// https://docs.temporal.io/develop/go/observability#visibility
+	attr := temporal.NewSearchAttributeKeyKeywordList("WaitingForSignals").ValueSet(sig)
+	if err := workflow.UpsertTypedSearchAttributes(ctx, attr); err != nil {
+		return fmt.Errorf("failed to set workflow search attribute: %w", err)
 	}
-	if err := bitbucket.RegisterRepositorySignals(ctx, s, tq); err != nil {
-		return err
-	}
+
+	sel := workflow.NewSelector(ctx)
+	tq := c.cmd.String("temporal-task-queue-revchat")
+	bitbucket.RegisterPullRequestSignals(ctx, sel, tq)
+	bitbucket.RegisterRepositorySignals(ctx, sel, tq)
+	github.RegisterSignals(ctx, sel, tq)
 
 	for {
-		s.Select(ctx)
+		sel.Select(ctx)
 	}
 }

@@ -1,13 +1,9 @@
 package github
 
 import (
-	"reflect"
-
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
-
-	"github.com/tzrikka/revchat/internal/temporal"
 )
 
 type Config struct {
@@ -15,7 +11,6 @@ type Config struct {
 }
 
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request
-//
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_comment
 var Signals = []string{
 	"github.events.pull_request",
@@ -39,43 +34,52 @@ func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
 }
 
 // RegisterSignals routes [Signals] to registered workflows.
-func RegisterSignals(ctx workflow.Context, s workflow.Selector, tq string) error {
-	ch, err := temporal.GetSignalChannels(ctx, Signals)
-	if err != nil {
-		return err
-	}
+func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
+	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 
-	m := map[workflow.ReceiveChannel]any{
-		ch[0]: PullRequestEvent{},
-		ch[1]: PullRequestReviewEvent{},
-		ch[2]: PullRequestReviewCommentEvent{},
-		ch[3]: PullRequestReviewThreadEvent{},
+	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[0]), func(c workflow.ReceiveChannel, _ bool) {
+		e := PullRequestEvent{}
+		c.Receive(ctx, &e)
 
-		ch[4]: IssueCommentEvent{},
-	}
+		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		wf := workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
 
-	for ch, e := range m {
-		s.AddReceive(ch, func(c workflow.ReceiveChannel, _ bool) {
-			c.Receive(ctx, &e)
+		// Wait for [Config.prOpened] completion before returning, to ensure we handle
+		// subsequent PR initialization events appropriately (e.g. check states).
+		if e.Action == "opened" {
+			_ = wf.Get(ctx, nil)
+		}
+	})
 
-			action := ""
-			f := reflect.ValueOf(e).FieldByName("Action")
-			if f.IsValid() && f.Kind() == reflect.String {
-				action = f.String()
-			}
+	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[1]), func(c workflow.ReceiveChannel, _ bool) {
+		e := PullRequestReviewEvent{}
+		c.Receive(ctx, &e)
 
-			signal := c.Name()
-			workflow.GetLogger(ctx).Debug("received signal", "signal", signal, "action", action)
-			ctx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: tq})
-			wf := workflow.ExecuteChildWorkflow(ctx, signal, e)
+		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+	})
 
-			// Wait for [Config.prOpened] completion before returning, to ensure we handle
-			// subsequent PR initialization events appropriately (e.g. check states).
-			if signal == "github.events.pull_request" && action == "opened" {
-				_ = wf.Get(ctx, nil)
-			}
-		})
-	}
+	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[2]), func(c workflow.ReceiveChannel, _ bool) {
+		e := PullRequestReviewCommentEvent{}
+		c.Receive(ctx, &e)
 
-	return nil
+		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+	})
+
+	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[3]), func(c workflow.ReceiveChannel, _ bool) {
+		e := PullRequestReviewThreadEvent{}
+		c.Receive(ctx, &e)
+
+		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+	})
+
+	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[4]), func(c workflow.ReceiveChannel, _ bool) {
+		e := IssueCommentEvent{}
+		c.Receive(ctx, &e)
+
+		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+	})
 }

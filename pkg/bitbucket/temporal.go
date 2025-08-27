@@ -6,8 +6,6 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
-
-	"github.com/tzrikka/revchat/internal/temporal"
 )
 
 type Config struct {
@@ -86,14 +84,9 @@ func RegisterRepositoryWorkflows(w worker.Worker, cmd *cli.Command) {
 }
 
 // RegisterPullRequestSignals routes [PullRequestSignals] to registered workflows.
-func RegisterPullRequestSignals(ctx workflow.Context, s workflow.Selector, taskQueue string) error {
-	chs, err := temporal.GetSignalChannels(ctx, PullRequestSignals)
-	if err != nil {
-		return err
-	}
-
-	for _, ch := range chs {
-		s.AddReceive(ch, func(c workflow.ReceiveChannel, _ bool) {
+func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
+	for _, sig := range PullRequestSignals {
+		sel.AddReceive(workflow.GetSignalChannel(ctx, sig), func(c workflow.ReceiveChannel, _ bool) {
 			e := PullRequestEvent{}
 			c.Receive(ctx, &e)
 
@@ -114,19 +107,12 @@ func RegisterPullRequestSignals(ctx workflow.Context, s workflow.Selector, taskQ
 			}
 		})
 	}
-
-	return nil
 }
 
 // RegisterRepositorySignals routes [RepositorySignals] to registered workflows.
-func RegisterRepositorySignals(ctx workflow.Context, s workflow.Selector, tq string) error {
-	chs, err := temporal.GetSignalChannels(ctx, RepositorySignals)
-	if err != nil {
-		return err
-	}
-
-	for _, ch := range chs {
-		s.AddReceive(ch, func(c workflow.ReceiveChannel, _ bool) {
+func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
+	for _, sig := range RepositorySignals {
+		sel.AddReceive(workflow.GetSignalChannel(ctx, sig), func(c workflow.ReceiveChannel, _ bool) {
 			e := RepositoryEvent{}
 			c.Receive(ctx, &e)
 
@@ -137,10 +123,8 @@ func RegisterRepositorySignals(ctx workflow.Context, s workflow.Selector, tq str
 			}
 
 			workflow.GetLogger(ctx).Debug("received signal", "signal", signal)
-			ctx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: tq})
+			ctx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 			workflow.ExecuteChildWorkflow(ctx, signal, e)
 		})
 	}
-
-	return nil
 }
