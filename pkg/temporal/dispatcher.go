@@ -2,6 +2,7 @@ package temporal
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/temporal"
@@ -20,10 +21,8 @@ type config struct {
 //
 // [Timpani]: https://pkg.go.dev/github.com/tzrikka/timpani/pkg/listeners
 func (c config) eventDispatcherWorkflow(ctx workflow.Context) error {
-	sig := append(bitbucket.PullRequestSignals, bitbucket.RepositorySignals...)
-	sig = append(sig, github.Signals...)
-
 	// https://docs.temporal.io/develop/go/observability#visibility
+	sig := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals)
 	attr := temporal.NewSearchAttributeKeyKeywordList("WaitingForSignals").ValueSet(sig)
 	if err := workflow.UpsertTypedSearchAttributes(ctx, attr); err != nil {
 		return fmt.Errorf("failed to set workflow search attribute: %w", err)
