@@ -1,26 +1,31 @@
 package github
 
 import (
+	"errors"
+
 	"go.temporal.io/sdk/workflow"
 )
 
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request_review_thread
-func (g GitHub) handlePullRequestReviewThreadEvent(ctx workflow.Context, event PullRequestReviewThreadEvent) {
+func (c Config) prReviewThreadWorkflow(ctx workflow.Context, event PullRequestReviewThreadEvent) error {
 	switch event.Action {
 	case "resolved":
-		g.reviewThreadResolved()
+		return c.reviewThreadResolved()
 	case "deleted":
-		g.reviewThreadUnresolved()
+		return c.reviewThreadUnresolved()
 
 	default:
 		workflow.GetLogger(ctx).Error("unrecognized GitHub PR review thread event action", "action", event.Action)
+		return errors.New("unrecognized GitHub PR review thread event action: " + event.Action)
 	}
 }
 
 // A comment thread on a pull request was marked as resolved.
-func (g GitHub) reviewThreadResolved() {
+func (c Config) reviewThreadResolved() error {
+	return nil
 }
 
 // A previously resolved comment thread on a pull request was marked as unresolved.
-func (g GitHub) reviewThreadUnresolved() {
+func (c Config) reviewThreadUnresolved() error {
+	return nil
 }

@@ -15,10 +15,9 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	pr := event.PullRequest
-
+func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
+	pr := event.PullRequest
 	channelID, found := lookupChannel(ctx, event.Type, pr)
 	if !found {
 		return nil
@@ -28,8 +27,7 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
-	url := pr.Links["html"].HRef
-	b.cleanupPRData(ctx, url)
+	c.cleanupPRData(ctx, pr.Links["html"].HRef)
 
 	state := "closed this PR"
 	switch event.Type {
@@ -43,13 +41,13 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 		state = fmt.Sprintf("%s with this reason: `%s`", state, reason)
 	}
 
-	_, _ = b.mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
+	_ = c.mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
-	if err := slack.ArchiveChannelActivity(ctx, b.cmd, channelID); err != nil {
+	if err := slack.ArchiveChannelActivity(ctx, c.Cmd, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
 		msg := "Failed to archive this channel, even though its PR was " + state
 		req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
-		slack.PostChatMessageActivityAsync(ctx, b.cmd, req)
+		_, _ = slack.PostChatMessageActivity(ctx, c.Cmd, req)
 
 		return err
 	}
@@ -60,22 +58,21 @@ func (b Bitbucket) archiveChannelWorkflow(ctx workflow.Context, event PullReques
 // lookupChannel returns the ID of a channel associated
 // with a PR, if the PR is active and the channel is found.
 func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (string, bool) {
-	l := workflow.GetLogger(ctx)
-	url := pr.Links["html"].HRef
-
 	if pr.Draft {
-		l.Debug("ignoring Bitbucket event - the PR is a draft", "event_type", eventType, "pr_url", url)
 		return "", false
 	}
 
+	url := pr.Links["html"].HRef
 	channelID, err := data.SwitchURLAndID(url)
 	if err != nil {
-		l.Error("failed to retrieve Bitbucket PR's Slack channel ID", "error", err, "event_type", eventType, "pr_url", url)
+		msg := "failed to retrieve Bitbucket PR's Slack channel ID"
+		workflow.GetLogger(ctx).Error(msg, "error", err, "event_type", eventType, "pr_url", url)
 		return "", false
 	}
 
 	if channelID == "" {
-		l.Debug("Bitbucket PR's Slack channel ID is empty", "event_type", eventType, "pr_url", url)
+		msg := "Bitbucket PR's Slack channel ID is empty"
+		workflow.GetLogger(ctx).Debug(msg, "event_type", eventType, "pr_url", url)
 		return "", false
 	}
 
@@ -84,7 +81,7 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 
 // cleanupPRData deletes all data associated with a PR. If there are errors,
 // they are logged but ignored, as they do not affect the overall workflow.
-func (b Bitbucket) cleanupPRData(ctx workflow.Context, url string) {
+func (c Config) cleanupPRData(ctx workflow.Context, url string) {
 	if err := data.DeleteBitbucketPR(url); err != nil {
 		workflow.GetLogger(ctx).Error("failed to delete PR snapshot", "error", err, "pr_url", url)
 	}
@@ -96,7 +93,7 @@ func (b Bitbucket) cleanupPRData(ctx workflow.Context, url string) {
 
 // initPRData saves the initial state of a new PR: a snapshot of the
 // PR details, and mappings for 2-way syncs between Bitbucket and Slack.
-func (b Bitbucket) initPRData(ctx workflow.Context, url string, pr PullRequest, channelID string) bool {
+func (c Config) initPRData(ctx workflow.Context, url string, pr PullRequest, channelID string) bool {
 	l := workflow.GetLogger(ctx)
 
 	if err := data.StoreBitbucketPR(url, pr); err != nil {
@@ -112,49 +109,49 @@ func (b Bitbucket) initPRData(ctx workflow.Context, url string, pr PullRequest, 
 	return true
 }
 
-func (b Bitbucket) initChannelWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error {
 	pr := event.PullRequest
 	url := pr.Links["html"].HRef
-
-	channelID, err := b.createChannel(ctx, pr)
+	channelID, err := c.createChannel(ctx, pr)
 	if err != nil {
-		b.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		c.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
 		return err
 	}
 
-	if !b.initPRData(ctx, url, pr, channelID) {
-		b.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
-		b.cleanupPRData(ctx, url)
+	if !c.initPRData(ctx, url, pr, channelID) {
+		c.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		c.cleanupPRData(ctx, url)
+
 		return errors.New("failed to initialize PR data")
 	}
 
 	// Channel cosmetics.
-	slack.SetChannelTopicActivity(ctx, b.cmd, channelID, url)
-	slack.SetChannelDescriptionActivity(ctx, b.cmd, channelID, pr.Title, url)
-	b.setChannelBookmarks(ctx, channelID, url, pr)
-	b.postIntroMessage(ctx, channelID, event.Type, pr, event.Actor)
+	slack.SetChannelTopicActivity(ctx, c.Cmd, channelID, url)
+	slack.SetChannelDescriptionActivity(ctx, c.Cmd, channelID, pr.Title, url)
+	c.setChannelBookmarks(ctx, channelID, url, pr)
+	c.postIntroMessage(ctx, channelID, event.Type, pr, event.Actor)
 
-	err = slack.InviteUsersToChannelActivity(ctx, b.cmd, channelID, b.prParticipants(ctx, pr))
+	err = slack.InviteUsersToChannelActivity(ctx, c.Cmd, channelID, c.prParticipants(ctx, pr))
 	if err != nil {
-		b.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
-		b.cleanupPRData(ctx, url)
+		c.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		c.cleanupPRData(ctx, url)
 	}
 
 	return err
 }
 
-func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
-	title := slack.NormalizeChannelName(pr.Title, b.cmd.Int("slack-max-channel-name-length"))
+func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
+	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
 	url := pr.Links["html"].HRef
 	l := workflow.GetLogger(ctx)
 
-	for i := 1; i < 100; i++ {
-		name := fmt.Sprintf("%s_%d_%s", b.cmd.String("slack-channel-name-prefix"), pr.ID, title)
+	for i := 1; i < 50; i++ {
+		name := fmt.Sprintf("%s_%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.ID, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		id, retry, err := slack.CreateChannelActivity(ctx, b.cmd, name, url)
+		id, retry, err := slack.CreateChannelActivity(ctx, c.Cmd, name, url)
 		if err != nil {
 			if retry {
 				continue
@@ -171,28 +168,28 @@ func (b Bitbucket) createChannel(ctx workflow.Context, pr PullRequest) (string, 
 	return "", errors.New(msg)
 }
 
-func (b Bitbucket) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
+func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
 	// True = don't send a DM to the user if they're opted-out.
-	userID := users.BitbucketToSlackID(ctx, b.cmd, accountID, true)
+	userID := users.BitbucketToSlackID(ctx, c.Cmd, accountID, true)
 	if userID == "" {
 		return
 	}
 
 	msg := "Failed to create Slack channel for " + url
 	req := slack.ChatPostMessageRequest{Channel: userID, MarkdownText: msg}
-	slack.PostChatMessageActivityAsync(ctx, b.cmd, req)
+	_, _ = slack.PostChatMessageActivity(ctx, c.Cmd, req)
 }
 
-func (b Bitbucket) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
+func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
 	files := 0
 	commits := 0
 
-	slack.AddBookmarkActivity(ctx, b.cmd, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
-	slack.AddBookmarkActivity(ctx, b.cmd, channelID, fmt.Sprintf("Commits (%d)", commits), url+"/commits")
-	slack.AddBookmarkActivity(ctx, b.cmd, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff")
+	slack.AddBookmarkActivity(ctx, c.Cmd, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
+	slack.AddBookmarkActivity(ctx, c.Cmd, channelID, fmt.Sprintf("Commits (%d)", commits), url+"/commits")
+	slack.AddBookmarkActivity(ctx, c.Cmd, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff")
 }
 
-func (b Bitbucket) postIntroMessage(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
+func (c Config) postIntroMessage(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
 	action := "created"
 	if eventType == "pullrequest.updated" {
 		action = "marked as ready for review"
@@ -200,15 +197,15 @@ func (b Bitbucket) postIntroMessage(ctx workflow.Context, channelID, eventType s
 
 	msg := fmt.Sprintf("%%s %s %s: `%s`", action, pr.Links["html"].HRef, pr.Title)
 	if text := strings.TrimSpace(pr.Description); text != "" {
-		msg += "\n\n" + markdown.BitbucketToSlack(ctx, b.cmd, text)
+		msg += "\n\n" + markdown.BitbucketToSlack(ctx, c.Cmd, text)
 	}
 
-	_, _ = b.mentionUserInMsg(ctx, channelID, actor, msg)
+	_ = c.mentionUserInMsg(ctx, channelID, actor, msg)
 }
 
 // prParticipants returns a list of opted-in Slack user IDs (author/participants/reviewers).
 // The output is guaranteed to be sorted, without teams/apps, and without repetitions.
-func (b Bitbucket) prParticipants(ctx workflow.Context, pr PullRequest) []string {
+func (c Config) prParticipants(ctx workflow.Context, pr PullRequest) []string {
 	accounts := append([]Account{pr.Author}, pr.Reviewers...)
 	for _, p := range pr.Participants {
 		accounts = append(accounts, p.User)
@@ -225,7 +222,7 @@ func (b Bitbucket) prParticipants(ctx workflow.Context, pr PullRequest) []string
 	for _, aid := range accountIDs {
 		// True = don't include opted-out users. They will still be mentioned
 		// in the channel, but as non-members they won't be notified about it.
-		if sid := users.BitbucketToSlackID(ctx, b.cmd, aid, true); sid != "" {
+		if sid := users.BitbucketToSlackID(ctx, c.Cmd, aid, true); sid != "" {
 			slackIDs = append(slackIDs, sid)
 		}
 	}

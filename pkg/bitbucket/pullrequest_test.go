@@ -4,6 +4,31 @@ import (
 	"testing"
 )
 
+func TestHTMLURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		links map[string]Link
+		want  string
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name:  "happy_path",
+			links: map[string]Link{"html": {HRef: "http://example.com"}},
+			want:  "http://example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := htmlURL(tt.links); got != tt.want {
+				t.Errorf("htmlURL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestInlineCommentPrefix(t *testing.T) {
 	from, to := 1, 2
 

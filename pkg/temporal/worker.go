@@ -8,6 +8,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
+	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/github"
@@ -29,8 +30,12 @@ func Run(l zerolog.Logger, cmd *cli.Command) error {
 	defer c.Close()
 
 	w := worker.New(c, cmd.String("temporal-task-queue-revchat"), worker.Options{})
-	bitbucket.RegisterWorkflows(w, cmd)
+	bitbucket.RegisterPullRequestWorkflows(w, cmd)
+	bitbucket.RegisterRepositoryWorkflows(w, cmd)
 	github.RegisterWorkflows(w, cmd)
+
+	cfg := config{cmd: cmd}
+	w.RegisterWorkflowWithOptions(cfg.eventsDispatcherWorkflow, workflow.RegisterOptions{Name: "events.dispatcher"})
 
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		return fmt.Errorf("failed to start Temporal worker: %w", err)

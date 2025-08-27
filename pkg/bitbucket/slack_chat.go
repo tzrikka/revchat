@@ -1,6 +1,7 @@
 package bitbucket
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -11,93 +12,88 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-func (b Bitbucket) mentionUserInMsgAsync(ctx workflow.Context, channelID string, user Account, msg string) {
-	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, b.cmd, user.AccountID, user.DisplayName))
-	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
-	slack.PostChatMessageActivityAsync(ctx, b.cmd, req)
-}
-
-func (b Bitbucket) mentionUserInReplyAsync(ctx workflow.Context, parentURL string, user Account, msg string) {
+func (c Config) mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
 	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
 		l.Error("failed to retrieve PR comment's Slack IDs", "url", parentURL, "error", err)
-		return
+		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		l.Debug("can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
-		return
+		return errors.New("missing/bad Slack IDs")
 	}
 
-	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, b.cmd, user.AccountID, user.DisplayName))
+	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, c.Cmd, user.AccountID, user.DisplayName))
 	req := slack.ChatPostMessageRequest{Channel: id[0], MarkdownText: msg, ThreadTS: id[1]}
-	slack.PostChatMessageActivityAsync(ctx, b.cmd, req)
+	_, err = slack.PostChatMessageActivity(ctx, c.Cmd, req)
+	return err
 }
 
-func (b Bitbucket) mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) (string, error) {
-	return b.mentionUserInReply(ctx, channelID, "", user, msg)
+func (c Config) mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) error {
+	return c.mentionUserInReply(ctx, channelID, "", user, msg)
 }
 
-func (b Bitbucket) mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) (string, error) {
-	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, b.cmd, user.AccountID, user.DisplayName))
+func (c Config) mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) error {
+	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, c.Cmd, user.AccountID, user.DisplayName))
 	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg, ThreadTS: threadTS}
-	resp, err := slack.PostChatMessageActivity(ctx, b.cmd, req)
-	if err != nil {
-		return "", err
-	}
-
-	return resp.TS, nil
+	_, err := slack.PostChatMessageActivity(ctx, c.Cmd, req)
+	return err
 }
 
-func (b Bitbucket) impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string) {
-	name, icon := b.impersonateUser(ctx, user)
+func (c Config) impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string) error {
+	name, icon := c.impersonateUser(ctx, user)
 	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg, Username: name, IconURL: icon}
-	resp, err := slack.PostChatMessageActivity(ctx, b.cmd, req)
+	resp, err := slack.PostChatMessageActivity(ctx, c.Cmd, req)
 	if err != nil {
-		return
+		return err
 	}
 
 	if err := data.MapURLAndID(url, fmt.Sprintf("%s/%s", channelID, resp.TS)); err != nil {
 		workflow.GetLogger(ctx).Error("failed to map PR comment URL to Slack IDs", "url", url, "error", err)
 	}
+
+	return nil
 }
 
-func (b Bitbucket) impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string) {
+func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string) error {
 	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
 		l.Error("failed to retrieve PR comment's Slack IDs", "url", parentURL, "error", err)
-		return
+		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		l.Error("can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
-		return
+		return errors.New("missing/bad Slack IDs")
 	}
 
-	name, icon := b.impersonateUser(ctx, user)
+	name, icon := c.impersonateUser(ctx, user)
 	req := slack.ChatPostMessageRequest{Channel: id[0], MarkdownText: msg, ThreadTS: id[1], Username: name, IconURL: icon}
-	resp, err := slack.PostChatMessageActivity(ctx, b.cmd, req)
+	resp, err := slack.PostChatMessageActivity(ctx, c.Cmd, req)
 	if err != nil {
-		return
+		return err
 	}
 
 	if err := data.MapURLAndID(url, fmt.Sprintf("%s/%s/%s", id[0], id[1], resp.TS)); err != nil {
 		l.Error("failed to map PR comment URL to Slack IDs", "url", url, "error", err)
 	}
+
+	return nil
 }
 
-func (b Bitbucket) impersonateUser(ctx workflow.Context, user Account) (name, icon string) {
-	id := users.BitbucketToSlackID(ctx, b.cmd, user.AccountID, false)
+func (c Config) impersonateUser(ctx workflow.Context, user Account) (name, icon string) {
+	id := users.BitbucketToSlackID(ctx, c.Cmd, user.AccountID, false)
 	if id == "" {
 		name = user.DisplayName
 		return
 	}
 
-	profile, err := slack.UserProfileActivity(ctx, b.cmd, id)
+	profile, err := slack.UserProfileActivity(ctx, c.Cmd, id)
 	if err != nil {
 		name = user.DisplayName
 		return
@@ -108,42 +104,41 @@ func (b Bitbucket) impersonateUser(ctx workflow.Context, user Account) (name, ic
 	return
 }
 
-func (b Bitbucket) deleteMsg(ctx workflow.Context, url string) {
+func (c Config) deleteMsg(ctx workflow.Context, url string) error {
 	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
 		l.Error("failed to retrieve PR comment's Slack IDs", "url", url, "error", err)
-		return
+		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		l.Error("can't delete Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
-		return
+		return errors.New("missing/bad Slack IDs")
 	}
-
-	req := slack.ChatDeleteRequest{Channel: id[0], TS: id[len(id)-1]}
-	slack.DeleteChatMessageActivityAsync(ctx, b.cmd, req)
 
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
 		l.Error("failed to delete URL/Slack mappings", "error", err, "comment_url", url)
 	}
+
+	return slack.DeleteChatMessageActivity(ctx, c.Cmd, id[0], id[len(id)-1])
 }
 
-func (b Bitbucket) editMsg(ctx workflow.Context, url, msg string) {
+func (c Config) editMsg(ctx workflow.Context, url, msg string) error {
 	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
 		l.Error("failed to retrieve PR comment's Slack IDs", "url", url, "error", err)
-		return
+		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		l.Error("can't update Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
-		return
+		return errors.New("missing/bad Slack IDs")
 	}
 
 	req := slack.ChatUpdateRequest{Channel: id[0], TS: id[len(id)-1], MarkdownText: msg}
-	slack.UpdateChatMessageActivityAsync(ctx, b.cmd, req)
+	return slack.UpdateChatMessageActivity(ctx, c.Cmd, req)
 }
