@@ -12,6 +12,10 @@ import (
 	"github.com/tzrikka/revchat/pkg/github"
 )
 
+const (
+	SearchAttribute = "WaitingForSignals"
+)
+
 type config struct {
 	cmd *cli.Command
 }
@@ -23,7 +27,7 @@ type config struct {
 func (c config) eventDispatcherWorkflow(ctx workflow.Context) error {
 	// https://docs.temporal.io/develop/go/observability#visibility
 	sig := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals)
-	attr := temporal.NewSearchAttributeKeyKeywordList("WaitingForSignals").ValueSet(sig)
+	attr := temporal.NewSearchAttributeKeyKeywordList(SearchAttribute).ValueSet(sig)
 	if err := workflow.UpsertTypedSearchAttributes(ctx, attr); err != nil {
 		return fmt.Errorf("failed to set workflow search attribute: %w", err)
 	}
