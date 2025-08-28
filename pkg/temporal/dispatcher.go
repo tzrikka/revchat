@@ -45,7 +45,6 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	github.RegisterSignals(ctx, sel, tq)
 
 	for {
-		log.Debug(ctx, "waiting for signals from Timpani")
 		sel.Select(ctx)
 
 		// https://docs.temporal.io/develop/go/continue-as-new
