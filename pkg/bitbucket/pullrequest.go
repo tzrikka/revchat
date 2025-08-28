@@ -5,6 +5,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/markdown"
 )
 
@@ -42,7 +43,7 @@ func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent)
 	case "changes_request_removed":
 
 	default:
-		workflow.GetLogger(ctx).Error("unrecognized Bitbucket PR review event type", "event_type", event.Type)
+		log.Error(ctx, "unrecognized Bitbucket PR review event type", "event_type", event.Type)
 	}
 
 	return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)

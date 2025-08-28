@@ -3,6 +3,8 @@ package slack
 import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 // https://docs.slack.dev/reference/methods/bookmarks.add
@@ -25,6 +27,6 @@ func AddBookmarkActivity(ctx workflow.Context, cmd *cli.Command, channelID, titl
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to add new bookmark in Slack channel"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "title", title)
+		log.Error(ctx, msg, "error", err, "channel_id", channelID, "title", title)
 	}
 }

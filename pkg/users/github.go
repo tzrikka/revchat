@@ -7,6 +7,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
@@ -28,8 +29,6 @@ func GitHubToSlackRef(ctx workflow.Context, cmd *cli.Command, username, url stri
 // the user's email address being the same in both systems. This function returns an
 // empty string if the username is not found, or if it belongs to a GitHub team or app.
 func GitHubToSlackID(ctx workflow.Context, cmd *cli.Command, username string, checkOptIn bool) string {
-	l := workflow.GetLogger(ctx)
-
 	// Don't even check GitHub teams, only individual users.
 	if strings.Contains(username, "/") {
 		return ""
@@ -37,7 +36,7 @@ func GitHubToSlackID(ctx workflow.Context, cmd *cli.Command, username string, ch
 
 	email, err := data.GitHubUserEmailByID(username)
 	if err != nil {
-		l.Error("failed to load GitHub user email", "error", err, "username", username)
+		log.Error(ctx, "failed to load GitHub user email", "error", err, "username", username)
 		return ""
 	}
 
@@ -48,7 +47,7 @@ func GitHubToSlackID(ctx workflow.Context, cmd *cli.Command, username string, ch
 	if checkOptIn {
 		optedIn, err := data.IsOptedIn(email)
 		if err != nil {
-			l.Error("failed to load user opt-in status", "error", err, "email", email)
+			log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
 			return ""
 		}
 		if !optedIn {
@@ -58,7 +57,7 @@ func GitHubToSlackID(ctx workflow.Context, cmd *cli.Command, username string, ch
 
 	id, err := data.SlackUserIDByEmail(email)
 	if err != nil {
-		l.Error("failed to load Slack user ID", "error", err, "email", email)
+		log.Error(ctx, "failed to load Slack user ID", "error", err, "email", email)
 	}
 
 	if id == "" {

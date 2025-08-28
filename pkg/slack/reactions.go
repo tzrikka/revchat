@@ -3,6 +3,8 @@ package slack
 import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 // https://docs.slack.dev/reference/methods/reactions.add
@@ -19,7 +21,7 @@ func AddReactionActivity(ctx workflow.Context, cmd *cli.Command, channelID, time
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to add reaction to Slack message"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "timestamp", timestamp, "emoji", emoji)
+		log.Error(ctx, msg, "error", err, "channel_id", channelID, "timestamp", timestamp, "emoji", emoji)
 		return err
 	}
 
@@ -43,7 +45,7 @@ func RemoveReactionActivity(ctx workflow.Context, cmd *cli.Command, channelID, t
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to remove reaction from Slack message"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "timestamp", timestamp, "emoji", emoji)
+		log.Error(ctx, msg, "error", err, "channel_id", channelID, "timestamp", timestamp, "emoji", emoji)
 		return err
 	}
 

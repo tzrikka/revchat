@@ -7,22 +7,22 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
 func (c Config) mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
-	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
-		l.Error("failed to retrieve PR comment's Slack IDs", "url", parentURL, "error", err)
+		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", parentURL)
 		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		l.Debug("can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
+		log.Debug(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 
@@ -52,23 +52,22 @@ func (c Config) impersonateUserInMsg(ctx workflow.Context, url, channelID string
 	}
 
 	if err := data.MapURLAndID(url, fmt.Sprintf("%s/%s", channelID, resp.TS)); err != nil {
-		workflow.GetLogger(ctx).Error("failed to map PR comment URL to Slack IDs", "url", url, "error", err)
+		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url)
 	}
 
 	return nil
 }
 
 func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string) error {
-	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
-		l.Error("failed to retrieve PR comment's Slack IDs", "url", parentURL, "error", err)
+		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", parentURL)
 		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		l.Error("can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
+		log.Error(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 
@@ -80,7 +79,7 @@ func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL stri
 	}
 
 	if err := data.MapURLAndID(url, fmt.Sprintf("%s/%s/%s", id[0], id[1], resp.TS)); err != nil {
-		l.Error("failed to map PR comment URL to Slack IDs", "url", url, "error", err)
+		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url)
 	}
 
 	return nil
@@ -105,37 +104,35 @@ func (c Config) impersonateUser(ctx workflow.Context, user Account) (name, icon 
 }
 
 func (c Config) deleteMsg(ctx workflow.Context, url string) error {
-	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		l.Error("failed to retrieve PR comment's Slack IDs", "url", url, "error", err)
+		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
 		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		l.Error("can't delete Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		log.Error(ctx, "can't delete Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
-		l.Error("failed to delete URL/Slack mappings", "error", err, "comment_url", url)
+		log.Error(ctx, "failed to delete URL/Slack mappings", "error", err, "comment_url", url)
 	}
 
 	return slack.DeleteChatMessageActivity(ctx, c.Cmd, id[0], id[len(id)-1])
 }
 
 func (c Config) editMsg(ctx workflow.Context, url, msg string) error {
-	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		l.Error("failed to retrieve PR comment's Slack IDs", "url", url, "error", err)
+		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
 		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		l.Error("can't update Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		log.Error(ctx, "can't update Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 

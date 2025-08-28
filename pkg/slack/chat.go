@@ -3,6 +3,8 @@ package slack
 import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 // https://docs.slack.dev/reference/methods/chat.delete
@@ -18,8 +20,7 @@ func DeleteChatMessageActivity(ctx workflow.Context, cmd *cli.Command, channelID
 	a := executeTimpaniActivity(ctx, cmd, "slack.chat.delete", chatDeleteRequest{Channel: channelID, TS: timestamp})
 
 	if err := a.Get(ctx, nil); err != nil {
-		msg := "failed to delete Slack message"
-		workflow.GetLogger(ctx).Error(msg, "error", err)
+		log.Error(ctx, "failed to delete Slack message", "error", err)
 		return err
 	}
 
@@ -65,8 +66,7 @@ func PostChatMessageActivity(ctx workflow.Context, cmd *cli.Command, req ChatPos
 
 	resp := &ChatPostMessageResponse{}
 	if err := a.Get(ctx, resp); err != nil {
-		msg := "failed to post Slack message"
-		workflow.GetLogger(ctx).Error(msg, "error", err)
+		log.Error(ctx, "failed to post Slack message", "error", err)
 		return nil, err
 	}
 
@@ -98,8 +98,7 @@ func UpdateChatMessageActivity(ctx workflow.Context, cmd *cli.Command, req ChatU
 	a := executeTimpaniActivity(ctx, cmd, "slack.chat.update", req)
 
 	if err := a.Get(ctx, nil); err != nil {
-		msg := "failed to update Slack message"
-		workflow.GetLogger(ctx).Error(msg, "error", err)
+		log.Error(ctx, "failed to update Slack message", "error", err)
 		return err
 	}
 

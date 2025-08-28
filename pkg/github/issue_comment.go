@@ -4,6 +4,8 @@ import (
 	"errors"
 
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_comment
@@ -17,7 +19,7 @@ func (c Config) issueCommentWorkflow(ctx workflow.Context, event IssueCommentEve
 		return c.issueCommentDeleted()
 
 	default:
-		workflow.GetLogger(ctx).Error("unrecognized GitHub issue comment event action", "action", event.Action)
+		log.Error(ctx, "unrecognized GitHub issue comment event action", "action", event.Action)
 		return errors.New("unrecognized GitHub issue comment event action: " + event.Action)
 	}
 }
