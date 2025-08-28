@@ -7,6 +7,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -15,16 +16,15 @@ import (
 func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) error {
 	// Already confirmed the Slack channel exists before calling this function.
 	channelID, _ := lookupChannel(ctx, event.Action, event.PullRequest)
+	var err error
 
 	// Individual assignee.
 	if user := event.Assignee; user != nil {
 		switch event.Action {
 		case "assigned":
-			return c.addChannelMember(ctx, channelID, *user, event.Sender, "assignee")
+			err = c.addChannelMember(ctx, channelID, *user, event.Sender, "assignee")
 		case "unassigned":
-			return c.removeChannelMember(ctx, channelID, *user, event.Sender, "assignee")
-		default:
-			return nil
+			err = c.removeChannelMember(ctx, channelID, *user, event.Sender, "assignee")
 		}
 	}
 
@@ -32,11 +32,9 @@ func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) erro
 	if user := event.RequestedReviewer; user != nil {
 		switch event.Action {
 		case "review_requested":
-			return c.addChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
+			err = c.addChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
 		case "review_request_removed":
-			return c.removeChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
-		default:
-			return nil
+			err = c.removeChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
 		}
 	}
 
@@ -47,10 +45,10 @@ func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) erro
 	}
 	if team := event.RequestedTeam; team != nil {
 		msg := fmt.Sprintf("%s the <%s|%s> team as a reviewer", action, team.HTMLURL, team.Name)
-		return c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
+		err = c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
 	}
 
-	return nil
+	return err
 }
 
 func (c Config) addChannelMember(ctx workflow.Context, channelID string, reviewer, sender User, role string) error {
@@ -98,7 +96,7 @@ func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, s
 	slackID := strings.TrimSuffix(strings.TrimPrefix(slackRef, "<@"), ">")
 	email, err := data.SlackUserEmailByID(slackID)
 	if err != nil {
-		workflow.GetLogger(ctx).Error("failed to load Slack user email", "error", err, "user_id", slackID)
+		log.Error(ctx, "failed to load Slack user email", "error", err, "user_id", slackID)
 		return ""
 	}
 	if email == "" {
@@ -107,7 +105,7 @@ func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, s
 
 	optedIn, err := data.IsOptedIn(email)
 	if err != nil {
-		workflow.GetLogger(ctx).Error("failed to load user opt-in status", "error", err, "email", email)
+		log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
 		return ""
 	}
 	if !optedIn {

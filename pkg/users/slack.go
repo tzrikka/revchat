@@ -4,6 +4,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
@@ -16,8 +17,7 @@ func EmailToSlackID(ctx workflow.Context, cmd *cli.Command, email string) string
 	}
 
 	if err := data.AddSlackUser(user.ID, email); err != nil {
-		msg := "failed to save Slack user ID/email mapping"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "user_id", user.ID, "email", email)
+		log.Error(ctx, "failed to save Slack user ID/email mapping", "error", err, "user_id", user.ID, "email", email)
 	}
 
 	return user.ID
@@ -66,7 +66,7 @@ func slackLookupUserByEmailActivity(ctx workflow.Context, cmd *cli.Command, emai
 
 	resp := slackUsersLookupByEmailResponse{}
 	if err := a.Get(ctx, &resp); err != nil {
-		workflow.GetLogger(ctx).Error("failed to lookup Slack user by email", "error", err, "email", email)
+		log.Error(ctx, "failed to lookup Slack user by email", "error", err, "email", email)
 		return nil
 	}
 

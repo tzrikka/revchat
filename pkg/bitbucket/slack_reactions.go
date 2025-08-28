@@ -6,21 +6,21 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 )
 
 func (c Config) addReaction(ctx workflow.Context, url, emoji string) error {
-	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		l.Error("failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
+		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
 		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		l.Error("can't add reaction to Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		log.Error(ctx, "can't add reaction to Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 
@@ -28,16 +28,15 @@ func (c Config) addReaction(ctx workflow.Context, url, emoji string) error {
 }
 
 func (c Config) removeReaction(ctx workflow.Context, url, emoji string) error {
-	l := workflow.GetLogger(ctx)
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		l.Error("failed to retrieve PR comment's Slack IDs", "url", url, "error", err)
+		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
 		return err
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		l.Error("can't remove reaction from Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		log.Error(ctx, "can't remove reaction from Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 

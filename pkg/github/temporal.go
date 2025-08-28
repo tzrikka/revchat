@@ -4,6 +4,8 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 type Config struct {
@@ -41,7 +43,7 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		e := PullRequestEvent{}
 		c.Receive(ctx, &e)
 
-		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
 		wf := workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
 
 		// Wait for [Config.prOpened] completion before returning, to ensure we handle
@@ -55,7 +57,7 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		e := PullRequestReviewEvent{}
 		c.Receive(ctx, &e)
 
-		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
 		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
 	})
 
@@ -63,7 +65,7 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		e := PullRequestReviewCommentEvent{}
 		c.Receive(ctx, &e)
 
-		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
 		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
 	})
 
@@ -71,7 +73,7 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		e := PullRequestReviewThreadEvent{}
 		c.Receive(ctx, &e)
 
-		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
 		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
 	})
 
@@ -79,7 +81,7 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		e := IssueCommentEvent{}
 		c.Receive(ctx, &e)
 
-		workflow.GetLogger(ctx).Debug("received signal", "signal", c.Name(), "action", e.Action)
+		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
 		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
 	})
 }

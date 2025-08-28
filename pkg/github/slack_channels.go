@@ -9,6 +9,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
@@ -59,14 +60,12 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 
 	channelID, err := data.SwitchURLAndID(pr.HTMLURL)
 	if err != nil {
-		msg := "failed to retrieve GitHub PR's Slack channel ID"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "action", action, "pr_url", pr.HTMLURL)
+		log.Error(ctx, "failed to retrieve PR's Slack channel ID", "error", err, "action", action, "pr_url", pr.HTMLURL)
 		return "", false
 	}
 
 	if channelID == "" {
-		msg := "GitHub PR's Slack channel ID not found"
-		workflow.GetLogger(ctx).Debug(msg, "action", action, "pr_url", pr.HTMLURL)
+		log.Debug(ctx, "PR's Slack channel ID is empty", "action", action, "pr_url", pr.HTMLURL)
 		return "", false
 	}
 
@@ -77,50 +76,49 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 // they are logged but ignored, as they do not affect the overall workflow.
 func (c Config) cleanupPRData(ctx workflow.Context, url string) {
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
-		msg := "failed to delete PR URL / Slack channel mappings"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "pr_url", url)
+		log.Error(ctx, "failed to delete PR URL / Slack channel mappings", "error", err, "pr_url", url)
 	}
 }
 
 func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error {
 	pr := event.PullRequest
+	url := pr.HTMLURL
+
 	channelID, err := c.createChannel(ctx, pr)
 	if err != nil {
-		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, pr.HTMLURL)
+		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
 		return err
 	}
 
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
-	if err := data.MapURLAndID(pr.HTMLURL, channelID); err != nil {
-		msg := "failed to save PR URL / Slack channel mapping"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", pr.HTMLURL)
-		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, pr.HTMLURL)
-		c.cleanupPRData(ctx, pr.HTMLURL)
-
+	if err := data.MapURLAndID(url, channelID); err != nil {
+		log.Error(ctx, "failed to save PR URL / Slack channel mapping", "error", err, "channel_id", channelID, "pr_url", url)
+		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
+		c.cleanupPRData(ctx, url)
 		return err
 	}
 
 	// Channel cosmetics.
-	slack.SetChannelTopicActivity(ctx, c.Cmd, channelID, pr.HTMLURL)
-	slack.SetChannelDescriptionActivity(ctx, c.Cmd, channelID, pr.Title, pr.HTMLURL)
-	c.setChannelBookmarks(ctx, channelID, pr.HTMLURL, pr)
+	slack.SetChannelTopicActivity(ctx, c.Cmd, channelID, url)
+	slack.SetChannelDescriptionActivity(ctx, c.Cmd, channelID, pr.Title, url)
+	c.setChannelBookmarks(ctx, channelID, url, pr)
 	c.postIntroMessage(ctx, channelID, event.Action, pr, event.Sender)
 
 	err = slack.InviteUsersToChannelActivity(ctx, c.Cmd, channelID, c.prParticipants(ctx, pr))
 	if err != nil {
-		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, pr.HTMLURL)
-		c.cleanupPRData(ctx, pr.HTMLURL)
+		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
+		c.cleanupPRData(ctx, url)
+		return err
 	}
 
-	return err
+	return nil
 }
 
 func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
 	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
-	l := workflow.GetLogger(ctx)
 
 	for i := 1; i < 50; i++ {
-		name := fmt.Sprintf("%s_%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.Number, title)
+		name := fmt.Sprintf("%s-%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.Number, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
@@ -138,7 +136,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 	}
 
 	msg := "too many failed attempts to create Slack channel"
-	l.Error(msg, "pr_url", pr.HTMLURL)
+	log.Error(ctx, msg, "pr_url", pr.HTMLURL)
 	return "", errors.New(msg)
 }
 

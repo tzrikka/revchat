@@ -6,6 +6,8 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 type Config struct {
@@ -96,9 +98,9 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 				e.Type = signal
 			}
 
-			workflow.GetLogger(ctx).Debug("received signal", "signal", signal)
-			ctx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-			wf := workflow.ExecuteChildWorkflow(ctx, signal, e)
+			log.Info(ctx, "received signal", "signal", signal)
+			childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
+			wf := workflow.ExecuteChildWorkflow(childCtx, signal, e)
 
 			// Wait for [Config.prCreated] completion before returning, to ensure we handle
 			// subsequent PR initialization events appropriately (e.g. check states).
@@ -122,9 +124,9 @@ func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, task
 				e.Type = signal
 			}
 
-			workflow.GetLogger(ctx).Debug("received signal", "signal", signal)
-			ctx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-			workflow.ExecuteChildWorkflow(ctx, signal, e)
+			log.Info(ctx, "received signal", "signal", signal)
+			childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
+			workflow.ExecuteChildWorkflow(childCtx, signal, e)
 		})
 	}
 }

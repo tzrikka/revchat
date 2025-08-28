@@ -4,6 +4,8 @@ import (
 	"errors"
 
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request_review_thread
@@ -15,7 +17,7 @@ func (c Config) prReviewThreadWorkflow(ctx workflow.Context, event PullRequestRe
 		return c.reviewThreadUnresolved()
 
 	default:
-		workflow.GetLogger(ctx).Error("unrecognized GitHub PR review thread event action", "action", event.Action)
+		log.Error(ctx, "unrecognized GitHub PR review thread event action", "action", event.Action)
 		return errors.New("unrecognized GitHub PR review thread event action: " + event.Action)
 	}
 }

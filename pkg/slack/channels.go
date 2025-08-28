@@ -7,6 +7,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 // NormalizeChannelName transforms arbitrary text into a valid Slack channel name.
@@ -105,11 +107,11 @@ func ArchiveChannelActivity(ctx workflow.Context, cmd *cli.Command, channelID st
 	a := executeTimpaniActivity(ctx, cmd, "slack.conversations.archive", req)
 
 	if err := a.Get(ctx, nil); err != nil {
-		msg := "failed to archive Slack channel"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID)
+		log.Error(ctx, "failed to archive Slack channel", "error", err, "channel_id", channelID)
 		return err
 	}
 
+	log.Info(ctx, "archived Slack channel", "channel_id", channelID)
 	return nil
 }
 
@@ -117,24 +119,22 @@ func ArchiveChannelActivity(ctx workflow.Context, cmd *cli.Command, channelID st
 func CreateChannelActivity(ctx workflow.Context, cmd *cli.Command, name, url string) (string, bool, error) {
 	req := conversationsCreateRequest{Name: name, IsPrivate: false}
 	a := executeTimpaniActivity(ctx, cmd, "slack.conversations.create", req)
-	l := workflow.GetLogger(ctx)
 
 	resp := &ConversationsCreateResponse{}
 	if err := a.Get(ctx, resp); err != nil {
 		msg := "failed to create Slack channel"
 
 		if strings.Contains(err.Error(), "name_taken") {
-			l.Debug(msg+" - already exists", "channel_name", name, "pr_url", url)
+			log.Debug(ctx, msg+" - already exists", "channel_name", name, "pr_url", url)
 			return "", true, err // Retryable error.
 		}
 
-		l.Error(msg, "error", err, "channel_name", name, "pr_url", url)
+		log.Error(ctx, msg, "error", err, "channel_name", name, "pr_url", url)
 		return "", false, err // Non-retryable error.
 	}
 
-	id := resp.Channel.ID
-	l.Info("created Slack channel", "channel_id", id, "channel_name", name, "pr_url", url)
-	return id, false, nil
+	log.Info(ctx, "created Slack channel", "channel_id", resp.Channel.ID, "channel_name", name, "pr_url", url)
+	return resp.Channel.ID, false, nil
 }
 
 // https://docs.slack.dev/reference/methods/conversations.invite
@@ -143,10 +143,9 @@ func InviteUsersToChannelActivity(ctx workflow.Context, cmd *cli.Command, channe
 		return nil
 	}
 
-	l := workflow.GetLogger(ctx)
 	if len(userIDs) > 1000 { // API limitation.
 		msg := "trying to add more than 1000 users to Slack channel"
-		l.Warn(msg, "channel_id", channelID, "users_len", len(userIDs))
+		log.Warn(ctx, msg, "channel_id", channelID, "users_len", len(userIDs))
 		userIDs = userIDs[:1000]
 	}
 
@@ -158,10 +157,11 @@ func InviteUsersToChannelActivity(ctx workflow.Context, cmd *cli.Command, channe
 	if err := a.Get(ctx, resp); err != nil {
 		msg := "failed to add user(s) to Slack channel"
 		if strings.Contains(err.Error(), "already_in_channel") {
-			l.Debug(msg+" - already in channel", "error", err, "resp", resp, "user_ids", strings.Join(userIDs, ","))
+			msg += " - already in channel"
+			log.Debug(ctx, msg, "error", err, "resp", resp, "user_ids", strings.Join(userIDs, ","))
 			return nil
 		}
-		l.Error(msg, "error", err, "channel_id", channelID, "user_ids", strings.Join(userIDs, ","))
+		log.Error(ctx, msg, "error", err, "channel_id", channelID, "user_ids", strings.Join(userIDs, ","))
 		return err
 	}
 
@@ -175,7 +175,7 @@ func KickUserFromChannelActivity(ctx workflow.Context, cmd *cli.Command, channel
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to kick user from Slack channel"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "user_id", userID)
+		log.Error(ctx, msg, "error", err, "channel_id", channelID, "user_id", userID)
 		return err
 	}
 
@@ -194,7 +194,7 @@ func SetChannelDescriptionActivity(ctx workflow.Context, cmd *cli.Command, chann
 
 	if err := a.Get(ctx, nil); err != nil {
 		msg := "failed to set Slack channel description"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
+		log.Error(ctx, msg, "error", err, "channel_id", channelID, "pr_url", url)
 	}
 }
 
@@ -209,7 +209,6 @@ func SetChannelTopicActivity(ctx workflow.Context, cmd *cli.Command, channelID, 
 	a := executeTimpaniActivity(ctx, cmd, "slack.conversations.setTopic", req)
 
 	if err := a.Get(ctx, nil); err != nil {
-		msg := "failed to set Slack channel topic"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "channel_id", channelID, "pr_url", url)
+		log.Error(ctx, "failed to set Slack channel topic", "error", err, "channel_id", channelID, "pr_url", url)
 	}
 }

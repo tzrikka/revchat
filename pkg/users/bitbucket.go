@@ -6,6 +6,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
@@ -29,11 +30,9 @@ func BitbucketToSlackRef(ctx workflow.Context, cmd *cli.Command, accountID, disp
 // This depends on the user's email address being the same in both systems.
 // This function returns an empty string if the account ID is not found.
 func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string, checkOptIn bool) string {
-	l := workflow.GetLogger(ctx)
-
 	email, err := data.BitbucketUserEmailByID(accountID)
 	if err != nil {
-		l.Error("failed to load Bitbucket user email", "error", err, "account_id", accountID)
+		log.Error(ctx, "failed to load Bitbucket user email", "error", err, "account_id", accountID)
 		return ""
 	}
 
@@ -46,7 +45,7 @@ func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 	if checkOptIn {
 		optedIn, err := data.IsOptedIn(email)
 		if err != nil {
-			l.Error("failed to load user opt-in status", "error", err, "email", email)
+			log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
 			return ""
 		}
 		if !optedIn {
@@ -56,7 +55,7 @@ func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 
 	id, err := data.SlackUserIDByEmail(email)
 	if err != nil {
-		l.Error("failed to load Slack user ID", "error", err, "email", email)
+		log.Error(ctx, "failed to load Slack user ID", "error", err, "email", email)
 	}
 
 	if id == "" {

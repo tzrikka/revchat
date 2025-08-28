@@ -3,6 +3,8 @@ package slack
 import (
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/log"
 )
 
 // https://docs.slack.dev/reference/methods/users.info
@@ -79,13 +81,11 @@ type Profile struct {
 
 // https://docs.slack.dev/reference/methods/users.info
 func UserInfoActivity(ctx workflow.Context, cmd *cli.Command, userID string) (*User, error) {
-	req := usersInfoRequest{User: userID}
-	a := executeTimpaniActivity(ctx, cmd, "slack.users.info", req)
+	a := executeTimpaniActivity(ctx, cmd, "slack.users.info", usersInfoRequest{User: userID})
 
 	resp := &usersInfoResponse{}
 	if err := a.Get(ctx, resp); err != nil {
-		msg := "failed to retrieve Slack user info"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "user_id", userID)
+		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", userID)
 		return nil, err
 	}
 
@@ -94,13 +94,11 @@ func UserInfoActivity(ctx workflow.Context, cmd *cli.Command, userID string) (*U
 
 // https://docs.slack.dev/reference/methods/users.profile.get
 func UserProfileActivity(ctx workflow.Context, cmd *cli.Command, userID string) (*Profile, error) {
-	req := usersProfileGetRequest{User: userID}
-	a := executeTimpaniActivity(ctx, cmd, "slack.users.profile.get", req)
+	a := executeTimpaniActivity(ctx, cmd, "slack.users.profile.get", usersProfileGetRequest{User: userID})
 
 	resp := &usersProfileGetResponse{}
 	if err := a.Get(ctx, resp); err != nil {
-		msg := "failed to retrieve Slack user profile"
-		workflow.GetLogger(ctx).Error(msg, "error", err, "user_id", userID)
+		log.Error(ctx, "failed to retrieve Slack user profile", "error", err, "user_id", userID)
 		return nil, err
 	}
 
