@@ -49,9 +49,8 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 			e := map[string]any{}
 			c.Receive(ctx, &e)
 
-			signal := c.Name()
-			log.Info(ctx, "received signal", "signal", signal)
-			workflow.ExecuteChildWorkflow(childCtx, signal, e)
+			log.Info(ctx, "received signal", "signal", c.Name())
+			workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
 		})
 	}
 }

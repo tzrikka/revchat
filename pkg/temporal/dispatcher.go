@@ -33,7 +33,7 @@ type Config struct {
 // [Timpani]: https://pkg.go.dev/github.com/tzrikka/timpani/pkg/listeners
 func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	// https://docs.temporal.io/develop/go/observability#visibility
-	sig := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals)
+	sig := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals, slack.Signals)
 	attr := temporal.NewSearchAttributeKeyKeywordList(SearchAttribute).ValueSet(sig)
 	if err := workflow.UpsertTypedSearchAttributes(ctx, attr); err != nil {
 		return fmt.Errorf("failed to set workflow search attribute: %w", err)
