@@ -25,7 +25,7 @@ func main() {
 		Flags:   config.Flags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			initLog(cmd.Bool("dev") || cmd.Bool("pretty-log"))
-			return temporal.Run(log.Logger, cmd)
+			return temporal.Run(ctx, log.Logger, cmd)
 		},
 	}
 
