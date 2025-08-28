@@ -14,6 +14,7 @@ import (
 
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/github"
+	"github.com/tzrikka/revchat/pkg/slack"
 )
 
 // Run initializes the Temporal worker, and blocks to keep it running.
@@ -37,6 +38,7 @@ func Run(ctx context.Context, l zerolog.Logger, cmd *cli.Command) error {
 	bitbucket.RegisterPullRequestWorkflows(w, cmd)
 	bitbucket.RegisterRepositoryWorkflows(w, cmd)
 	github.RegisterWorkflows(w, cmd)
+	slack.RegisterWorkflows(w, cmd)
 
 	cfg := Config{cmd: cmd}
 	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})

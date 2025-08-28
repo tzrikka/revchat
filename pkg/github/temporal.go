@@ -12,8 +12,12 @@ type Config struct {
 	Cmd *cli.Command
 }
 
-// https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request
-// https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_comment
+// Signals is a list of signal names that RevChat receives
+// from Timpani, to trigger event handling workflows.
+//
+// This is based on:
+//   - https://github.com/tzrikka/revchat/blob/main/docs/github.md#subscribe-to-event
+//   - https://github.com/tzrikka/timpani/blob/main/pkg/listeners/github/webhook.go
 var Signals = []string{
 	"github.events.pull_request",
 	"github.events.pull_request_review",
@@ -26,12 +30,10 @@ var Signals = []string{
 // RegisterWorkflows maps event handler functions to [Signals].
 func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
 	c := Config{Cmd: cmd}
-
 	w.RegisterWorkflowWithOptions(c.pullRequestWorkflow, workflow.RegisterOptions{Name: Signals[0]})
 	w.RegisterWorkflowWithOptions(c.prReviewWorkflow, workflow.RegisterOptions{Name: Signals[1]})
 	w.RegisterWorkflowWithOptions(c.prReviewCommentWorkflow, workflow.RegisterOptions{Name: Signals[2]})
 	w.RegisterWorkflowWithOptions(c.prReviewThreadWorkflow, workflow.RegisterOptions{Name: Signals[3]})
-
 	w.RegisterWorkflowWithOptions(c.issueCommentWorkflow, workflow.RegisterOptions{Name: Signals[4]})
 }
 

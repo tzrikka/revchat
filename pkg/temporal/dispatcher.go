@@ -11,6 +11,7 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/github"
+	"github.com/tzrikka/revchat/pkg/slack"
 )
 
 const (
@@ -43,6 +44,7 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	bitbucket.RegisterPullRequestSignals(ctx, sel, tq)
 	bitbucket.RegisterRepositorySignals(ctx, sel, tq)
 	github.RegisterSignals(ctx, sel, tq)
+	slack.RegisterSignals(ctx, sel, tq)
 
 	for {
 		sel.Select(ctx)
