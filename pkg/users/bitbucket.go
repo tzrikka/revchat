@@ -10,9 +10,9 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
-// BitbucketToSlackRef converts Bitbucket account ID into a Slack user reference.
+// BitbucketToSlackRef converts a Bitbucket account ID into a Slack user reference.
 // This depends on the user's email address being the same in both systems.
-// This function returns the display name if the user is not found in Slack.
+// This function returns the Bitbucket display name if the user is not found in Slack.
 func BitbucketToSlackRef(ctx workflow.Context, cmd *cli.Command, accountID, displayName string) string {
 	id := BitbucketToSlackID(ctx, cmd, accountID, false)
 	if id != "" {

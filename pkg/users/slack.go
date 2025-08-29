@@ -8,8 +8,8 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
-// EmailToSlackID looks up a Slack user based on the given email address.
-// This function assumes a mapping does not exist, so it adds it if found.
+// EmailToSlackID looks up a Slack user based on an email address. This
+// function assumes this mapping does not exist yet, so it saves it if found.
 func EmailToSlackID(ctx workflow.Context, cmd *cli.Command, email string) string {
 	user := slackLookupUserByEmailActivity(ctx, cmd, email)
 	if user == nil {
