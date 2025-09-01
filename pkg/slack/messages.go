@@ -15,7 +15,7 @@ type messageEventWrapper struct {
 	InnerEvent MessageEvent `json:"event"`
 }
 
-// https://docs.slack.dev/reference/events/message/
+// https://docs.slack.dev/reference/events/message
 type MessageEvent struct {
 	// Type string `json:"type"` // Always "message".
 
@@ -52,7 +52,7 @@ type edited struct {
 	TS   string `json:"ts"`
 }
 
-// https://docs.slack.dev/reference/events/message/
+// https://docs.slack.dev/reference/events/message
 func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
 	userID := c.extractUserID(ctx, &event.InnerEvent)
 	if userID == "" {
