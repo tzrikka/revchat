@@ -61,41 +61,43 @@ func (c Config) prClosedWorkflow(ctx workflow.Context, event PullRequestEvent) e
 
 func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	pr := event.PullRequest
+	channelID, found := lookupChannel(ctx, event.Type, pr)
 	if !found {
 		return nil
 	}
 
-	url := htmlURL(event.Comment.Links)
-	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw)
+	commentURL := htmlURL(event.Comment.Links)
+	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw, htmlURL(pr.Links))
 	if inline := event.Comment.Inline; inline != nil {
-		msg = inlineCommentPrefix(url, inline) + msg
+		msg = inlineCommentPrefix(commentURL, inline) + msg
 	}
 
 	var err error
 	if event.Comment.Parent == nil {
-		err = c.impersonateUserInMsg(ctx, url, channelID, event.Comment.User, msg)
+		err = c.impersonateUserInMsg(ctx, commentURL, channelID, event.Comment.User, msg)
 	} else {
 		parentURL := htmlURL(event.Comment.Parent.Links)
-		err = c.impersonateUserInReply(ctx, url, parentURL, event.Comment.User, msg)
+		err = c.impersonateUserInReply(ctx, commentURL, parentURL, event.Comment.User, msg)
 	}
 	return err
 }
 
 func (c Config) prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	pr := event.PullRequest
+	_, found := lookupChannel(ctx, event.Type, pr)
 	if !found {
 		return nil
 	}
 
-	url := htmlURL(event.Comment.Links)
-	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw)
+	commentURL := htmlURL(event.Comment.Links)
+	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw, htmlURL(pr.Links))
 	if inline := event.Comment.Inline; inline != nil {
-		msg = inlineCommentPrefix(url, inline) + msg
+		msg = inlineCommentPrefix(commentURL, inline) + msg
 	}
 
-	return c.editMsg(ctx, url, msg)
+	return c.editMsg(ctx, commentURL, msg)
 }
 
 func (c Config) prCommentDeletedWorkflow(ctx workflow.Context, event PullRequestEvent) error {

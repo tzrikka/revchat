@@ -1,7 +1,6 @@
 package markdown
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -17,40 +16,13 @@ import (
 //   - https://confluence.atlassian.com/bitbucketserver/markdown-syntax-guide-776639995.html
 //   - https://bitbucket.org/tutorials/markdowndemo/src/master/
 //   - https://docs.slack.dev/messaging/formatting-message-text/
-func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text string) string {
-	text = strings.TrimSpace(text)
-
-	// Header lines --> bold lines.
-	text = regexp.MustCompile(`(?m)^#+\s+(.+)`).ReplaceAllString(text, "**${1}**")
-
-	// Italic text: "*" --> "_" ("_" -> "_" is a no-op).
-	text = regexp.MustCompile(`(^|[^*])\*([^*]+?)\*`).ReplaceAllString(text, "${1}_${2}_")
-
-	// Bold text: "**" or "__" --> "*".
-	text = regexp.MustCompile(`\*\*(.+?)\*\*`).ReplaceAllString(text, "*${1}*")
-	text = regexp.MustCompile(`__(.+?)__`).ReplaceAllString(text, "*${1}*")
-
-	// Strikethrough text: "~~" --> "~".
-	text = regexp.MustCompile(`~~(.+?)~~`).ReplaceAllString(text, "~${1}~")
-
-	// Links: "[text](url){: ... }" --> "<url|text>".
-	// Images: "![text](url){: ... }" --> "!<url|text>" --> "Image: <url|text>".
-	text = regexp.MustCompile(`\[(.*?)\]\((.*?)\)(\{:.*?\})?`).ReplaceAllString(text, "<${2}|${1}>")
-	text = regexp.MustCompile(`!<(.*?)>`).ReplaceAllString(text, "Image: <${1}>")
-
-	// Unordered lists (up to 2 levels): "-" or "*" or "+" --> "•" and "◦".
-	for _, bullet := range []string{"-", `\+`} {
-		// When editing the PR description in the Bitbucket web UI, it injects
-		// superfluous "\n" and whitespaces between different levels of embedding.
-		text = regexp.MustCompile(`(?m)\n\n\s{4}`+bullet).ReplaceAllString(text, "\n    "+bullet)
-		text = regexp.MustCompile(`(?m)\n\s{4}\n`).ReplaceAllString(text, "\n")
-
-		pattern := fmt.Sprintf(`(?m)^%s\s*`, bullet)
-		text = regexp.MustCompile(pattern).ReplaceAllString(text, "  •  ")
-
-		pattern = fmt.Sprintf(`(?m)^\s{2,4}%s\s*`, bullet)
-		text = regexp.MustCompile(pattern).ReplaceAllString(text, "          ◦   ")
-	}
+func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string) string {
+	// Before list styling, because our fake lists rely on whitespace prefixes.
+	text = bitbucketToSlackWhitespaces(text)
+	// Before text styling, to prevent confusion in "*"-based bullets with text that contains "*" characters.
+	text = bitbucketToSlackLists(text)
+	text = bitbucketToSlackTextStyles(text)
+	text = bitbucketToSlackLinks(text, prURL)
 
 	// Mentions: "@{account:uuid}" --> "<@U123>" or "Display Name",
 	for _, bbRef := range regexp.MustCompile(`@\{[\w:-]+\}`).FindAllString(text, -1) {
@@ -60,4 +32,60 @@ func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text string) strin
 	}
 
 	return text
+}
+
+func bitbucketToSlackLinks(text, prURL string) string {
+	// Links: "[text](url){ ... }" --> "<url|text>".
+	text = regexp.MustCompile(`\[(.*?)\]\((.*?)\)(\{.*?\})?`).ReplaceAllString(text, "<${2}|${1}>")
+
+	// Images: "![text](url){ ... }" --> "!<url|text>" --> "Image: <url|text>".
+	text = regexp.MustCompile(`!<(.*?)>`).ReplaceAllString(text, "Image: <${1}>")
+
+	// PR references: "#123" --> "<PR URL|#123>".
+	baseURL := "<" + regexp.MustCompile(`/pull-requests/\d+$`).ReplaceAllString(prURL, "/pull-requests/")
+	text = regexp.MustCompile(`#(\d+)`).ReplaceAllString(text, baseURL+"${1}|#${1}>")
+
+	// PR references in another repo: "repo#123" --> "<PR URL|repo#123>".
+	pattern := `([\w-]+)<(.*?)/([\w-]+)/pull-requests/(\d+)\|`
+	text = regexp.MustCompile(pattern).ReplaceAllString(text, "<${2}/${1}/pull-requests/${4}|${1}")
+
+	// PR references in another workspace: "proj/repo#123" --> "<PR URL|proj/repo#123>".
+	pattern = `([\w-]+)/<(.*?)/([\w-]+)/([\w-]+)/pull-requests/(\d+)\|`
+	return regexp.MustCompile(pattern).ReplaceAllString(text, "<${2}/${1}/${4}/pull-requests/${5}|${1}/")
+}
+
+func bitbucketToSlackLists(text string) string {
+	// The Bitbucket web UI injects superfluous whitespaces between different levels.
+	text = regexp.MustCompile(`(?m)\n\n\s{4}([-*+])`).ReplaceAllString(text, "\n    ${1}")
+	text = regexp.MustCompile(`(?m)\n\s{4}\n`).ReplaceAllString(text, "\n")
+
+	// Up to 2 levels: "-" or "+" or "*" --> "•" and "◦".
+	text = regexp.MustCompile(`(?m)^[-*+]\s+`).ReplaceAllString(text, "  •  ")
+	return regexp.MustCompile(`(?m)^\s{2,4}[-*+]\s+`).ReplaceAllString(text, "          ◦   ")
+}
+
+func bitbucketToSlackTextStyles(text string) string {
+	// Bold text: "**" or "__" --> "*".
+	text = regexp.MustCompile(`\*\*(.+?)\*\*`).ReplaceAllString(text, "@REVCHAT-TEMP-BOLD@${1}@REVCHAT-TEMP-BOLD@")
+	text = regexp.MustCompile(`__(.+?)__`).ReplaceAllString(text, "@REVCHAT-TEMP-BOLD@${1}@REVCHAT-TEMP-BOLD@")
+
+	// Italic text: "*" --> "_" ("_" -> "_" is a no-op).
+	// This is why we use a temporary marker for bold text.
+	text = regexp.MustCompile(`\*(.+?)\*`).ReplaceAllString(text, "_${1}_")
+
+	// Finalize the transformation of bold text.
+	text = strings.ReplaceAll(text, "@REVCHAT-TEMP-BOLD@", "*")
+
+	// Strikethrough text: "~~" --> "~" ("~" -> "~" is a no-op).
+	text = regexp.MustCompile(`~~(.+?)~~`).ReplaceAllString(text, "~${1}~")
+
+	// Header lines --> bold lines: "# ..." --> "*# ...*".
+	return regexp.MustCompile(`(?m)^(#+)\s+(.+)`).ReplaceAllString(text, "*${1} ${2}*")
+}
+
+func bitbucketToSlackWhitespaces(text string) string {
+	text = strings.TrimSpace(text)
+
+	// Newlines: no more than 1 or 2.
+	return regexp.MustCompile(`\n{3,}`).ReplaceAllString(text, "\n\n")
 }

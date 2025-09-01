@@ -18,22 +18,22 @@ func TestGitHubToSlack(t *testing.T) {
 		{
 			name: "h1",
 			text: "# H1",
-			want: "*H1*",
+			want: "*# H1*",
 		},
 		{
 			name: "h2",
 			text: "## H2",
-			want: "*H2*",
+			want: "*## H2*",
 		},
 		{
 			name: "h3",
 			text: "### H3",
-			want: "*H3*",
+			want: "*### H3*",
 		},
 		{
 			name: "multiple_headers",
 			text: "# Title 1\n\nFoo\n\n## Subtitle 2\nBar",
-			want: "*Title 1*\n\nFoo\n\n*Subtitle 2*\nBar",
+			want: "*# Title 1*\n\nFoo\n\n*## Subtitle 2*\nBar",
 		},
 		// Basic text styles.
 		{
@@ -69,30 +69,44 @@ func TestGitHubToSlack(t *testing.T) {
 		},
 		{
 			name: "italic_inside_bold_1",
-			text: "**this _is_ nested**",
-			want: "*this _is_ nested*",
-		},
-		{
-			name: "italic_inside_bold_2",
 			text: "**this *is* nested**",
 			want: "*this _is_ nested*",
 		},
 		{
+			name: "italic_inside_bold_2",
+			text: "**this _is_ nested**",
+			want: "*this _is_ nested*",
+		},
+		{
 			name: "italic_inside_bold_3",
+			text: "__this *is* nested__",
+			want: "*this _is_ nested*",
+		},
+		{
+			name: "italic_inside_bold_4",
 			text: "__this _is_ nested__",
 			want: "*this _is_ nested*",
 		},
 		{
 			name: "bold_inside_italic_1",
+			text: "*this **is** nested*",
+			want: "_this *is* nested_",
+		},
+		{
+			name: "bold_inside_italic_2",
+			text: "*this __is__ nested*",
+			want: "_this *is* nested_",
+		},
+		{
+			name: "bold_inside_italic_3",
 			text: "_this **is** nested_",
 			want: "_this *is* nested_",
 		},
-		// {
-		// 	name: "bold_inside_italic_2",
-		// 	text: "*this **is** nested*",
-		// 	want: "_this *is* nested_",
-		// },
-
+		{
+			name: "bold_inside_italic_4",
+			text: "_this __is__ nested_",
+			want: "_this *is* nested_",
+		},
 		// Quote blocks.
 		{
 			name: "block_quotes",
@@ -121,6 +135,12 @@ func TestGitHubToSlack(t *testing.T) {
 			text: "!<url maybe with text>",
 			want: "Image: <url maybe with text>",
 		},
+		{
+			name: "pr_ref",
+			text: "#123",
+			url:  "https://github.com/org/repo/pull/987",
+			want: "<https://github.com/org/repo/pull/123|#123>",
+		},
 		// Simple lists.
 		{
 			name: "simple_list_1",
@@ -129,15 +149,30 @@ func TestGitHubToSlack(t *testing.T) {
 		},
 		{
 			name: "simple_list_2",
+			text: "* 111\n* 222\n* 333",
+			want: "  •  111\n  •  222\n  •  333",
+		},
+		{
+			name: "simple_list_3",
 			text: "+ 111\n+ 222\n+ 333",
 			want: "  •  111\n  •  222\n  •  333",
 		},
-		// {
-		// 	name: "simple_list_3",
-		// 	text: "* 111\n* 222\n* 333",
-		// 	want: "  •  111\n  •  222\n  •  333",
-		// },
-
+		// Simple lists with confusing characters.
+		{
+			name: "simple_list_4",
+			text: "- 111 - 222\n- 333",
+			want: "  •  111 - 222\n  •  333",
+		},
+		{
+			name: "simple_list_5",
+			text: "* 111 * 222\n* 333",
+			want: "  •  111 * 222\n  •  333",
+		},
+		{
+			name: "simple_list_6",
+			text: "+ 111 + 222\n+ 333",
+			want: "  •  111 + 222\n  •  333",
+		},
 		// Embedded lists.
 		{
 			name: "embedded_list_1",
@@ -149,11 +184,11 @@ func TestGitHubToSlack(t *testing.T) {
 			text: "+ 111\n  + 222\n  + 333\n+ 444",
 			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
 		},
-		// {
-		// 	name: "embedded_list_3",
-		// 	text: "* 111\n  * 222\n  * 333\n* 444",
-		// 	want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
-		// },
+		{
+			name: "embedded_list_3",
+			text: "* 111\n  * 222\n  * 333\n* 444",
+			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
+		},
 
 		// User mentions.
 		// {
@@ -175,18 +210,16 @@ func TestGitHubToSlack(t *testing.T) {
 		// 	want: "<https://github.com/org/teams/team|@org/team>",
 		// },
 
-		// PR references.
-		{
-			name: "pr_ref",
-			text: "#123",
-			url:  "https://github.com/org/repo/pull/987",
-			want: "<https://github.com/org/repo/pull/123|#123>",
-		},
-		// HTML comments.
+		// HTML comments and <sub> tags.
 		{
 			name: "html_comment",
 			text: "Foo\n<!-- hidden -->\nBar",
 			want: "Foo\n\nBar",
+		},
+		{
+			name: "html_sub",
+			text: "Blah blah\n\n\n<sub>hidden\nstuff</sub>\n\nBlah",
+			want: "Blah blah\n\nBlah",
 		},
 	}
 
