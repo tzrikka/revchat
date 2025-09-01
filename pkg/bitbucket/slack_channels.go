@@ -192,9 +192,10 @@ func (c Config) postIntroMessage(ctx workflow.Context, channelID, eventType stri
 		action = "marked as ready for review"
 	}
 
-	msg := fmt.Sprintf("%%s %s %s: `%s`", action, pr.Links["html"].HRef, pr.Title)
+	url := pr.Links["html"].HRef
+	msg := fmt.Sprintf("%%s %s %s: `%s`", action, url, pr.Title)
 	if text := strings.TrimSpace(pr.Description); text != "" {
-		msg += "\n\n" + markdown.BitbucketToSlack(ctx, c.Cmd, text)
+		msg += "\n\n" + markdown.BitbucketToSlack(ctx, c.Cmd, text, url)
 	}
 
 	_ = c.mentionUserInMsg(ctx, channelID, actor, msg)
