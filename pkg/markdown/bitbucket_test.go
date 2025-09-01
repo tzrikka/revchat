@@ -198,8 +198,8 @@ func TestBitbucketToSlack(t *testing.T) {
 		},
 		{
 			name: "embedded_list_4",
-			text: "+ 111\n\n    + 222\n    \n    + 333\n    \n+ 444\n+ 555",
-			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444\n  •  555",
+			text: "XXX\n\n* 111\n\n    * 222\n    * 333\n    \n* 444\n\nYYY",
+			want: "XXX\n\n  •  111\n          ◦   222\n          ◦   333\n  •  444\n\nYYY",
 		},
 
 		// User mentions.

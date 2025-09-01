@@ -57,7 +57,7 @@ func bitbucketToSlackLinks(text, prURL string) string {
 func bitbucketToSlackLists(text string) string {
 	// The Bitbucket web UI injects superfluous whitespaces between different levels.
 	text = regexp.MustCompile(`(?m)\n\n\s{4}([-*+])`).ReplaceAllString(text, "\n    ${1}")
-	text = regexp.MustCompile(`(?m)\n\s{4}\n`).ReplaceAllString(text, "\n")
+	text = regexp.MustCompile(`(?m)\n\s{4}\n([-*+])`).ReplaceAllString(text, "\n${1}")
 
 	// Up to 2 levels: "-" or "+" or "*" --> "•" and "◦".
 	text = regexp.MustCompile(`(?m)^[-*+]\s+`).ReplaceAllString(text, "  •  ")
