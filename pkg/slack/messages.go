@@ -6,6 +6,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 type messageEventWrapper struct {
@@ -21,15 +22,18 @@ type MessageEvent struct {
 	Subtype string `json:"subtype,omitempty"`
 	Hidden  bool   `json:"hidden,omitempty"` // For example, when subtype = "message_changed" or "message_deleted".
 
-	Team        string `json:"team,omitempty"`
-	Channel     string `json:"channel"`
-	ChannelType string `json:"channel_type"`
-	User        string `json:"user"`
+	User     string `json:"user,omitempty"`
+	BotID    string `json:"bot_id,omitempty"`
+	Username string `json:"username,omitempty"` // Customized display name, when bot_id is present.
 
-	Text string `json:"text"`
+	Team        string `json:"team,omitempty"`
+	Channel     string `json:"channel,omitempty"`
+	ChannelType string `json:"channel_type,omitempty"`
+
+	Text string `json:"text,omitempty"`
 	// Blocks []map[string]any `json:"blocks"` // Text is enough.
 
-	Edited          *edited       `json:"edited"`                     // Subtype = "message_changed".
+	Edited          *edited       `json:"edited,omitempty"`           // Subtype = "message_changed".
 	Message         *MessageEvent `json:"message,omitempty"`          // Subtype = "message_changed".
 	PreviousMessage *MessageEvent `json:"previous_message,omitempty"` // Subtype = "message_changed" or "message_deleted".
 	Root            *MessageEvent `json:"root,omitempty"`             // Subtype = "thread_broadcast".
@@ -39,7 +43,7 @@ type MessageEvent struct {
 	ParentUserID string `json:"parent_user_id,omitempty"` // Subtype = "thread_broadcast".
 
 	ClientMsgID string `json:"client_msg_id,omitempty"`
-	EventTS     string `json:"event_ts"`
+	EventTS     string `json:"event_ts,omitempty"`
 	TS          string `json:"ts"`
 }
 
@@ -50,30 +54,68 @@ type edited struct {
 
 // https://docs.slack.dev/reference/events/message/
 func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
-	// First, determine who triggered this event.
-	user := event.InnerEvent.User
-	if msg := event.InnerEvent.Message; user == "" && msg != nil {
-		user = msg.User // Thread broadcast.
-		if msg.Edited != nil {
-			user = msg.Edited.User // Edited message.
-		}
-	}
-	if msg := event.InnerEvent.PreviousMessage; user == "" && msg != nil {
-		user = msg.User // Deleted reply.
-		if msg.Edited != nil {
-			user = msg.Edited.User // Deleted message.
-		}
-	}
-	if user == "" {
+	userID := c.extractUserID(ctx, &event.InnerEvent)
+	if userID == "" {
 		msg := "could not determine who triggered a Slack message event"
 		log.Error(ctx, msg)
 		return errors.New(msg)
 	}
 
-	if isSelfTriggeredEvent(ctx, event.Authorizations, user) {
+	if isSelfTriggeredEvent(ctx, event.Authorizations, userID) {
 		return nil
 	}
 
 	log.Warn(ctx, "message event", "event", event)
 	return nil
+}
+
+// extractUserID determines the user ID of the user/app that triggered a Slack message event.
+// This ID is located in different places depending on the event subtype and the user type.
+func (c Config) extractUserID(ctx workflow.Context, msg *MessageEvent) string {
+	if msg == nil {
+		return ""
+	}
+
+	if msg.Edited != nil && msg.Edited.User != "" {
+		return msg.Edited.User
+	}
+
+	if msg.BotID != "" {
+		return c.convertBotIDToUserID(ctx, msg.BotID)
+	}
+
+	if user := c.extractUserID(ctx, msg.Message); user != "" {
+		return user
+	}
+
+	if user := c.extractUserID(ctx, msg.PreviousMessage); user != "" {
+		return user
+	}
+
+	return msg.User
+}
+
+// convertBotIDToUserID uses a cache to convert Slack bot IDs to a user IDs.
+func (c Config) convertBotIDToUserID(ctx workflow.Context, botID string) string {
+	userID, err := data.GetSlackBotUserID(botID)
+	if err != nil {
+		log.Error(ctx, "failed to read Slack bot's user ID", "bot_id", botID, "error", err)
+		return ""
+	}
+
+	if userID != "" {
+		return userID
+	}
+
+	bi, err := BotsInfoActivity(ctx, c.Cmd, botID, "")
+	if err != nil {
+		log.Error(ctx, "failed to retrieve bot info from Slack", "bot_id", botID, "error", err)
+		return ""
+	}
+
+	log.Debug(ctx, "retrieved bot info from Slack", "bot_id", botID, "user_id", bi.UserID, "name", bi.Name)
+	if err := data.SetSlackBotUserID(botID, bi.UserID); err != nil {
+		log.Error(ctx, "failed to cache Slack bot's user ID", "bot_id", botID, "error", err)
+	}
+	return bi.UserID
 }
