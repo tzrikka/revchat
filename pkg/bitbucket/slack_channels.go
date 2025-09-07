@@ -179,9 +179,9 @@ func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string,
 	files := 0
 	commits := 0
 
-	tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
-	tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", commits), url+"/commits")
-	tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", commits), url+"/commits")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff")
 }
 
 func (c Config) postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {

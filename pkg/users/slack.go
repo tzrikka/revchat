@@ -55,7 +55,7 @@ func SlackIDToEmail(ctx workflow.Context, userID string) (string, error) {
 	}
 	if user.Profile.Email == "" {
 		log.Error(ctx, "Slack user has no email address in their profile", "user_id", userID, "real_name", user.RealName)
-		return "", fmt.Errorf("Slack user has no email address in their profile: %s", userID)
+		return "", fmt.Errorf("slack user has no email address in their profile: %s", userID)
 	}
 
 	email = user.Profile.Email

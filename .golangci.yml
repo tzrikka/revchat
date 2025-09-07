@@ -2,11 +2,17 @@ version: "2"
 
 linters:
   enable:
+    - asciicheck
+    - bidichk
     - bodyclose
     - canonicalheader
     - containedctx
+    - contextcheck
     - copyloopvar
+    - dupl
     - dupword
+    - embeddedstructfieldcheck
+    - errcheck
     - errchkjson
     - errname
     - errorlint
@@ -18,7 +24,10 @@ linters:
     - godox
     - gosec
     - gosmopolitan
+    - govet
+    - ineffassign
     - intrange
+    - mirror
     - misspell
     - musttag
     - noctx
@@ -27,8 +36,12 @@ linters:
     - predeclared
     - recvcheck
     # - revive
+    - staticcheck
+    - thelper
     - unconvert
+    - unused
     - usestdlibvars
+    - usetesting
     - zerologlint
 
   exclusions:

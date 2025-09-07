@@ -76,7 +76,7 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 	}
 	if len(users) == 0 {
 		log.Error(ctx, "Bitbucket user not found", "email", email)
-		return "", fmt.Errorf("Bitbucket user account not found for %q", email)
+		return "", fmt.Errorf("bitbucket user account not found for %q", email)
 	}
 	if len(users) > 1 {
 		log.Warn(ctx, "multiple Bitbucket users found", "email", email, "count", len(users))
