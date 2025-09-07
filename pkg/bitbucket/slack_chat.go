@@ -11,12 +11,13 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/users"
+	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 func (c Config) mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", parentURL)
+		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", parentURL)
 		return err
 	}
 
@@ -27,8 +28,7 @@ func (c Config) mentionUserInReplyByURL(ctx workflow.Context, parentURL string, 
 	}
 
 	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, c.Cmd, user.AccountID, user.DisplayName))
-	req := slack.ChatPostMessageRequest{Channel: id[0], MarkdownText: msg, ThreadTS: id[1]}
-	_, err = slack.PostChatMessageActivity(ctx, c.Cmd, req)
+	_, err = slack.PostReply(ctx, id[0], id[1], msg)
 	return err
 }
 
@@ -38,21 +38,21 @@ func (c Config) mentionUserInMsg(ctx workflow.Context, channelID string, user Ac
 
 func (c Config) mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) error {
 	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, c.Cmd, user.AccountID, user.DisplayName))
-	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg, ThreadTS: threadTS}
-	_, err := slack.PostChatMessageActivity(ctx, c.Cmd, req)
+	_, err := slack.PostReply(ctx, channelID, threadTS, msg)
 	return err
 }
 
 func (c Config) impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string) error {
 	name, icon := c.impersonateUser(ctx, user)
-	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg, Username: name, IconURL: icon}
-	resp, err := slack.PostChatMessageActivity(ctx, c.Cmd, req)
+	resp, err := slack.PostMessageAsUser(ctx, channelID, name, icon, msg)
 	if err != nil {
 		return err
 	}
 
 	if err := data.MapURLAndID(url, fmt.Sprintf("%s/%s", channelID, resp.TS)); err != nil {
 		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url)
+		// Don't return the error - the message is already posted in Slack, so we
+		// don't want to retry and post it again, even though this is problematic.
 	}
 
 	return nil
@@ -61,7 +61,7 @@ func (c Config) impersonateUserInMsg(ctx workflow.Context, url, channelID string
 func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string) error {
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", parentURL)
+		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", parentURL)
 		return err
 	}
 
@@ -72,14 +72,15 @@ func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL stri
 	}
 
 	name, icon := c.impersonateUser(ctx, user)
-	req := slack.ChatPostMessageRequest{Channel: id[0], MarkdownText: msg, ThreadTS: id[1], Username: name, IconURL: icon}
-	resp, err := slack.PostChatMessageActivity(ctx, c.Cmd, req)
+	resp, err := slack.PostReplyAsUser(ctx, id[0], id[1], name, icon, msg)
 	if err != nil {
 		return err
 	}
 
 	if err := data.MapURLAndID(url, fmt.Sprintf("%s/%s/%s", id[0], id[1], resp.TS)); err != nil {
 		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url)
+		// Don't return the error - the message is already posted in Slack, so we
+		// don't want to retry and post it again, even though this is problematic.
 	}
 
 	return nil
@@ -92,7 +93,7 @@ func (c Config) impersonateUser(ctx workflow.Context, user Account) (name, icon 
 		return
 	}
 
-	profile, err := users.SlackUserProfileActivity(ctx, c.Cmd, id)
+	profile, err := tslack.UsersProfileGetActivity(ctx, id)
 	if err != nil {
 		name = user.DisplayName
 		return
@@ -118,9 +119,10 @@ func (c Config) deleteMsg(ctx workflow.Context, url string) error {
 
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
 		log.Error(ctx, "failed to delete URL/Slack mappings", "error", err, "comment_url", url)
+		// Don't abort - we still want to attempt to delete the Slack message.
 	}
 
-	return slack.DeleteChatMessageActivity(ctx, c.Cmd, id[0], id[len(id)-1])
+	return slack.DeleteMessage(ctx, id[0], id[len(id)-1])
 }
 
 func (c Config) editMsg(ctx workflow.Context, url, msg string) error {
@@ -136,6 +138,5 @@ func (c Config) editMsg(ctx workflow.Context, url, msg string) error {
 		return errors.New("missing/bad Slack IDs")
 	}
 
-	req := slack.ChatUpdateRequest{Channel: id[0], TS: id[len(id)-1], MarkdownText: msg}
-	return slack.UpdateChatMessageActivity(ctx, c.Cmd, req)
+	return slack.UpdateMessage(ctx, id[0], id[len(id)-1], msg)
 }

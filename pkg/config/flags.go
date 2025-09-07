@@ -21,7 +21,7 @@ const (
 
 	ScheduleToStartTimeout = time.Minute
 	StartToCloseTimeout    = 5 * time.Second
-	MaxRetryAttempts       = 3
+	MaxRetryAttempts       = 5
 
 	DefaultChannelNamePrefix    = "_pr"
 	DefaultMaxChannelNameLength = 50 // Slack's hard limit = 80, but that's still too long.

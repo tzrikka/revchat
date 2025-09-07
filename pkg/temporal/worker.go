@@ -13,8 +13,10 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/bitbucket"
+	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/github"
 	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/timpani-api/pkg/temporal"
 )
 
 // Run initializes the Temporal worker, and blocks to keep it running.
@@ -51,6 +53,14 @@ func Run(ctx context.Context, l zerolog.Logger, cmd *cli.Command) error {
 	}
 	if _, err := c.ExecuteWorkflow(ctx, opts, EventDispatcher); err != nil {
 		return fmt.Errorf("failed to start event dispatcher workflow: %w", err)
+	}
+
+	temporal.ActivityOptions = &workflow.ActivityOptions{
+		TaskQueue:           cmd.String("temporal-task-queue-timpani"),
+		StartToCloseTimeout: config.StartToCloseTimeout,
+		RetryPolicy: &temporal.RetryPolicy{
+			MaximumAttempts: config.MaxRetryAttempts,
+		},
 	}
 
 	if err := w.Run(worker.InterruptCh()); err != nil {

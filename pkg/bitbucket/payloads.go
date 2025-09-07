@@ -1,5 +1,9 @@
 package bitbucket
 
+import (
+	"github.com/tzrikka/timpani-api/pkg/bitbucket"
+)
+
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Pull-request-events
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Common-entities-for-event-payloads
 type PullRequestEvent struct {
@@ -25,16 +29,7 @@ type RepositoryEvent struct {
 	Comment *Comment `json:"comment,omitempty"`
 }
 
-type Account struct {
-	Type string `json:"type"`
-
-	DisplayName string `json:"display_name"`
-	Nickname    string `json:"nickname"`
-	AccountID   string `json:"account_id"`
-	UUID        string `json:"uuid"`
-
-	Links map[string]Link `json:"links"`
-}
+type Account = bitbucket.User
 
 type Branch struct {
 	Name string `json:"name"`

@@ -14,6 +14,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/users"
+	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
@@ -39,11 +40,10 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 
 	_ = c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+state)
 
-	if err := slack.ArchiveChannelActivity(ctx, c.Cmd, channelID); err != nil {
+	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
 		msg := "Failed to archive this channel, even though its PR was " + state
-		req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
-		_, _ = slack.PostChatMessageActivity(ctx, c.Cmd, req)
+		_, _ = slack.PostMessage(ctx, channelID, msg)
 
 		return err
 	}
@@ -99,12 +99,12 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	}
 
 	// Channel cosmetics.
-	slack.SetChannelTopicActivity(ctx, c.Cmd, channelID, url)
-	slack.SetChannelDescriptionActivity(ctx, c.Cmd, channelID, pr.Title, url)
+	slack.SetChannelTopic(ctx, channelID, url)
+	slack.SetChannelDescription(ctx, channelID, pr.Title, url)
 	c.setChannelBookmarks(ctx, channelID, url, pr)
-	c.postIntroMessage(ctx, channelID, event.Action, pr, event.Sender)
+	c.postIntroMsg(ctx, channelID, event.Action, pr, event.Sender)
 
-	err = slack.InviteUsersToChannelActivity(ctx, c.Cmd, channelID, c.prParticipants(ctx, pr))
+	err = slack.InviteUsersToChannel(ctx, channelID, c.prParticipants(ctx, pr))
 	if err != nil {
 		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
 		c.cleanupPRData(ctx, url)
@@ -123,7 +123,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		id, retry, err := slack.CreateChannelActivity(ctx, c.Cmd, name, pr.HTMLURL)
+		id, retry, err := slack.CreateChannel(ctx, name, pr.HTMLURL)
 		if err != nil {
 			if retry {
 				continue
@@ -147,22 +147,20 @@ func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, username, url 
 		return
 	}
 
-	msg := "Failed to create Slack channel for " + url
-	req := slack.ChatPostMessageRequest{Channel: userID, MarkdownText: msg}
-	_, _ = slack.PostChatMessageActivity(ctx, c.Cmd, req)
+	_, _ = slack.PostMessage(ctx, userID, "Failed to create Slack channel for "+url)
 }
 
 func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
 	checks := 0
 
-	slack.AddBookmarkActivity(ctx, c.Cmd, channelID, fmt.Sprintf("Comments (%d)", pr.Comments), url)
-	slack.AddBookmarkActivity(ctx, c.Cmd, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits")
-	slack.AddBookmarkActivity(ctx, c.Cmd, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks")
-	slack.AddBookmarkActivity(ctx, c.Cmd, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files")
-	slack.AddBookmarkActivity(ctx, c.Cmd, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff")
+	tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.Comments), url)
+	tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits")
+	tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks")
+	tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files")
+	tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff")
 }
 
-func (c Config) postIntroMessage(ctx workflow.Context, channelID, action string, pr PullRequest, sender User) {
+func (c Config) postIntroMsg(ctx workflow.Context, channelID, action string, pr PullRequest, sender User) {
 	if action == "ready_for_review" {
 		action = "marked as ready for review"
 	}

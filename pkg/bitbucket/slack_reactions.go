@@ -8,7 +8,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 func (c Config) addReaction(ctx workflow.Context, url, emoji string) error {
@@ -24,7 +24,7 @@ func (c Config) addReaction(ctx workflow.Context, url, emoji string) error {
 		return errors.New("missing/bad Slack IDs")
 	}
 
-	return slack.AddReactionActivity(ctx, c.Cmd, id[0], id[len(id)-1], emoji)
+	return slack.ReactionsAddActivity(ctx, id[0], id[len(id)-1], emoji)
 }
 
 func (c Config) removeReaction(ctx workflow.Context, url, emoji string) error {
@@ -40,5 +40,5 @@ func (c Config) removeReaction(ctx workflow.Context, url, emoji string) error {
 		return errors.New("missing/bad Slack IDs")
 	}
 
-	return slack.RemoveReactionActivity(ctx, c.Cmd, id[0], id[len(id)-1], emoji)
+	return slack.ReactionsRemoveActivity(ctx, id[0], id[len(id)-1], emoji)
 }

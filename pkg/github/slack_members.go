@@ -11,6 +11,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/users"
+	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) error {
@@ -57,7 +58,7 @@ func (c Config) addChannelMember(ctx workflow.Context, channelID string, reviewe
 		return nil
 	}
 
-	err := slack.InviteUsersToChannelActivity(ctx, c.Cmd, channelID, []string{slackUserID})
+	err := slack.InviteUsersToChannel(ctx, channelID, []string{slackUserID})
 
 	if reviewer.Login == sender.Login {
 		return err // No need to also DM the user if they added themselves.
@@ -76,7 +77,7 @@ func (c Config) removeChannelMember(ctx workflow.Context, channelID string, revi
 		return nil
 	}
 
-	return slack.KickUserFromChannelActivity(ctx, c.Cmd, channelID, slackUserID)
+	return tslack.ConversationsKickActivity(ctx, channelID, slackUserID)
 }
 
 func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, sender User, role, action string) string {
@@ -94,7 +95,7 @@ func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, s
 	}
 
 	slackID := strings.TrimSuffix(strings.TrimPrefix(slackRef, "<@"), ">")
-	email, err := users.SlackIDToEmail(ctx, c.Cmd, slackID)
+	email, err := users.SlackIDToEmail(ctx, slackID)
 	if err != nil {
 		return ""
 	}

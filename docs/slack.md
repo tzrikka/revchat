@@ -7,7 +7,9 @@ Detailed instructions: https://github.com/tzrikka/thrippy/blob/main/docs/slack/R
 ### Permission Scopes
 
 - [app_mentions:read](https://docs.slack.dev/reference/scopes/app_mentions.read)
-- [bookmarks:write](https://docs.slack.dev/reference/scopes/bookmarks.write)
+- Bookmarks
+  - [bookmarks:read](https://docs.slack.dev/reference/scopes/bookmarks.read)
+  - [bookmarks:write](https://docs.slack.dev/reference/scopes/bookmarks.write)
 - Chat
   - [chat:write](https://docs.slack.dev/reference/scopes/chat.write)
   - [chat:write.customize](https://docs.slack.dev/reference/scopes/chat.write.customize)

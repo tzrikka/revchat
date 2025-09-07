@@ -55,14 +55,5 @@ func GitHubToSlackID(ctx workflow.Context, cmd *cli.Command, username string, ch
 		}
 	}
 
-	id, err := data.SlackUserIDByEmail(email)
-	if err != nil {
-		log.Error(ctx, "failed to load Slack user ID", "error", err, "email", email)
-	}
-
-	if id == "" {
-		id = EmailToSlackID(ctx, cmd, email)
-	}
-
-	return id
+	return EmailToSlackID(ctx, email)
 }

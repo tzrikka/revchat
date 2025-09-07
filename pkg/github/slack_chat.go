@@ -11,7 +11,6 @@ import (
 
 func (c Config) mentionUserInMsg(ctx workflow.Context, channelID string, u User, msg string) error {
 	msg = fmt.Sprintf(msg, users.GitHubToSlackRef(ctx, c.Cmd, u.Login, u.HTMLURL))
-	req := slack.ChatPostMessageRequest{Channel: channelID, MarkdownText: msg}
-	_, err := slack.PostChatMessageActivity(ctx, c.Cmd, req)
+	_, err := slack.PostMessage(ctx, channelID, msg)
 	return err
 }

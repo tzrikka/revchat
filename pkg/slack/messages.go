@@ -8,6 +8,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 type messageEventWrapper struct {
@@ -115,7 +116,7 @@ func (c Config) extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 func (c Config) convertBotIDToUserID(ctx workflow.Context, botID string) string {
 	userID, err := data.GetSlackBotUserID(botID)
 	if err != nil {
-		log.Error(ctx, "failed to read Slack bot's user ID", "bot_id", botID, "error", err)
+		log.Error(ctx, "failed to load Slack bot's user ID", "bot_id", botID, "error", err)
 		return ""
 	}
 
@@ -123,17 +124,18 @@ func (c Config) convertBotIDToUserID(ctx workflow.Context, botID string) string 
 		return userID
 	}
 
-	bi, err := BotsInfoActivity(ctx, c.Cmd, botID, "")
+	bot, err := slack.BotsInfoActivity(ctx, botID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve bot info from Slack", "bot_id", botID, "error", err)
 		return ""
 	}
 
-	log.Debug(ctx, "retrieved bot info from Slack", "bot_id", botID, "user_id", bi.UserID, "name", bi.Name)
-	if err := data.SetSlackBotUserID(botID, bi.UserID); err != nil {
-		log.Error(ctx, "failed to cache Slack bot's user ID", "bot_id", botID, "error", err)
+	log.Debug(ctx, "retrieved bot info from Slack", "bot_id", botID, "user_id", bot.UserID, "name", bot.Name)
+	if err := data.SetSlackBotUserID(botID, bot.UserID); err != nil {
+		log.Error(ctx, "failed to save Slack bot's user ID", "bot_id", botID, "error", err)
 	}
-	return bi.UserID
+
+	return bot.UserID
 }
 
 func (c Config) addMessage(ctx workflow.Context, event MessageEvent) error {

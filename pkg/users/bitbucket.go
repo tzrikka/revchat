@@ -8,6 +8,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
 // BitbucketToSlackRef converts a Bitbucket account ID into a Slack user reference.
@@ -53,14 +54,39 @@ func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 		}
 	}
 
-	id, err := data.SlackUserIDByEmail(email)
+	return EmailToSlackID(ctx, email)
+}
+
+// EmailToBitbucketID retrieves a Bitbucket user's account ID based on their
+// email address. This function uses data caching, and API calls as a fallback.
+func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, error) {
+	id, err := data.BitbucketUserIDByEmail(email)
 	if err != nil {
-		log.Error(ctx, "failed to load Slack user ID", "error", err, "email", email)
+		log.Error(ctx, "failed to load Bitbucket account ID", "error", err, "email", email)
+		// Don't abort - try to use the Bitbucket API as a fallback.
+	}
+	if id != "" {
+		return id, nil
 	}
 
-	if id == "" {
-		id = EmailToSlackID(ctx, cmd, email)
+	users, err := bitbucket.WorkspacesListMembersActivity(ctx, workspace, []string{email})
+	if err != nil {
+		log.Error(ctx, "failed to search Bitbucket user by email", "error", err, "email", email)
+		return "", err
+	}
+	if len(users) == 0 {
+		log.Error(ctx, "Bitbucket user not found", "email", email)
+		return "", fmt.Errorf("Bitbucket user account not found for %q", email)
+	}
+	if len(users) > 1 {
+		log.Warn(ctx, "multiple Bitbucket users found", "email", email, "count", len(users))
+		return "", fmt.Errorf("multiple (%d) Bitbucket accounts found for %q", len(users), email)
 	}
 
-	return id
+	id = users[0].AccountID
+	if err := data.AddBitbucketUser(users[0].AccountID, email); err != nil {
+		log.Error(ctx, "failed to save Bitbucket account ID/email mapping", "error", err, "account_id", id, "email", email)
+	}
+
+	return id, nil
 }

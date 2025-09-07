@@ -38,8 +38,8 @@ type eventAuth struct {
 	IsEnterpriseInstall bool    `json:"is_enterprise_install"`
 }
 
-// https://docs.slack.dev/reference/events/member_joined_channel
-// https://docs.slack.dev/reference/events/member_left_channel
+// https://docs.slack.dev/reference/events/member_joined_channel/
+// https://docs.slack.dev/reference/events/member_left_channel/
 type MemberEvent struct {
 	// Type string `json:"type"`
 
