@@ -92,7 +92,7 @@ func (c Config) impersonateUser(ctx workflow.Context, user Account) (name, icon 
 		return
 	}
 
-	profile, err := slack.UserProfileActivity(ctx, c.Cmd, id)
+	profile, err := users.SlackUserProfileActivity(ctx, c.Cmd, id)
 	if err != nil {
 		name = user.DisplayName
 		return

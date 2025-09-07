@@ -27,6 +27,30 @@ func DeleteChatMessageActivity(ctx workflow.Context, cmd *cli.Command, channelID
 	return nil
 }
 
+// https://docs.slack.dev/reference/methods/chat.postEphemeral
+type chatPostEphemeralRequest struct {
+	Channel string `json:"channel"`
+	User    string `json:"user"`
+
+	Blocks       []map[string]any `json:"blocks,omitempty"`
+	Attachments  []map[string]any `json:"attachments,omitempty"`
+	MarkdownText string           `json:"markdown_text,omitempty"`
+	Text         string           `json:"text,omitempty"`
+}
+
+// https://docs.slack.dev/reference/methods/chat.postEphemeral
+func PostEphemeralMessageActivity(ctx workflow.Context, cmd *cli.Command, channelID, userID, msg string) error {
+	req := chatPostEphemeralRequest{Channel: channelID, User: userID, MarkdownText: msg}
+	a := executeTimpaniActivity(ctx, cmd, "slack.chat.postEphemeral", req)
+
+	if err := a.Get(ctx, nil); err != nil {
+		log.Error(ctx, "failed to post Slack ephemeral message", "error", err)
+		return err
+	}
+
+	return nil
+}
+
 // https://docs.slack.dev/reference/methods/chat.postMessage
 type ChatPostMessageRequest struct {
 	Channel string `json:"channel"`

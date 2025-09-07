@@ -17,7 +17,7 @@ type eventWrapper struct {
 	APIAppID            string  `json:"api_app_id"`
 	TeamID              string  `json:"team_id"`
 	ContextTeamID       string  `json:"context_team_id"`
-	ContextEnterpriseID *string `json:"context_enterprise_id"`
+	ContextEnterpriseID *string `json:"context_enterprise_id,omitempty"`
 
 	// Type string `json:"type"` // Always "event_callback".
 
@@ -31,7 +31,7 @@ type eventWrapper struct {
 
 // https://docs.slack.dev/apis/events-api/#authorizations
 type eventAuth struct {
-	EnterpriseID        *string `json:"enterprise_id"`
+	EnterpriseID        *string `json:"enterprise_id,omitempty"`
 	TeamID              string  `json:"team_id"`
 	UserID              string  `json:"user_id"`
 	IsBot               bool    `json:"is_bot"`

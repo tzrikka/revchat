@@ -2,6 +2,7 @@ package slack
 
 import (
 	"errors"
+	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -20,7 +21,6 @@ type MessageEvent struct {
 	// Type string `json:"type"` // Always "message".
 
 	Subtype string `json:"subtype,omitempty"`
-	Hidden  bool   `json:"hidden,omitempty"` // For example, when subtype = "message_changed" or "message_deleted".
 
 	User     string `json:"user,omitempty"`
 	BotID    string `json:"bot_id,omitempty"`
@@ -38,13 +38,13 @@ type MessageEvent struct {
 	PreviousMessage *MessageEvent `json:"previous_message,omitempty"` // Subtype = "message_changed" or "message_deleted".
 	Root            *MessageEvent `json:"root,omitempty"`             // Subtype = "thread_broadcast".
 
-	DeletedTS    string `json:"deleted_ts,omitempty"`     // Subtype = "message_deleted".
-	ThreadTS     string `json:"thread_ts,omitempty"`      // Reply, or subtype = "thread_broadcast".
-	ParentUserID string `json:"parent_user_id,omitempty"` // Subtype = "thread_broadcast".
+	TS        string `json:"ts"`
+	EventTS   string `json:"event_ts,omitempty"`
+	DeletedTS string `json:"deleted_ts,omitempty"` // Subtype = "message_deleted".
+	ThreadTS  string `json:"thread_ts,omitempty"`  // Reply, or subtype = "thread_broadcast".
 
-	ClientMsgID string `json:"client_msg_id,omitempty"`
-	EventTS     string `json:"event_ts,omitempty"`
-	TS          string `json:"ts"`
+	ParentUserID string `json:"parent_user_id,omitempty"` // Subtype = "thread_broadcast".
+	ClientMsgID  string `json:"client_msg_id,omitempty"`
 }
 
 type edited struct {
@@ -65,7 +65,23 @@ func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper)
 		return nil
 	}
 
-	log.Warn(ctx, "message event", "event", event)
+	subtype := event.InnerEvent.Subtype
+	if strings.HasPrefix(subtype, "channel_") || strings.HasPrefix(subtype, "group_") {
+		return nil
+	}
+	if subtype == "reminder_add" || event.InnerEvent.User == "USLACKBOT" {
+		return nil
+	}
+
+	switch subtype {
+	case "", "bot_message", "thread_broadcast":
+		return c.addMessage(ctx, event.InnerEvent)
+	case "message_changed":
+	case "message_deleted":
+		return c.deleteMessage(ctx, event.InnerEvent)
+	}
+
+	log.Warn(ctx, "unhandled Slack message event", "event", event.InnerEvent)
 	return nil
 }
 
@@ -118,4 +134,39 @@ func (c Config) convertBotIDToUserID(ctx workflow.Context, botID string) string 
 		log.Error(ctx, "failed to cache Slack bot's user ID", "bot_id", botID, "error", err)
 	}
 	return bi.UserID
+}
+
+func (c Config) addMessage(ctx workflow.Context, event MessageEvent) error {
+	return c.addMessageInBitbucket(ctx, event)
+}
+
+func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent) error {
+	return c.deleteMessageInBitbucket(ctx, event)
+}
+
+// addMessageInBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
+func (c Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
+	if event.Subtype == "bot_message" {
+		log.Warn(ctx, "this is a bot message", "bot_id", event.BotID, "username", event.Username)
+	}
+
+	if event.ThreadTS == "" {
+		log.Warn(ctx, "message added", "channel", event.Channel, "ts", event.TS, "text", event.Text)
+		return nil
+	}
+
+	log.Warn(ctx, "reply added", "channel", event.Channel, "thread_ts", event.ThreadTS, "ts", event.TS, "text", event.Text)
+	return nil
+}
+
+// deleteMessageInBitbucket mirrors in Bitbucket the deletion of a Slack message/reply/broadcast.
+func (c Config) deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
+	prev := event.PreviousMessage
+	if prev.ThreadTS == "" {
+		log.Warn(ctx, "message deleted", "channel", event.Channel, "ts", event.DeletedTS, "text", prev.Text)
+	} else {
+		log.Warn(ctx, "reply deleted", "channel", event.Channel, "thread_ts", prev.ThreadTS, "ts", event.DeletedTS, "text", prev.Text)
+	}
+
+	return nil
 }

@@ -18,11 +18,11 @@ type botsInfoRequest struct {
 type botsInfoResponse struct {
 	slackResponse
 
-	Bot *BotInfo `json:"bot,omitempty"`
+	Bot *botInfo `json:"bot,omitempty"`
 }
 
 // https://docs.slack.dev/reference/methods/bots.info
-type BotInfo struct {
+type botInfo struct {
 	ID      string `json:"id"`
 	TeamID  string `json:"team_id"`
 	Name    string `json:"name"`
@@ -33,7 +33,7 @@ type BotInfo struct {
 }
 
 // https://docs.slack.dev/reference/methods/bots.info
-func BotsInfoActivity(ctx workflow.Context, cmd *cli.Command, botID, teamID string) (*BotInfo, error) {
+func botsInfoActivity(ctx workflow.Context, cmd *cli.Command, botID, teamID string) (*botInfo, error) {
 	a := executeTimpaniActivity(ctx, cmd, "slack.bots.info", botsInfoRequest{Bot: botID, TeamID: teamID})
 
 	resp := &botsInfoResponse{}

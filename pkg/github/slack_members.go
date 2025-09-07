@@ -94,12 +94,8 @@ func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, s
 	}
 
 	slackID := strings.TrimSuffix(strings.TrimPrefix(slackRef, "<@"), ">")
-	email, err := data.SlackUserEmailByID(slackID)
+	email, err := users.SlackIDToEmail(ctx, c.Cmd, slackID)
 	if err != nil {
-		log.Error(ctx, "failed to load Slack user email", "error", err, "user_id", slackID)
-		return ""
-	}
-	if email == "" {
 		return ""
 	}
 
