@@ -49,8 +49,9 @@ func (c Config) impersonateUserInMsg(ctx workflow.Context, url, channelID string
 		return err
 	}
 
-	if err := data.MapURLAndID(url, fmt.Sprintf("%s/%s", channelID, resp.TS)); err != nil {
-		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url)
+	id := fmt.Sprintf("%s/%s", channelID, resp.TS)
+	if err := data.MapURLAndID(url, id); err != nil {
+		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url, "slack_id", id)
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}
@@ -77,8 +78,9 @@ func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL stri
 		return err
 	}
 
-	if err := data.MapURLAndID(url, fmt.Sprintf("%s/%s/%s", id[0], id[1], resp.TS)); err != nil {
-		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url)
+	sid := fmt.Sprintf("%s/%s/%s", id[0], id[1], resp.TS)
+	if err := data.MapURLAndID(url, sid); err != nil {
+		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url, "slack_id", sid)
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}

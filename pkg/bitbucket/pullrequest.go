@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"fmt"
+	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -64,6 +65,12 @@ func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequest
 	pr := event.PullRequest
 	channelID, found := lookupChannel(ctx, event.Type, pr)
 	if !found {
+		return nil
+	}
+
+	// If the comment was created by RevChat, don't repost it.
+	if strings.HasSuffix(event.Comment.Content.Raw, "\n\n[This comment was created by RevChat]: #") {
+		log.Debug(ctx, "ignoring self-triggered Bitbucket event")
 		return nil
 	}
 

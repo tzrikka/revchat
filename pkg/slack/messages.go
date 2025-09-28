@@ -2,12 +2,15 @@ package slack
 
 import (
 	"errors"
+	"fmt"
+	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -149,16 +152,26 @@ func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent) error {
 // addMessageInBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
 func (c Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
 	if event.Subtype == "bot_message" {
-		log.Warn(ctx, "this is a bot message", "bot_id", event.BotID, "username", event.Username)
+		log.Error(ctx, "unexpected bot message", "bot_id", event.BotID, "username", event.Username)
 	}
 
-	if event.ThreadTS == "" {
-		log.Warn(ctx, "message added", "channel", event.Channel, "ts", event.TS, "text", event.Text)
-		return nil
+	id := event.Channel
+	if event.ThreadTS != "" {
+		id = fmt.Sprintf("%s/%s", id, event.ThreadTS)
 	}
 
-	log.Warn(ctx, "reply added", "channel", event.Channel, "thread_ts", event.ThreadTS, "ts", event.TS, "text", event.Text)
-	return nil
+	url, err := data.SwitchURLAndID(id)
+	if err != nil {
+		msg := "failed to retrieve Slack message's PR comment URL"
+		log.Error(ctx, msg, "error", err, "message_subtype", event.Subtype, "channel_id", event.Channel, "message_ts", event.ThreadTS)
+		return err
+	}
+	if url == "" {
+		log.Debug(ctx, "Slack message's PR comment URL is empty", "msg_subtype", event.Subtype, "channel_id", event.Channel, "msg_ts", event.ThreadTS)
+		return fmt.Errorf("no associated URL for Slack channel %q and message timestamp %q", event.Channel, event.ThreadTS)
+	}
+
+	return createPRComment(ctx, url, event.Text, fmt.Sprintf("%s/%s", id, event.TS))
 }
 
 // deleteMessageInBitbucket mirrors in Bitbucket the deletion of a Slack message/reply/broadcast.
@@ -168,6 +181,37 @@ func (c Config) deleteMessageInBitbucket(ctx workflow.Context, event MessageEven
 		log.Warn(ctx, "message deleted", "channel", event.Channel, "ts", event.DeletedTS, "text", prev.Text)
 	} else {
 		log.Warn(ctx, "reply deleted", "channel", event.Channel, "thread_ts", prev.ThreadTS, "ts", event.DeletedTS, "text", prev.Text)
+	}
+
+	return nil
+}
+
+func createPRComment(ctx workflow.Context, url, msg, slackID string) error {
+	pattern := regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
+	sub := pattern.FindStringSubmatch(url)
+	if len(sub) != 6 {
+		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
+	}
+
+	markdown := msg + "\n\n[This comment was created by RevChat]: #"
+
+	resp, err := bitbucket.PullRequestsCreateCommentActivity(ctx, bitbucket.PullRequestsCreateCommentRequest{
+		Workspace:     sub[1],
+		RepoSlug:      sub[2],
+		PullRequestID: sub[3],
+		Markdown:      markdown,
+		ParentID:      sub[5], // Optional.
+	})
+	if err != nil {
+		log.Error(ctx, "failed to create Bitbucket PR comment", "error", err, "url", url, "slack_id", slackID)
+		return fmt.Errorf("failed to create Bitbucket PR comment: %w", err)
+	}
+
+	url = resp.Links["html"].HRef
+	if err := data.MapURLAndID(url, slackID); err != nil {
+		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url, "slack_id", slackID)
+		// Don't return the error - the message is already created in Bitbucket, so
+		// we don't want to retry and post it again, even though this is problematic.
 	}
 
 	return nil
