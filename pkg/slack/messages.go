@@ -10,6 +10,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -78,7 +79,7 @@ func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper)
 	}
 
 	switch subtype {
-	case "", "bot_message", "thread_broadcast":
+	case "", "bot_message", "file_share", "thread_broadcast":
 		return c.addMessage(ctx, event.InnerEvent)
 	case "message_changed":
 	case "message_deleted":
@@ -186,20 +187,23 @@ func (c Config) deleteMessageInBitbucket(ctx workflow.Context, event MessageEven
 	return nil
 }
 
+var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
+
+const Submatches = 6
+
 func createPRComment(ctx workflow.Context, url, msg, slackID string) error {
-	pattern := regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
-	sub := pattern.FindStringSubmatch(url)
-	if len(sub) != 6 {
+	sub := commentURLPattern.FindStringSubmatch(url)
+	if len(sub) != Submatches {
 		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
 	}
 
-	markdown := msg + "\n\n[This comment was created by RevChat]: #"
+	msg = markdown.SlackToBitbucket(ctx, msg) + "\n\n[This comment was created by RevChat]: #"
 
 	resp, err := bitbucket.PullRequestsCreateCommentActivity(ctx, bitbucket.PullRequestsCreateCommentRequest{
 		Workspace:     sub[1],
 		RepoSlug:      sub[2],
 		PullRequestID: sub[3],
-		Markdown:      markdown,
+		Markdown:      msg,
 		ParentID:      sub[5], // Optional.
 	})
 	if err != nil {

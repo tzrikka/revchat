@@ -10,7 +10,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-// BitbucketToSlack converts a Bitbucket PR's description to Slack markdown text.
+// BitbucketToSlack converts Bitbucket markdown text into Slack markdown text.
 //
 // Based on:
 //   - https://confluence.atlassian.com/bitbucketserver/markdown-syntax-guide-776639995.html
@@ -88,4 +88,66 @@ func bitbucketToSlackWhitespaces(text string) string {
 
 	// Newlines: no more than 1 or 2.
 	return regexp.MustCompile(`\n{3,}`).ReplaceAllString(text, "\n\n")
+}
+
+// SlackToBitbucket converts Slack markdown text into Bitbucket markdown text.
+//
+// Based on:
+//   - https://docs.slack.dev/messaging/formatting-message-text/
+//   - https://confluence.atlassian.com/bitbucketserver/markdown-syntax-guide-776639995.html
+//   - https://bitbucket.org/tutorials/markdowndemo/src/master/
+func SlackToBitbucket(ctx workflow.Context, text string) string {
+	// Before the rest because they undo a few whitespace changes.
+	text = slackToBitbucketWhitespaces(text)
+
+	text = slackToBitbucketBlocks(text)
+	text = slackToBitbucketLists(text)
+	text = slackToBitbucketTextStyles(text)
+	return slackToBitbucketLinks(text)
+}
+
+func slackToBitbucketLinks(text string) string {
+	// Links: "<url>" and "<url|text>" --> "[text](url)".
+	text = regexp.MustCompile(`<(.*?)(\|(.*?))?>`).ReplaceAllString(text, "[${3}](${1})")
+	return regexp.MustCompile(`\[\]\((.*?)\)`).ReplaceAllString(text, "[$1]($1)")
+}
+
+func slackToBitbucketBlocks(text string) string {
+	// Quote blocks: "&gt;" --> ">" (">" --> ">" is a no-op).
+	text = regexp.MustCompile(`(?m)^&gt;`).ReplaceAllString(text, ">")
+	// Add a second newline after the last line of a quote block, if missing.
+	text = regexp.MustCompile(`(?m)(^>.+)\n([^\n>])`).ReplaceAllString(text, "${1}\n\n${2}")
+
+	// Code blocks: "```...```" --> "```\n...\n```".
+	return regexp.MustCompile("(?s)```(.+?)```").ReplaceAllString(text, "```\n${1}\n```")
+}
+
+func slackToBitbucketLists(text string) string {
+	// Up to 3 levels: "•" and "◦" and "▪︎" --> "-".
+	text = regexp.MustCompile(`(?m)^• (\S)`).ReplaceAllString(text, "-  ${1}")
+	text = regexp.MustCompile(`(?m)^    ◦ (\S)`).ReplaceAllString(text, "    -  ${1}")
+	text = regexp.MustCompile(`(?m)^        ▪︎ (\S)`).ReplaceAllString(text, "        -  ${1}")
+
+	// Add a second newline before and after (but not between) list items, if missing.
+	text = regexp.MustCompile(`(\S  )\n(\s*-)`).ReplaceAllString(text, "${1}\n\n${2}")
+	text = regexp.MustCompile(`(?m)(^\s*-.+)\n\n(\s*-)`).ReplaceAllString(text, "${1}\n${2}")
+	text = regexp.MustCompile(`(?m)(^\s*-.+)\n\n(\s*-)`).ReplaceAllString(text, "${1}\n${2}")
+	return regexp.MustCompile(`(?m)(^\s*-.+)\n([^\n\s-])`).ReplaceAllString(text, "${1}\n\n${2}")
+}
+
+func slackToBitbucketTextStyles(text string) string {
+	// Bold text: "*" --> "**".
+	text = regexp.MustCompile(`\*(.+?)\*`).ReplaceAllString(text, "**${1}**")
+
+	// Italic text: "_" --> "_" is a no-op.
+
+	// Strikethrough text: "~" --> "~~".
+	return regexp.MustCompile(`~(.+?)~`).ReplaceAllString(text, "~~${1}~~")
+}
+
+func slackToBitbucketWhitespaces(text string) string {
+	text = strings.TrimSpace(text)
+
+	// Newlines in Bitbucket: "\n" on its own is not enough.
+	return regexp.MustCompile(`(\S)\n`).ReplaceAllString(text, "${1}  \n")
 }
