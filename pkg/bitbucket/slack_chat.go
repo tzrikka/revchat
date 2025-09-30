@@ -112,6 +112,10 @@ func (c Config) deleteMsg(ctx workflow.Context, url string) error {
 		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
 		return err
 	}
+	if ids == "" {
+		log.Debug(ctx, "no Slack IDs found for Bitbucket URL (already deleted)", "url", url)
+		return nil
+	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {

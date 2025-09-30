@@ -175,25 +175,54 @@ func (c Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent) 
 	return createPRComment(ctx, url, event.Text, fmt.Sprintf("%s/%s", id, event.TS))
 }
 
+var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
+
+const ExpectedSubmatches = 6
+
 // deleteMessageInBitbucket mirrors in Bitbucket the deletion of a Slack message/reply/broadcast.
 func (c Config) deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
-	prev := event.PreviousMessage
-	if prev.ThreadTS == "" {
-		log.Warn(ctx, "message deleted", "channel", event.Channel, "ts", event.DeletedTS, "text", prev.Text)
-	} else {
-		log.Warn(ctx, "reply deleted", "channel", event.Channel, "thread_ts", prev.ThreadTS, "ts", event.DeletedTS, "text", prev.Text)
+	id := fmt.Sprintf("%s/%s", event.Channel, event.DeletedTS)
+	if tts := event.PreviousMessage.ThreadTS; tts != "" {
+		id = fmt.Sprintf("%s/%s/%s", event.Channel, tts, event.DeletedTS)
+	}
+
+	url, err := data.SwitchURLAndID(id)
+	if err != nil {
+		msg := "failed to retrieve Slack message's PR comment URL"
+		log.Error(ctx, msg, "error", err, "message_subtype", event.Subtype, "id", id, "url", url)
+		return err
+	}
+
+	sub := commentURLPattern.FindStringSubmatch(url)
+	if len(sub) != ExpectedSubmatches {
+		msg := "failed to parse Slack message's PR comment URL"
+		log.Error(ctx, msg, "message_subtype", event.Subtype, "id", id, "url", url)
+		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
+	}
+
+	if err := data.DeleteURLAndIDMapping(url); err != nil {
+		log.Error(ctx, "failed to delete URL/Slack mappings", "error", err, "comment_url", url)
+		// Don't abort - we still want to attempt to delete the PR comment.
+	}
+
+	err = bitbucket.PullRequestsDeleteCommentActivity(ctx, bitbucket.PullRequestsDeleteCommentRequest{
+		Workspace:     sub[1],
+		RepoSlug:      sub[2],
+		PullRequestID: sub[3],
+		CommentID:     sub[5],
+	})
+	if err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR comment", "error", err, "id", id, "url", url)
+		return err
 	}
 
 	return nil
 }
 
-var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
-
-const Submatches = 6
-
 func createPRComment(ctx workflow.Context, url, msg, slackID string) error {
 	sub := commentURLPattern.FindStringSubmatch(url)
-	if len(sub) != Submatches {
+	if len(sub) != ExpectedSubmatches {
+		log.Error(ctx, "failed to parse Slack message's PR comment URL", "url", url)
 		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
 	}
 
