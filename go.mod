@@ -4,7 +4,7 @@ go 1.25.1
 
 require (
 	github.com/rs/zerolog v1.34.0
-	github.com/tzrikka/timpani-api v0.1.4
+	github.com/tzrikka/timpani-api v0.2.0
 	github.com/tzrikka/xdg v1.3.0
 	github.com/urfave/cli-altsrc/v3 v3.0.1
 	github.com/urfave/cli/v3 v3.4.1
@@ -34,8 +34,8 @@ require (
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.13.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250922171735-9219d122eba9 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250922171735-9219d122eba9 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250929231259-57b25ae835d4 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250929231259-57b25ae835d4 // indirect
 	google.golang.org/grpc v1.75.1 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
