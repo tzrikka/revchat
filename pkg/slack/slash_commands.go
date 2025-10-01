@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -44,7 +45,7 @@ func (c Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEve
 	case "opt-in", "opt in", "optin":
 		return c.optInSlashCommand(ctx, event)
 	case "opt-out", "opt out", "optout":
-		return c.optOutSlashCommand(ctx, event)
+		return optOutSlashCommand(ctx, event)
 	}
 
 	log.Warn(ctx, "unrecognized Slack command", "username", event.UserName, "text", event.Text)
@@ -77,11 +78,18 @@ func (c Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent)
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":bell: You're already opted in")
 	}
 
-	return c.optInBitbucket(ctx, event, email)
+	switch {
+	case c.bitbucketWorkspace != "":
+		return optInBitbucket(ctx, event, email, c.bitbucketWorkspace)
+	default:
+		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		postEphemeralError(ctx, event, "internal configuration error")
+		return errors.New("neither Bitbucket nor GitHub are configured")
+	}
 }
 
-func (c Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, email string) error {
-	accountID, err := users.EmailToBitbucketID(ctx, "workspace", email)
+func optInBitbucket(ctx workflow.Context, event SlashCommandEvent, email, workspace string) error {
+	accountID, err := users.EmailToBitbucketID(ctx, workspace, email)
 	if err != nil {
 		postEphemeralError(ctx, event, "internal data reading error")
 		return err
@@ -96,7 +104,7 @@ func (c Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, em
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":bell: You are now opted into using RevChat")
 }
 
-func (c Config) optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+func optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	email, err := users.SlackIDToEmail(ctx, event.UserID)
 	if err != nil {
 		return err

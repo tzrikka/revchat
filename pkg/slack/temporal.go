@@ -9,7 +9,13 @@ import (
 )
 
 type Config struct {
-	Cmd *cli.Command
+	bitbucketWorkspace string
+}
+
+func newConfig(cmd *cli.Command) Config {
+	return Config{
+		bitbucketWorkspace: cmd.String("bitbucket-workspace"),
+	}
 }
 
 // Signals is a list of signal names that RevChat receives
@@ -33,7 +39,7 @@ var Signals = []string{
 
 // RegisterWorkflows maps event handler functions to [Signals].
 func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
-	c := Config{Cmd: cmd}
+	c := newConfig(cmd)
 	w.RegisterWorkflowWithOptions(c.appRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})
 	w.RegisterWorkflowWithOptions(c.memberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[1]})
 	w.RegisterWorkflowWithOptions(c.memberLeftWorkflow, workflow.RegisterOptions{Name: Signals[2]})

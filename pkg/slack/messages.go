@@ -59,7 +59,7 @@ type edited struct {
 
 // https://docs.slack.dev/reference/events/message
 func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
-	userID := c.extractUserID(ctx, &event.InnerEvent)
+	userID := extractUserID(ctx, &event.InnerEvent)
 	if userID == "" {
 		msg := "could not determine who triggered a Slack message event"
 		log.Error(ctx, msg)
@@ -82,6 +82,7 @@ func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper)
 	case "", "bot_message", "file_share", "thread_broadcast":
 		return c.addMessage(ctx, event.InnerEvent)
 	case "message_changed":
+		return c.changeMessage(ctx, event.InnerEvent)
 	case "message_deleted":
 		return c.deleteMessage(ctx, event.InnerEvent)
 	}
@@ -92,7 +93,7 @@ func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper)
 
 // extractUserID determines the user ID of the user/app that triggered a Slack message event.
 // This ID is located in different places depending on the event subtype and the user type.
-func (c Config) extractUserID(ctx workflow.Context, msg *MessageEvent) string {
+func extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 	if msg == nil {
 		return ""
 	}
@@ -102,14 +103,14 @@ func (c Config) extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 	}
 
 	if msg.BotID != "" {
-		return c.convertBotIDToUserID(ctx, msg.BotID)
+		return convertBotIDToUserID(ctx, msg.BotID)
 	}
 
-	if user := c.extractUserID(ctx, msg.Message); user != "" {
+	if user := extractUserID(ctx, msg.Message); user != "" {
 		return user
 	}
 
-	if user := c.extractUserID(ctx, msg.PreviousMessage); user != "" {
+	if user := extractUserID(ctx, msg.PreviousMessage); user != "" {
 		return user
 	}
 
@@ -117,7 +118,7 @@ func (c Config) extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 }
 
 // convertBotIDToUserID uses a cache to convert Slack bot IDs to a user IDs.
-func (c Config) convertBotIDToUserID(ctx workflow.Context, botID string) string {
+func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 	userID, err := data.GetSlackBotUserID(botID)
 	if err != nil {
 		log.Error(ctx, "failed to load Slack bot's user ID", "bot_id", botID, "error", err)
@@ -143,15 +144,37 @@ func (c Config) convertBotIDToUserID(ctx workflow.Context, botID string) string 
 }
 
 func (c Config) addMessage(ctx workflow.Context, event MessageEvent) error {
-	return c.addMessageInBitbucket(ctx, event)
+	switch {
+	case c.bitbucketWorkspace != "":
+		return addMessageInBitbucket(ctx, event)
+	default:
+		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		return errors.New("neither Bitbucket nor GitHub are configured")
+	}
+}
+
+func (c Config) changeMessage(ctx workflow.Context, event MessageEvent) error {
+	switch {
+	case c.bitbucketWorkspace != "":
+		return editMessageInBitbucket(ctx, event)
+	default:
+		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		return errors.New("neither Bitbucket nor GitHub are configured")
+	}
 }
 
 func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent) error {
-	return c.deleteMessageInBitbucket(ctx, event)
+	switch {
+	case c.bitbucketWorkspace != "":
+		return deleteMessageInBitbucket(ctx, event)
+	default:
+		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		return errors.New("neither Bitbucket nor GitHub are configured")
+	}
 }
 
 // addMessageInBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
-func (c Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
+func addMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
 	if event.Subtype == "bot_message" {
 		log.Error(ctx, "unexpected bot message", "bot_id", event.BotID, "username", event.Username)
 	}
@@ -179,8 +202,14 @@ var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+
 
 const ExpectedSubmatches = 6
 
+// editMessageInBitbucket mirrors in Bitbucket the editing of a Slack message/reply/broadcast.
+func editMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
+	log.Warn(ctx, "message edit event", "event", event)
+	return nil
+}
+
 // deleteMessageInBitbucket mirrors in Bitbucket the deletion of a Slack message/reply/broadcast.
-func (c Config) deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
+func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
 	id := fmt.Sprintf("%s/%s", event.Channel, event.DeletedTS)
 	if tts := event.PreviousMessage.ThreadTS; tts != "" {
 		id = fmt.Sprintf("%s/%s/%s", event.Channel, tts, event.DeletedTS)

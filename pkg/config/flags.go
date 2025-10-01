@@ -94,6 +94,16 @@ func Flags() []cli.Flag {
 
 		// https://pkg.go.dev/go.temporal.io/sdk/internal#WorkerOptions
 
+		// Bitbucket.
+		&cli.StringFlag{
+			Name:  "bitbucket-workspace",
+			Usage: "Bitbucket workspace slug",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("BITBUCKET_WORKSPACE"),
+				toml.TOML("bitbucket.workspace", path),
+			),
+		},
+
 		// Slack.
 		&cli.StringFlag{
 			Name:  "slack-channel-name-prefix",
