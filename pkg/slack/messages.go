@@ -11,6 +11,7 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
+	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -80,11 +81,11 @@ func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper)
 
 	switch subtype {
 	case "", "bot_message", "file_share", "thread_broadcast":
-		return c.addMessage(ctx, event.InnerEvent)
+		return c.addMessage(ctx, event.InnerEvent, userID)
 	case "message_changed":
-		return c.changeMessage(ctx, event.InnerEvent)
+		return c.changeMessage(ctx, event.InnerEvent, userID)
 	case "message_deleted":
-		return c.deleteMessage(ctx, event.InnerEvent)
+		return c.deleteMessage(ctx, event.InnerEvent, userID)
 	}
 
 	log.Warn(ctx, "unhandled Slack message event", "event", event.InnerEvent)
@@ -143,30 +144,30 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 	return bot.UserID
 }
 
-func (c Config) addMessage(ctx workflow.Context, event MessageEvent) error {
+func (c Config) addMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
-		return addMessageInBitbucket(ctx, event)
+		return addMessageInBitbucket(ctx, event, userID)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
 }
 
-func (c Config) changeMessage(ctx workflow.Context, event MessageEvent) error {
+func (c Config) changeMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
-		return editMessageInBitbucket(ctx, event)
+		return editMessageInBitbucket(ctx, event, userID)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
 }
 
-func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent) error {
+func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
-		return deleteMessageInBitbucket(ctx, event)
+		return deleteMessageInBitbucket(ctx, event, userID)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		return errors.New("neither Bitbucket nor GitHub are configured")
@@ -174,7 +175,7 @@ func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent) error {
 }
 
 // addMessageInBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
-func addMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
+func addMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
 	if event.Subtype == "bot_message" {
 		log.Error(ctx, "unexpected bot message", "bot_id", event.BotID, "username", event.Username)
 	}
@@ -195,7 +196,7 @@ func addMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
 		return fmt.Errorf("no associated URL for Slack channel %q and message timestamp %q", event.Channel, event.ThreadTS)
 	}
 
-	return createPRComment(ctx, url, event.Text, fmt.Sprintf("%s/%s", id, event.TS))
+	return createPRComment(ctx, url, event.Text, fmt.Sprintf("%s/%s", id, event.TS), userID)
 }
 
 var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
@@ -203,13 +204,13 @@ var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+
 const ExpectedSubmatches = 6
 
 // editMessageInBitbucket mirrors in Bitbucket the editing of a Slack message/reply/broadcast.
-func editMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
-	log.Warn(ctx, "message edit event", "event", event)
+func editMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
+	log.Warn(ctx, "message edit event", "event", event, "user_id", userID)
 	return nil
 }
 
 // deleteMessageInBitbucket mirrors in Bitbucket the deletion of a Slack message/reply/broadcast.
-func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
+func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
 	id := fmt.Sprintf("%s/%s", event.Channel, event.DeletedTS)
 	if tts := event.PreviousMessage.ThreadTS; tts != "" {
 		id = fmt.Sprintf("%s/%s/%s", event.Channel, tts, event.DeletedTS)
@@ -234,7 +235,17 @@ func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
 		// Don't abort - we still want to attempt to delete the PR comment.
 	}
 
+	email, err := users.SlackIDToEmail(ctx, userID)
+	if err != nil {
+		return err
+	}
+	linkID, err := data.UserLinkID(email)
+	if err != nil {
+		return err
+	}
+
 	err = bitbucket.PullRequestsDeleteCommentActivity(ctx, bitbucket.PullRequestsDeleteCommentRequest{
+		ThrippyLinkID: linkID,
 		Workspace:     sub[1],
 		RepoSlug:      sub[2],
 		PullRequestID: sub[3],
@@ -248,16 +259,26 @@ func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent) error {
 	return nil
 }
 
-func createPRComment(ctx workflow.Context, url, msg, slackID string) error {
+func createPRComment(ctx workflow.Context, url, msg, slackID, slackUser string) error {
 	sub := commentURLPattern.FindStringSubmatch(url)
 	if len(sub) != ExpectedSubmatches {
 		log.Error(ctx, "failed to parse Slack message's PR comment URL", "url", url)
 		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
 	}
 
+	email, err := users.SlackIDToEmail(ctx, slackUser)
+	if err != nil {
+		return err
+	}
+	linkID, err := data.UserLinkID(email)
+	if err != nil {
+		return err
+	}
+
 	msg = markdown.SlackToBitbucket(ctx, msg) + "\n\n[This comment was created by RevChat]: #"
 
 	resp, err := bitbucket.PullRequestsCreateCommentActivity(ctx, bitbucket.PullRequestsCreateCommentRequest{
+		ThrippyLinkID: linkID,
 		Workspace:     sub[1],
 		RepoSlug:      sub[2],
 		PullRequestID: sub[3],

@@ -60,7 +60,7 @@ func dataPath(filename string) string {
 }
 
 func readBitbucketPRs(path string) (map[string]any, error) {
-	f, err := os.ReadFile(path) //gosec:disable G304 -- user-specified by design
+	f, err := os.ReadFile(path) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func readBitbucketPRs(path string) (map[string]any, error) {
 }
 
 func writeBitbucketPRs(path string, m map[string]any) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- user-specified by design
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
 		return err
 	}

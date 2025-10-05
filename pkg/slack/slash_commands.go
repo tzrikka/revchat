@@ -80,7 +80,7 @@ func (c Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent)
 
 	switch {
 	case c.bitbucketWorkspace != "":
-		return optInBitbucket(ctx, event, email, c.bitbucketWorkspace)
+		return c.optInBitbucket(ctx, event, email)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		postEphemeralError(ctx, event, "internal configuration error")
@@ -88,14 +88,42 @@ func (c Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent)
 	}
 }
 
-func optInBitbucket(ctx workflow.Context, event SlashCommandEvent, email, workspace string) error {
-	accountID, err := users.EmailToBitbucketID(ctx, workspace, email)
+func (c Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, email string) error {
+	accountID, err := users.EmailToBitbucketID(ctx, c.bitbucketWorkspace, email)
 	if err != nil {
 		postEphemeralError(ctx, event, "internal data reading error")
 		return err
 	}
 
-	if err := data.OptInBitbucketUser(event.UserID, accountID, email); err != nil {
+	linkID, err := c.createThrippyLink(ctx)
+	if err != nil {
+		log.Error(ctx, "failed to create Thrippy link for Slack user", "error", err)
+		postEphemeralError(ctx, event, "internal authorization error")
+		return err
+	}
+
+	msg := ":point_right: <https://%s/start?id=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket"
+	msg = fmt.Sprintf(msg, c.thrippyHTTPAddress, linkID)
+	if err := PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg); err != nil {
+		log.Error(ctx, "failed to post ephemeral opt-in message in Slack", "error", err)
+		return err
+	}
+
+	err = c.waitForThrippyLinkCreds(ctx, linkID)
+	if err != nil {
+		c.deleteThrippyLink(ctx, linkID)
+		if err.Error() == ErrLinkAuthzTimeout { // For some reason errors.Is() doesn't work across Temporal.
+			log.Warn(ctx, "user did not complete Thrippy OAuth flow in time", "email", email)
+			postEphemeralError(ctx, event, "Bitbucket authorization timed out - please try opting in again")
+			return nil // Not a *server* error as far as we are concerned.
+		} else {
+			log.Error(ctx, "failed to authorize Bitbucket user", "error", err, "email", email)
+			postEphemeralError(ctx, event, "failed to authorize you in Bitbucket")
+			return err
+		}
+	}
+
+	if err := data.OptInBitbucketUser(event.UserID, accountID, email, linkID); err != nil {
 		log.Error(ctx, "failed to opt-in user", "error", err, "email", email)
 		postEphemeralError(ctx, event, "internal data writing error")
 		return err

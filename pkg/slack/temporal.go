@@ -10,11 +10,33 @@ import (
 
 type Config struct {
 	bitbucketWorkspace string
+
+	thrippyGRPCAddress        string
+	thrippyHTTPAddress        string
+	thrippyClientCert         string
+	thrippyClientKey          string
+	thrippyServerCACert       string
+	thrippyServerNameOverride string
+
+	thrippyLinksTemplate     string
+	thrippyLinksClientID     string
+	thrippyLinksClientSecret string
 }
 
 func newConfig(cmd *cli.Command) Config {
 	return Config{
 		bitbucketWorkspace: cmd.String("bitbucket-workspace"),
+
+		thrippyGRPCAddress:        cmd.String("thrippy-grpc-address"),
+		thrippyHTTPAddress:        cmd.String("thrippy-http-address"),
+		thrippyClientCert:         cmd.String("thrippy-client-cert"),
+		thrippyClientKey:          cmd.String("thrippy-client-key"),
+		thrippyServerCACert:       cmd.String("thrippy-server-ca-cert"),
+		thrippyServerNameOverride: cmd.String("thrippy-server-name-override"),
+
+		thrippyLinksTemplate:     cmd.String("thrippy-links-template"),
+		thrippyLinksClientID:     cmd.String("thrippy-links-client-id"),
+		thrippyLinksClientSecret: cmd.String("thrippy-links-client-secret"),
 	}
 }
 

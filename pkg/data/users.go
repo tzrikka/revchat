@@ -101,7 +101,7 @@ func addUser(prefix, id, email string) error {
 	m["ids"][fmt.Sprintf("%s/%s", prefix, id)] = email
 	m["emails"][fmt.Sprintf("%s/%s", prefix, email)] = id
 
-	return writeSONMaps(path, m)
+	return writeJSONMaps(path, m)
 }
 
 func userEmailByID(prefix, id string) (string, error) {
@@ -139,11 +139,11 @@ func removeUser(prefix, email string) error {
 	delete(m["emails"], email)
 	delete(m["ids"], id)
 
-	return writeSONMaps(path, m)
+	return writeJSONMaps(path, m)
 }
 
 func readJSONMaps(path string) (map[string]map[string]string, error) {
-	f, err := os.ReadFile(path) //gosec:disable G304 -- user-specified by design
+	f, err := os.ReadFile(path) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
 		return nil, err
 	}
@@ -162,8 +162,8 @@ func readJSONMaps(path string) (map[string]map[string]string, error) {
 	return m, nil
 }
 
-func writeSONMaps(path string, m map[string]map[string]string) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- user-specified by design
+func writeJSONMaps(path string, m map[string]map[string]string) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
 		return err
 	}

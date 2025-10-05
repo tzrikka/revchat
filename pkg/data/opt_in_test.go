@@ -23,10 +23,10 @@ func TestOptIn(t *testing.T) {
 	}
 
 	// Opt in.
-	if err := OptInBitbucketUser("SlackUserID", accountID, email); err != nil {
+	if err := OptInBitbucketUser("SlackUserID", accountID, email, "linkID"); err != nil {
 		t.Fatalf("OptInBitbucketUser() error = %v", err)
 	}
-	if err := OptInGitHubUser("SlackUserID", login, email); err != nil {
+	if err := OptInGitHubUser("SlackUserID", login, email, "linkID"); err != nil {
 		t.Fatalf("OptInGitHubUser() error = %v", err)
 	}
 

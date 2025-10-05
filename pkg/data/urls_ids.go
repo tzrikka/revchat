@@ -52,7 +52,7 @@ func DeleteURLAndIDMapping(key string) error {
 }
 
 func readJSON(path string) (map[string]string, error) {
-	f, err := os.ReadFile(path) //gosec:disable G304 -- user-specified by design
+	f, err := os.ReadFile(path) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func readJSON(path string) (map[string]string, error) {
 }
 
 func writeJSON(path string, m map[string]string) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- user-specified by design
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
 		return err
 	}

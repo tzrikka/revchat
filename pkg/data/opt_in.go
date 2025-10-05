@@ -1,14 +1,10 @@
 package data
 
-import (
-	"time"
-)
-
 const (
 	optInFile = "opt_in.json"
 )
 
-func OptInBitbucketUser(slackUserID, accountID, email string) error {
+func OptInBitbucketUser(slackUserID, accountID, email, linkID string) error {
 	if err := AddSlackUser(slackUserID, email); err != nil {
 		return err
 	}
@@ -17,10 +13,10 @@ func OptInBitbucketUser(slackUserID, accountID, email string) error {
 		return err
 	}
 
-	return optInUser(email)
+	return optInUser(email, linkID)
 }
 
-func OptInGitHubUser(slackUserID, username, email string) error {
+func OptInGitHubUser(slackUserID, username, email, linkID string) error {
 	if err := AddSlackUser(slackUserID, email); err != nil {
 		return err
 	}
@@ -29,10 +25,10 @@ func OptInGitHubUser(slackUserID, username, email string) error {
 		return err
 	}
 
-	return optInUser(email)
+	return optInUser(email, linkID)
 }
 
-func optInUser(email string) error {
+func optInUser(email, linkID string) error {
 	path := dataPath(optInFile)
 
 	m, err := readJSON(path)
@@ -40,24 +36,30 @@ func optInUser(email string) error {
 		return err
 	}
 
-	if m[email] == "" {
-		m[email] = time.Now().UTC().Format(time.RFC3339)
-	}
-
+	m[email] = linkID
 	return writeJSON(path, m)
 }
 
 func IsOptedIn(email string) (bool, error) {
-	if email == "" || email == "bot" {
-		return false, nil
-	}
-
-	m, err := readJSON(dataPath(optInFile))
+	linkID, err := UserLinkID(email)
 	if err != nil {
 		return false, err
 	}
 
-	return m[email] != "", nil
+	return linkID != "", nil
+}
+
+func UserLinkID(email string) (string, error) {
+	if email == "" || email == "bot" {
+		return "", nil
+	}
+
+	m, err := readJSON(dataPath(optInFile))
+	if err != nil {
+		return "", err
+	}
+
+	return m[email], nil
 }
 
 func OptOut(email string) error {

@@ -25,6 +25,8 @@ const (
 
 	DefaultChannelNamePrefix    = "_pr"
 	DefaultMaxChannelNameLength = 50 // Slack's hard limit = 80, but that's still too long.
+
+	DefaultThrippyGRPCAddress = "localhost:14460"
 )
 
 // configFile returns the path to the app's configuration file.
@@ -121,6 +123,90 @@ func Flags() []cli.Flag {
 			Sources: cli.NewValueSourceChain(
 				cli.EnvVar("SLACK_MAX_CHANNEL_NAME_LENGTH"),
 				toml.TOML("slack.max_channel_name_length", path),
+			),
+		},
+
+		// Thrippy.
+		&cli.StringFlag{
+			Name:  "thrippy-grpc-address",
+			Usage: "Thrippy gRPC server address",
+			Value: DefaultThrippyGRPCAddress,
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_GRPC_ADDRESS"),
+				toml.TOML("thrippy.grpc_address", path),
+			),
+		},
+		&cli.StringFlag{
+			Name:  "thrippy-http-address",
+			Usage: "Thrippy HTTP server address",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_HTTP_ADDRESS"),
+				toml.TOML("thrippy.http_address", path),
+			),
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:  "thrippy-client-cert",
+			Usage: "Thrippy gRPC client's public certificate PEM file (mTLS only)",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_CLIENT_CERT"),
+				toml.TOML("thrippy.client_cert", path),
+			),
+			TakesFile: true,
+		},
+		&cli.StringFlag{
+			Name:  "thrippy-client-key",
+			Usage: "Thrippy gRPC client's private key PEM file (mTLS only)",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_CLIENT_KEY"),
+				toml.TOML("thrippy.client_key", path),
+			),
+			TakesFile: true,
+		},
+		&cli.StringFlag{
+			Name:  "thrippy-server-ca-cert",
+			Usage: "Thrippy gRPC server's CA certificate PEM file (both TLS and mTLS)",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_SERVER_CA_CERT"),
+				toml.TOML("thrippy.server_ca_cert", path),
+			),
+			TakesFile: true,
+			Required:  true,
+		},
+		&cli.StringFlag{
+			Name:  "thrippy-server-name-override",
+			Usage: "Thrippy gRPC server's name override (for testing, both TLS and mTLS)",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_SERVER_NAME_OVERRIDE"),
+				toml.TOML("thrippy.server_name_override", path),
+			),
+		},
+
+		// Thrippy links (for Bitbucket or GitHub).
+		&cli.StringFlag{
+			Name:  "thrippy-links-template",
+			Usage: "Thrippy links template name",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_LINKS_TEMPLATE"),
+				toml.TOML("thrippy.links.template", path),
+			),
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:  "thrippy-links-client-id",
+			Usage: "Thrippy links OAuth client ID",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_LINKS_CLIENT_ID"),
+				toml.TOML("thrippy.links.client_id", path),
+			),
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:  "thrippy-links-client-secret",
+			Usage: "Thrippy links OAuth client secret (Bitbucket only)",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("THRIPPY_LINKS_CLIENT_SECRET"),
+				toml.TOML("thrippy.links.client_secret", path),
 			),
 		},
 	}
