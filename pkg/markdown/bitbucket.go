@@ -26,9 +26,8 @@ func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string
 
 	// Mentions: "@{account:uuid}" --> "<@U123>" or "Display Name",
 	for _, bbRef := range regexp.MustCompile(`@\{[\w:-]+\}`).FindAllString(text, -1) {
-		accountID := strings.TrimSuffix(bbRef[2:], "}")
-		slackRef := users.BitbucketToSlackRef(ctx, cmd, accountID, "")
-		text = strings.ReplaceAll(text, bbRef, slackRef)
+		accountID := bbRef[2 : len(bbRef)-1]
+		text = strings.ReplaceAll(text, bbRef, users.BitbucketToSlackRef(ctx, cmd, accountID, ""))
 	}
 
 	return text
@@ -96,17 +95,15 @@ func bitbucketToSlackWhitespaces(text string) string {
 //   - https://docs.slack.dev/messaging/formatting-message-text/
 //   - https://confluence.atlassian.com/bitbucketserver/markdown-syntax-guide-776639995.html
 //   - https://bitbucket.org/tutorials/markdowndemo/src/master/
-func SlackToBitbucket(ctx workflow.Context, text string) string {
+func SlackToBitbucket(ctx workflow.Context, bitbucketWorkspace, text string) string {
 	// Before the rest because they undo a few whitespace changes.
 	text = slackToBitbucketWhitespaces(text)
 
 	text = slackToBitbucketBlocks(text)
 	text = slackToBitbucketLists(text)
 	text = slackToBitbucketTextStyles(text)
-	return slackToBitbucketLinks(text)
-}
+	text = slackToBitbucketReferences(ctx, bitbucketWorkspace, text)
 
-func slackToBitbucketLinks(text string) string {
 	// Links: "<url>" and "<url|text>" --> "[text](url)".
 	text = regexp.MustCompile(`<(.*?)(\|(.*?))?>`).ReplaceAllString(text, "[${3}](${1})")
 	return regexp.MustCompile(`\[\]\((.*?)\)`).ReplaceAllString(text, "[$1]($1)")
@@ -133,6 +130,16 @@ func slackToBitbucketLists(text string) string {
 	text = regexp.MustCompile(`(?m)(^\s*-.+)\n\n(\s*-)`).ReplaceAllString(text, "${1}\n${2}")
 	text = regexp.MustCompile(`(?m)(^\s*-.+)\n\n(\s*-)`).ReplaceAllString(text, "${1}\n${2}")
 	return regexp.MustCompile(`(?m)(^\s*-.+)\n([^\n\s-])`).ReplaceAllString(text, "${1}\n\n${2}")
+}
+
+func slackToBitbucketReferences(ctx workflow.Context, bitbucketWorkspace, text string) string {
+	// User mentions: "<@U123>" --> "@{account:uuid}" or "Display Name".
+	for _, slackRef := range regexp.MustCompile(`<@[A-Z0-9]+>`).FindAllString(text, -1) {
+		bbRef := users.SlackToBitbucketRef(ctx, bitbucketWorkspace, slackRef)
+		text = strings.ReplaceAll(text, slackRef, bbRef)
+	}
+
+	return text
 }
 
 func slackToBitbucketTextStyles(text string) string {

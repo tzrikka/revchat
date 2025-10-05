@@ -147,7 +147,7 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 func (c Config) addMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
-		return addMessageInBitbucket(ctx, event, userID)
+		return c.addMessageInBitbucket(ctx, event, userID)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		return errors.New("neither Bitbucket nor GitHub are configured")
@@ -175,7 +175,7 @@ func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID s
 }
 
 // addMessageInBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
-func addMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
+func (c Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
 	if event.Subtype == "bot_message" {
 		log.Error(ctx, "unexpected bot message", "bot_id", event.BotID, "username", event.Username)
 	}
@@ -196,7 +196,7 @@ func addMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID stri
 		return fmt.Errorf("no associated URL for Slack channel %q and message timestamp %q", event.Channel, event.ThreadTS)
 	}
 
-	return createPRComment(ctx, url, event.Text, fmt.Sprintf("%s/%s", id, event.TS), userID)
+	return c.createPRComment(ctx, url, event.Text, fmt.Sprintf("%s/%s", id, event.TS), userID)
 }
 
 var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
@@ -259,7 +259,7 @@ func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID s
 	return nil
 }
 
-func createPRComment(ctx workflow.Context, url, msg, slackID, slackUser string) error {
+func (c Config) createPRComment(ctx workflow.Context, url, msg, slackID, slackUser string) error {
 	sub := commentURLPattern.FindStringSubmatch(url)
 	if len(sub) != ExpectedSubmatches {
 		log.Error(ctx, "failed to parse Slack message's PR comment URL", "url", url)
@@ -275,7 +275,7 @@ func createPRComment(ctx workflow.Context, url, msg, slackID, slackUser string) 
 		return err
 	}
 
-	msg = markdown.SlackToBitbucket(ctx, msg) + "\n\n[This comment was created by RevChat]: #"
+	msg = markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, msg) + "\n\n[This comment was created by RevChat]: #"
 
 	resp, err := bitbucket.PullRequestsCreateCommentActivity(ctx, bitbucket.PullRequestsCreateCommentRequest{
 		ThrippyLinkID: linkID,

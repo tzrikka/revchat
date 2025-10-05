@@ -297,24 +297,6 @@ func TestSlackToBitbucket(t *testing.T) {
 			text: "<url>",
 			want: "[url](url)",
 		},
-		// {
-		// 	name: "pr_ref_in_same_repo",
-		// 	text: "#9",
-		// 	url:  "https://bitbucket.org/workspace/repo/pull-requests/123",
-		// 	want: "<https://bitbucket.org/workspace/repo/pull-requests/9|#9>",
-		// },
-		// {
-		// 	name: "pr_ref_in_other_repo",
-		// 	text: "bar#12",
-		// 	url:  "https://bitbucket.org/workspace/repo/pull-requests/123",
-		// 	want: "<https://bitbucket.org/workspace/bar/pull-requests/12|bar#12>",
-		// },
-		// {
-		// 	name: "pr_ref_in_other_workspace",
-		// 	text: "foo-bar/blah-2-blah#3456",
-		// 	url:  "https://bitbucket.org/workspace/repo/pull-requests/123",
-		// 	want: "<https://bitbucket.org/foo-bar/blah-2-blah/pull-requests/3456|foo-bar/blah-2-blah#3456>",
-		// },
 		// Simple lists.
 		{
 			name: "simple_list_1",
@@ -358,7 +340,7 @@ func TestSlackToBitbucket(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := SlackToBitbucket(nil, tt.text); got != tt.want {
+			if got := SlackToBitbucket(nil, "workspace", tt.text); got != tt.want {
 				t.Errorf("SlackToBitbucket() = %q, want %q", got, tt.want)
 			}
 		})

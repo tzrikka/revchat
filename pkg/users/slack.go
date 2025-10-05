@@ -10,6 +10,19 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
+// SlackToBitbucketRef converts a Slack user reference ("<@U123>") into a Bitbucket account
+// ID ("@{account:uuid}"). This depends on the user's email address being the same in both
+// systems. This function returns the Slack display name if the user is not found.
+func SlackToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackUserRef string) string {
+	email, _ := SlackIDToEmail(ctx, slackUserRef[2:len(slackUserRef)-1])
+	accountID, _ := EmailToBitbucketID(ctx, bitbucketWorkspace, email)
+	if accountID != "" {
+		return fmt.Sprintf("@{%s}", accountID)
+	}
+
+	return "Display Name"
+}
+
 // EmailToSlackID retrieves a Slack user's ID based on their email address.
 // This function uses data caching, and API calls as a fallback.
 func EmailToSlackID(ctx workflow.Context, email string) string {

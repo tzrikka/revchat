@@ -60,6 +60,10 @@ func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 // EmailToBitbucketID retrieves a Bitbucket user's account ID based on their
 // email address. This function uses data caching, and API calls as a fallback.
 func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, error) {
+	if email == "" {
+		return "", fmt.Errorf("empty email address")
+	}
+
 	id, err := data.BitbucketUserIDByEmail(email)
 	if err != nil {
 		log.Error(ctx, "failed to load Bitbucket account ID", "error", err, "email", email)
