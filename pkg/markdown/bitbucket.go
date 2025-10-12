@@ -1,6 +1,8 @@
 package markdown
 
 import (
+	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -137,6 +139,20 @@ func slackToBitbucketReferences(ctx workflow.Context, bitbucketWorkspace, text s
 	for _, slackRef := range regexp.MustCompile(`<@[A-Z0-9]+>`).FindAllString(text, -1) {
 		bbRef := users.SlackToBitbucketRef(ctx, bitbucketWorkspace, slackRef)
 		text = strings.ReplaceAll(text, slackRef, bbRef)
+	}
+
+	// Special mentions: "<!...>" --> "@...".
+	text = strings.ReplaceAll(text, "<!here>", "@here")
+	text = strings.ReplaceAll(text, "<!channel>", "@channel")
+
+	// Channel references: "<#C123|>" --> "<link|@name>".
+	for _, slackRef := range regexp.MustCompile(`<#([A-Z0-9]+)\|?>`).FindAllStringSubmatch(text, -1) {
+		if len(slackRef) > 1 {
+			id := slackRef[1]
+			name := slackChannelIDToName(ctx, id)
+			u, _ := url.JoinPath(slackBaseURL(ctx), "archives", id) // "" on error.
+			text = strings.ReplaceAll(text, slackRef[0], fmt.Sprintf("<%s|#%s>", u, name))
+		}
 	}
 
 	return text
