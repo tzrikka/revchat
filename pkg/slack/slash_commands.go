@@ -111,7 +111,7 @@ func (c Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, em
 
 	err = c.waitForThrippyLinkCreds(ctx, linkID)
 	if err != nil {
-		c.deleteThrippyLink(ctx, linkID)
+		_ = c.deleteThrippyLink(ctx, linkID)
 		if err.Error() == ErrLinkAuthzTimeout { // For some reason errors.Is() doesn't work across Temporal.
 			log.Warn(ctx, "user did not complete Thrippy OAuth flow in time", "email", email)
 			postEphemeralError(ctx, event, "Bitbucket authorization timed out - please try opting in again")
