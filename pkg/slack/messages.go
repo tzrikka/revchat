@@ -196,7 +196,7 @@ func (c Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent, 
 		return fmt.Errorf("no associated URL for Slack channel %q and message timestamp %q", event.Channel, event.ThreadTS)
 	}
 
-	return c.createPRComment(ctx, url, event.Text, fmt.Sprintf("%s/%s", id, event.TS), userID)
+	return c.createPRComment(ctx, url, event.Text, event.Channel, fmt.Sprintf("%s/%s", id, event.TS), userID)
 }
 
 var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
@@ -235,13 +235,13 @@ func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID s
 		// Don't abort - we still want to attempt to delete the PR comment.
 	}
 
-	email, err := users.SlackIDToEmail(ctx, userID)
+	linkID, err := userIDToLinkID(ctx, userID)
 	if err != nil {
 		return err
 	}
-	linkID, err := data.UserLinkID(email)
-	if err != nil {
-		return err
+	if linkID == "" {
+		msg := "Cannot mirror deletion in Bitbucket, you need to run the slash command `/revchat opt-in`"
+		return PostEphemeralMessage(ctx, event.Channel, userID, msg)
 	}
 
 	err = bitbucket.PullRequestsDeleteCommentActivity(ctx, bitbucket.PullRequestsDeleteCommentRequest{
@@ -259,20 +259,20 @@ func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID s
 	return nil
 }
 
-func (c Config) createPRComment(ctx workflow.Context, url, msg, slackID, slackUser string) error {
+func (c Config) createPRComment(ctx workflow.Context, url, msg, slackChannel, slackID, slackUser string) error {
 	sub := commentURLPattern.FindStringSubmatch(url)
 	if len(sub) != ExpectedSubmatches {
 		log.Error(ctx, "failed to parse Slack message's PR comment URL", "url", url)
 		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
 	}
 
-	email, err := users.SlackIDToEmail(ctx, slackUser)
+	linkID, err := userIDToLinkID(ctx, slackUser)
 	if err != nil {
 		return err
 	}
-	linkID, err := data.UserLinkID(email)
-	if err != nil {
-		return err
+	if linkID == "" {
+		msg := "Cannot mirror message in Bitbucket, you need to run the slash command `/revchat opt-in`"
+		return PostEphemeralMessage(ctx, slackChannel, slackUser, msg)
 	}
 
 	msg = markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, msg) + "\n\n[This comment was created by RevChat]: #"
@@ -298,4 +298,18 @@ func (c Config) createPRComment(ctx workflow.Context, url, msg, slackID, slackUs
 	}
 
 	return nil
+}
+
+func userIDToLinkID(ctx workflow.Context, userID string) (string, error) {
+	email, err := users.SlackIDToEmail(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	linkID, err := data.UserLinkID(email)
+	if err != nil {
+		return "", err
+	}
+
+	return linkID, nil
 }
