@@ -108,10 +108,7 @@ func SlackToBitbucket(ctx workflow.Context, bitbucketWorkspace, text string) str
 	text = slackToBitbucketLists(text)
 	text = slackToBitbucketTextStyles(text)
 	text = slackToBitbucketReferences(ctx, bitbucketWorkspace, text)
-
-	// Links: "<url>" and "<url|text>" --> "[text](url)".
-	text = regexp.MustCompile(`<(.*?)(\|(.*?))?>`).ReplaceAllString(text, "[${3}](${1})")
-	return regexp.MustCompile(`\[\]\((.*?)\)`).ReplaceAllString(text, "[$1]($1)")
+	return slackToBitbucketLinks(text)
 }
 
 func slackToBitbucketBlocks(text string) string {
@@ -122,6 +119,15 @@ func slackToBitbucketBlocks(text string) string {
 
 	// Code blocks: "```...```" --> "```\n...\n```".
 	return regexp.MustCompile("(?s)```(.+?)```").ReplaceAllString(text, "```\n${1}\n```")
+}
+
+func slackToBitbucketLinks(text string) string {
+	// Keep Bitbucket-style links as-is (unlinkified).
+	text = regexp.MustCompile(`\[(.*?)\]\((.*?)\)`).ReplaceAllString(text, `\[${1}](${2})`)
+
+	// Links: "<url>" and "<url|text>" --> "[text](url)".
+	text = regexp.MustCompile(`<(.*?)(\|(.*?))?>`).ReplaceAllString(text, "[${3}](${1})")
+	return regexp.MustCompile(`\[\]\((.*?)\)`).ReplaceAllString(text, "[$1]($1)")
 }
 
 func slackToBitbucketLists(text string) string {

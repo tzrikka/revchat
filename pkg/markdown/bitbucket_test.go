@@ -294,13 +294,18 @@ func TestSlackToBitbucket(t *testing.T) {
 		// Links.
 		{
 			name: "link_1",
-			text: "<url|text>",
-			want: "[text](url)",
+			text: "<url|label>",
+			want: "[label](url)",
 		},
 		{
 			name: "link_2",
 			text: "<url>",
 			want: "[url](url)",
+		},
+		{
+			name: "reverse_link",
+			text: "[label](url)",
+			want: `\[label](url)`,
 		},
 		// Simple lists.
 		{
