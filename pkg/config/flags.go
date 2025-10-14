@@ -125,6 +125,14 @@ func Flags() []cli.Flag {
 				toml.TOML("slack.max_channel_name_length", path),
 			),
 		},
+		&cli.BoolFlag{
+			Name:  "slack-private-channels",
+			Usage: "Make PR channels private",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("SLACK_PRIVATE_CHANNELS"),
+				toml.TOML("slack.private_channels", path),
+			),
+		},
 
 		// Linkification.
 		&cli.StringSliceFlag{

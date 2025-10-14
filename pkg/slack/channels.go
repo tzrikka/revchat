@@ -44,8 +44,8 @@ func NormalizeChannelName(name string, maxLen int) string {
 	return name
 }
 
-func CreateChannel(ctx workflow.Context, name, url string) (string, bool, error) {
-	id, err := slack.ConversationsCreateActivity(ctx, name, false)
+func CreateChannel(ctx workflow.Context, name, url string, private bool) (string, bool, error) {
+	id, err := slack.ConversationsCreateActivity(ctx, name, private)
 	if err != nil {
 		msg := "failed to create Slack channel"
 

@@ -123,7 +123,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		id, retry, err := slack.CreateChannel(ctx, name, pr.HTMLURL)
+		id, retry, err := slack.CreateChannel(ctx, name, pr.HTMLURL, c.Cmd.Bool("slack-private-channels"))
 		if err != nil {
 			if retry {
 				continue
