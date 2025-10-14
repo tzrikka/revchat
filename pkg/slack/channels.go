@@ -22,7 +22,8 @@ func NormalizeChannelName(name string, maxLen int) string {
 		return name
 	}
 
-	name = regexp.MustCompile(`\[[\w -]*\]`).ReplaceAllString(name, "") // Remove annotations.
+	name = regexp.MustCompile(`\[[\w -]*\]`).ReplaceAllString(name, "")      // Remove annotations.
+	name = regexp.MustCompile(`[A-Z]{3,}-\d{5,}`).ReplaceAllString(name, "") // Remove annotations.
 
 	name = strings.ToLower(name)
 	name = strings.TrimSpace(name)

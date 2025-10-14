@@ -17,8 +17,8 @@ func TestNormalizeChannelName(t *testing.T) {
 		},
 		{
 			name: "remove_annotations",
-			s:    "[a][bb][CCC][DDDD-1234] [DDDD 1234] Foo[] Bar [Baz]",
-			want: "foo-bar",
+			s:    "[a][bb][CCC][DDDD-1234] [DDDD 1234] EE-1234 FFF-12345 Foo[] Bar [Baz]",
+			want: "ee-1234-foo-bar",
 		},
 		{
 			name: "lower_case",
