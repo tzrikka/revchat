@@ -36,11 +36,14 @@ func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string
 }
 
 func bitbucketToSlackLinks(text, prURL string) string {
+	// Keep Slack-style links as-is (unlinkified).
+	text = regexp.MustCompile(`<(\S+?)(\|.*?)?>`).ReplaceAllString(text, `&lt;${1}${2}>`)
+
 	// Links: "[text](url){ ... }" --> "<url|text>".
 	text = regexp.MustCompile(`\[(.*?)\]\((.*?)\)(\{.*?\})?`).ReplaceAllString(text, "<${2}|${1}>")
 
 	// Images: "![text](url){ ... }" --> "!<url|text>" --> "Image: <url|text>".
-	text = regexp.MustCompile(`!<(.*?)>`).ReplaceAllString(text, "Image: <${1}>")
+	text = regexp.MustCompile(`!(<|&lt;)(.*?)>`).ReplaceAllString(text, "Image: <${2}>")
 
 	// PR references: "#123" --> "<PR URL|#123>".
 	baseURL := "<" + regexp.MustCompile(`/pull-requests/\d+$`).ReplaceAllString(prURL, "/pull-requests/")

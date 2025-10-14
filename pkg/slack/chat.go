@@ -38,11 +38,11 @@ func PostReply(ctx workflow.Context, channelID, timestamp, msg string) (*slack.C
 
 func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg string) (*slack.ChatPostMessageResponse, error) {
 	resp, err := slack.ChatPostMessageActivity(ctx, slack.ChatPostMessageRequest{
-		Channel:      channelID,
-		ThreadTS:     timestamp,
-		Username:     name,
-		IconURL:      icon,
-		MarkdownText: msg,
+		Channel:  channelID,
+		ThreadTS: timestamp,
+		Username: name,
+		IconURL:  icon,
+		Text:     msg,
 	})
 	if err != nil {
 		log.Error(ctx, "failed to post Slack message", "error", err, "channel_id", channelID, "thread_ts", timestamp)
