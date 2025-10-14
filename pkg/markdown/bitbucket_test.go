@@ -128,7 +128,7 @@ func TestBitbucketToSlack(t *testing.T) {
 		{
 			name: "image",
 			text: "!<url maybe with text>",
-			want: "Image: <url maybe with text>",
+			want: ":camera: <url maybe with text>",
 		},
 		{
 			name: "reverse_link",
