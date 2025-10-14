@@ -3,6 +3,8 @@ package bitbucket
 import (
 	"errors"
 	"fmt"
+	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -127,6 +129,9 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	slack.SetChannelDescription(ctx, channelID, pr.Title, url)
 	c.setChannelBookmarks(ctx, channelID, url, pr)
 	c.postIntroMsg(ctx, channelID, event.Type, pr, event.Actor)
+	if msg := c.linkifyIDs(ctx, pr.Title+pr.Description); msg != "" {
+		_, _ = slack.PostMessage(ctx, channelID, msg)
+	}
 
 	err = slack.InviteUsersToChannel(ctx, channelID, c.prParticipants(ctx, pr))
 	if err != nil {
@@ -197,6 +202,62 @@ func (c Config) postIntroMsg(ctx workflow.Context, channelID, eventType string, 
 	}
 
 	_ = c.mentionUserInMsg(ctx, channelID, actor, msg)
+}
+
+var linkifyPattern = regexp.MustCompile(`[A-Z]+-\d+`)
+
+// linkifyIDs finds IDs in the text and tries to linkify them based on the configured issue
+// trackers. If no IDs are found, or none are recognized, an empty string is returned.
+func (c Config) linkifyIDs(ctx workflow.Context, text string) string {
+	ids := linkifyPattern.FindAllString(text, -1)
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+
+	msg := "> References in the PR:"
+	for _, id := range ids {
+		if url := c.linkify(ctx, id); url != "" {
+			msg += fmt.Sprintf("\n>  •  <%s|%s>", url, id)
+		}
+	}
+
+	if strings.Count(msg, "\n") == 0 {
+		msg = ""
+	}
+	return msg
+}
+
+// linkify can recognize specific case-sensitive keys, as well as a generic "default" key.
+func (c Config) linkify(ctx workflow.Context, id string) string {
+	lm := c.Cmd.StringSlice("linkification-map")
+	keys := map[string]string{}
+	for _, kv := range lm {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			log.Error(ctx, "invalid key-value pair in linkification map configuration", "kv", kv)
+			continue
+		}
+		keys[strings.TrimSpace(k)] = strings.TrimSpace(v)
+	}
+
+	key, _, _ := strings.Cut(id, "-")
+	if base, found := keys[key]; found {
+		return buildURL(ctx, base, id)
+	}
+
+	if base, found := keys["default"]; found {
+		return buildURL(ctx, base, id)
+	}
+
+	return ""
+}
+
+func buildURL(ctx workflow.Context, base, id string) string {
+	u, err := url.JoinPath(base, id)
+	if err != nil {
+		log.Error(ctx, "failed to join URL paths", "error", err, "base", base, "id", id)
+		return ""
+	}
+	return u
 }
 
 // prParticipants returns a list of opted-in Slack user IDs (author/participants/reviewers).

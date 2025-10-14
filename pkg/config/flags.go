@@ -126,6 +126,16 @@ func Flags() []cli.Flag {
 			),
 		},
 
+		// Linkification.
+		&cli.StringSliceFlag{
+			Name:  "linkification-map",
+			Usage: `Map of case-sensitive project keys to URL prefixes (e.g. PROJ=https://domain.atlassian.net/browse/, supports "default" key)`,
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("LINKIFICATION_MAP"),
+				toml.TOML("linkification.map", path),
+			),
+		},
+
 		// Thrippy.
 		&cli.StringFlag{
 			Name:  "thrippy-grpc-address",
