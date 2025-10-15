@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -60,6 +61,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		if msg := c.linkifyIDs(ctx, event.PullRequest.Title); msg != "" {
 			_, _ = slack.PostMessage(ctx, channelID, msg)
 		}
+
 		return nil
 	}
 
@@ -76,6 +78,35 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		}
 
 		return err
+	}
+
+	// Reviewers added/removed.
+	added, removed := reviewersDiff(*snapshot, event.PullRequest)
+	if len(added)+len(removed) > 0 {
+		msg := reviewerMentions(added, removed)
+		_ = c.mentionUserInMsg(ctx, channelID, event.Actor, msg+".")
+		return nil
+	}
+
+	// Commit(s) pushed to the PR branch.
+	if snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
+		count := 0
+
+		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, count)
+		if count != 1 {
+			msg += "s"
+		}
+		return c.mentionUserInMsg(ctx, channelID, event.Actor, msg+"> to this PR.")
+	}
+
+	// Retargeted destination branch.
+	oldBranch := snapshot.Destination.Branch.Name
+	newBranch := event.PullRequest.Destination.Branch.Name
+	if oldBranch != newBranch {
+		repoURL := event.Repository.Links["html"].HRef
+		msg := "%%s changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
+		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
+		return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	log.Warn(ctx, "unhandled Bitbucket PR update event", "url", url)
@@ -115,6 +146,74 @@ func mapToStruct(m any, pr *PullRequest) error {
 	}
 
 	return nil
+}
+
+func reviewers(pr PullRequest, includeParticipants bool) []string {
+	var accountIDs []string
+	for _, r := range pr.Reviewers {
+		accountIDs = append(accountIDs, r.AccountID)
+	}
+
+	if !includeParticipants {
+		for _, p := range pr.Participants {
+			accountIDs = append(accountIDs, p.User.AccountID)
+		}
+	}
+
+	slices.Sort(accountIDs)
+	return slices.Compact(accountIDs)
+}
+
+func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
+	prevIDs := reviewers(prev, false)
+	currIDs := reviewers(curr, false)
+
+	for _, id := range currIDs {
+		if !slices.Contains(prevIDs, id) {
+			added = append(added, id)
+		}
+	}
+
+	for _, id := range prevIDs {
+		if !slices.Contains(currIDs, id) {
+			removed = append(removed, id)
+		}
+	}
+
+	return
+}
+
+func reviewerMentions(added, removed []string) string {
+	msg := "%s "
+	if len(added) > 0 {
+		msg += "added"
+		for _, a := range added {
+			msg += fmt.Sprintf(" %s", a)
+		}
+		if len(added) == 1 {
+			msg += " as a reviewer"
+		} else {
+			msg += " as reviewers"
+		}
+	}
+
+	if len(added) > 0 && len(removed) > 0 {
+		msg += ", and "
+	}
+
+	if len(removed) > 0 {
+		msg += "removed"
+		for _, r := range removed {
+			msg += fmt.Sprintf(" %s", r)
+		}
+		if len(removed) == 1 {
+			msg += " as a reviewer"
+		} else {
+			msg += " as reviewers"
+		}
+	}
+
+	return msg
 }
 
 func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
@@ -180,6 +279,7 @@ func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequest
 		parentURL := htmlURL(event.Comment.Parent.Links)
 		err = c.impersonateUserInReply(ctx, commentURL, parentURL, event.Comment.User, msg)
 	}
+
 	return err
 }
 
