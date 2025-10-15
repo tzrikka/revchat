@@ -114,7 +114,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 }
 
 func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*PullRequest, error) {
-	defer data.StoreBitbucketPR(url, snapshot)
+	defer func() { _ = data.StoreBitbucketPR(url, snapshot) }()
 
 	prev, err := data.LoadBitbucketPR(url)
 	if err != nil {
