@@ -1,12 +1,15 @@
 package bitbucket
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 )
 
@@ -21,6 +24,70 @@ func (c Config) prCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 }
 
 func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	url := event.PullRequest.Links["html"].HRef
+	snapshot, err := switchSnapshot(ctx, url, event.PullRequest)
+	if err != nil {
+		return err
+	}
+
+	// PR converted to a draft.
+	if snapshot != nil && event.PullRequest.Draft {
+		event.PullRequest.Draft = false
+		return c.prClosedWorkflow(ctx, event)
+	}
+
+	// Ignore drafts until they're marked as ready for review.
+	if snapshot == nil && event.PullRequest.Draft {
+		return nil
+	}
+
+	// PR converted from a draft to ready-for-review.
+	if snapshot == nil && !event.PullRequest.Draft {
+		return c.prCreatedWorkflow(ctx, event)
+	}
+
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	if !found {
+		return nil
+	}
+
+	log.Warn(ctx, "unhandled Bitbucket PR update event", "event", event, "channel_id", channelID)
+	return nil
+}
+
+func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*PullRequest, error) {
+	defer data.StoreBitbucketPR(url, snapshot)
+
+	prev, err := data.LoadBitbucketPR(url)
+	if err != nil {
+		log.Error(ctx, "failed to load Bitbucket PR snapshot", "error", err, "url", url)
+		return nil, err
+	}
+
+	if prev == nil {
+		return nil, nil
+	}
+
+	pr := new(PullRequest)
+	if err := mapToStruct(prev, pr); err != nil {
+		log.Error(ctx, "previous snapshot of Bitbucket PR is invalid", "error", err, "url", url)
+		return nil, err
+	}
+
+	return pr, nil
+}
+
+func mapToStruct(m any, pr *PullRequest) error {
+	buf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(buf).Encode(m); err != nil {
+		return err
+	}
+
+	if err := json.NewDecoder(buf).Decode(pr); err != nil {
+		return err
+	}
+
 	return nil
 }
 

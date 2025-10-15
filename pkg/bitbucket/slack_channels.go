@@ -35,9 +35,9 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 
 	state := "closed this PR"
 	switch event.Type {
-	case "pullrequest.fulfilled":
+	case "fulfilled":
 		state = "merged this PR"
-	case "pullrequest.updated":
+	case "updated":
 		state = "converted this PR to a draft"
 	}
 
@@ -45,11 +45,11 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 		state = fmt.Sprintf("%s with this reason: `%s`", state, reason)
 	}
 
-	_ = c.mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
+	_ = c.mentionUserInMsg(ctx, channelID, event.Actor, fmt.Sprintf("%%s %s.", state))
 
 	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
-		msg := "Failed to archive this channel, even though its PR was " + state
+		msg := fmt.Sprintf("Failed to archive this channel, even though its PR was %s.", state)
 		_, _ = slack.PostMessage(ctx, channelID, msg)
 
 		return err
@@ -191,7 +191,7 @@ func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string,
 
 func (c Config) postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
 	action := "created"
-	if eventType == "pullrequest.updated" {
+	if eventType == "updated" {
 		action = "marked as ready for review"
 	}
 

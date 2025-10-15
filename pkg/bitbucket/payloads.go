@@ -34,8 +34,8 @@ type Account = bitbucket.User
 type Branch struct {
 	Name string `json:"name"`
 
-	Links          map[string]Link `json:"links"`
-	SyncStrategies []string        `json:"sync_strategies"`
+	Links          map[string]Link `json:"links,omitempty"`
+	SyncStrategies []string        `json:"sync_strategies,omitempty"`
 }
 
 type Comment struct {
@@ -155,13 +155,13 @@ type Repository struct {
 	Name     string `json:"name"`
 	UUID     string `json:"uuid"`
 
-	SCM       string  `json:"scm"`
-	IsPrivate bool    `json:"is_private"`
-	Website   *string `json:"website"`
+	SCM       string `json:"scm,omitempty"`
+	IsPrivate bool   `json:"is_private,omitempty"`
+	Website   string `json:"website,omitempty"`
 
-	Workspace Workspace `json:"workspace"`
-	Project   Project   `json:"project"`
-	Owner     Account   `json:"owner"`
+	Workspace *Workspace `json:"workspace,omitempty"`
+	Project   *Project   `json:"project,omitempty"`
+	Owner     *Account   `json:"owner,omitempty"`
 
 	Links map[string]Link `json:"links"`
 }
