@@ -13,6 +13,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/users"
 )
 
 // A new PR was created (or marked as ready for review - see [Config.prUpdatedWorkflow]).
@@ -83,7 +84,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	// Reviewers added/removed.
 	added, removed := reviewersDiff(*snapshot, event.PullRequest)
 	if len(added)+len(removed) > 0 {
-		msg := reviewerMentions(added, removed)
+		msg := c.reviewerMentions(ctx, added, removed)
 		_ = c.mentionUserInMsg(ctx, channelID, event.Actor, msg+".")
 		return nil
 	}
@@ -191,37 +192,35 @@ func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
 }
 
 // reviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.
-func reviewerMentions(added, removed []string) string {
+func (c Config) reviewerMentions(ctx workflow.Context, added, removed []string) string {
 	msg := "%s "
 	if len(added) > 0 {
-		msg += "added"
-		for _, a := range added {
-			msg += fmt.Sprintf(" %s", a)
-		}
-		if len(added) == 1 {
-			msg += " as a reviewer"
-		} else {
-			msg += " as reviewers"
-		}
+		msg += "added" + c.bitbucketAccountsToSlackMentions(ctx, added)
 	}
-
 	if len(added) > 0 && len(removed) > 0 {
 		msg += ", and "
 	}
-
 	if len(removed) > 0 {
-		msg += "removed"
-		for _, r := range removed {
-			msg += fmt.Sprintf(" %s", r)
-		}
-		if len(removed) == 1 {
-			msg += " as a reviewer"
-		} else {
-			msg += " as reviewers"
+		msg += "removed" + c.bitbucketAccountsToSlackMentions(ctx, removed)
+	}
+	return msg
+}
+
+func (c Config) bitbucketAccountsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
+	slackUsers := ""
+	for _, a := range accountIDs {
+		if ref := users.BitbucketToSlackRef(ctx, c.Cmd, a, ""); ref != "" {
+			slackUsers += " " + ref
 		}
 	}
 
-	return msg
+	if len(accountIDs) == 1 {
+		slackUsers += " as a reviewer"
+	} else {
+		slackUsers += " as reviewers"
+	}
+
+	return slackUsers
 }
 
 func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
