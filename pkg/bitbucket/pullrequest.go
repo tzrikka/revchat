@@ -113,6 +113,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	return nil
 }
 
+// switchSnapshot stores the given new PR snapshot, and returns the previous one (if any).
 func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*PullRequest, error) {
 	defer func() { _ = data.StoreBitbucketPR(url, snapshot) }()
 
@@ -135,6 +136,7 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 	return pr, nil
 }
 
+// mapToStruct converts a map-based representation of JSON data into a [PullRequest] struct.
 func mapToStruct(m any, pr *PullRequest) error {
 	buf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(buf).Encode(m); err != nil {
@@ -148,6 +150,8 @@ func mapToStruct(m any, pr *PullRequest) error {
 	return nil
 }
 
+// reviewers returns the list of reviewer account IDs, and possibly participants too.
+// The output is guaranteed to be sorted, without teams/apps, and without repetitions.
 func reviewers(pr PullRequest, includeParticipants bool) []string {
 	var accountIDs []string
 	for _, r := range pr.Reviewers {
@@ -164,6 +168,9 @@ func reviewers(pr PullRequest, includeParticipants bool) []string {
 	return slices.Compact(accountIDs)
 }
 
+// reviewerDiff returns the lists of added and removed reviewers
+// (not participants), compared to the previous snapshot of the PR.
+// The output is guaranteed to be sorted, without teams/apps, and without repetitions.
 func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
 	prevIDs := reviewers(prev, false)
 	currIDs := reviewers(curr, false)
@@ -183,6 +190,7 @@ func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
 	return
 }
 
+// reviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.
 func reviewerMentions(added, removed []string) string {
 	msg := "%s "
 	if len(added) > 0 {
