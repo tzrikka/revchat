@@ -11,6 +11,7 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
+	"github.com/tzrikka/revchat/pkg/slack"
 )
 
 // A new PR was created (or marked as ready for review - see [Config.prUpdatedWorkflow]).
@@ -52,7 +53,32 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		return nil
 	}
 
-	log.Warn(ctx, "unhandled Bitbucket PR update event", "event", event, "channel_id", channelID)
+	// Title edited.
+	if snapshot.Title != event.PullRequest.Title {
+		_ = c.mentionUserInMsg(ctx, channelID, event.Actor, "%s edited the PR title.")
+		slack.SetChannelDescription(ctx, channelID, event.PullRequest.Title, url)
+		if msg := c.linkifyIDs(ctx, event.PullRequest.Title); msg != "" {
+			_, _ = slack.PostMessage(ctx, channelID, msg)
+		}
+		return nil
+	}
+
+	// Description edited.
+	if snapshot.Description != event.PullRequest.Description {
+		msg := "%s deleted the PR description."
+		if text := strings.TrimSpace(event.PullRequest.Description); text != "" {
+			msg = "%s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, c.Cmd, text, url)
+		}
+
+		err := c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		if msg := c.linkifyIDs(ctx, event.PullRequest.Description); msg != "" {
+			_, err = slack.PostMessage(ctx, channelID, msg)
+		}
+
+		return err
+	}
+
+	log.Warn(ctx, "unhandled Bitbucket PR update event", "url", url)
 	return nil
 }
 
