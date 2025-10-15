@@ -106,6 +106,26 @@ func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []stri
 	return nil
 }
 
+func KickUsersFromChannel(ctx workflow.Context, channelID string, userIDs []string) error {
+	var err error
+	for _, userID := range userIDs {
+		err = slack.ConversationsKickActivity(ctx, channelID, userID)
+		if err != nil {
+			msg := "failed to remove user from Slack channel"
+
+			if strings.Contains(err.Error(), "not_in_channel") {
+				msg += " - not in channel" // This is not a problem.
+				log.Debug(ctx, msg, "error", err, "channel_id", channelID, "user_id", userID)
+				continue
+			}
+
+			log.Error(ctx, msg, "error", err, "channel_id", channelID, "user_id", userID)
+		}
+	}
+
+	return err
+}
+
 func SetChannelDescription(ctx workflow.Context, channelID, title, url string) {
 	desc := fmt.Sprintf("`%s`", title)
 	if len(desc) > channelMetadataMaxLen {

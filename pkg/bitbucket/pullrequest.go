@@ -86,6 +86,8 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	if len(added)+len(removed) > 0 {
 		msg := c.reviewerMentions(ctx, added, removed)
 		_ = c.mentionUserInMsg(ctx, channelID, event.Actor, msg+".")
+		_ = slack.InviteUsersToChannel(ctx, channelID, c.bitbucketToSlackIDs(ctx, added))
+		_ = slack.KickUsersFromChannel(ctx, channelID, c.bitbucketToSlackIDs(ctx, removed))
 		return nil
 	}
 
@@ -221,6 +223,18 @@ func (c Config) bitbucketAccountsToSlackMentions(ctx workflow.Context, accountID
 	}
 
 	return slackUsers
+}
+
+func (c Config) bitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {
+	slackIDs := []string{}
+	for _, aid := range accountIDs {
+		// True = don't include opted-out users. They will still be mentioned
+		// in the channel, but as non-members they won't be notified about it.
+		if sid := users.BitbucketToSlackID(ctx, c.Cmd, aid, true); sid != "" {
+			slackIDs = append(slackIDs, sid)
+		}
+	}
+	return slackIDs
 }
 
 func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
