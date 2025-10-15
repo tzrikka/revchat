@@ -62,7 +62,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			_, _ = slack.PostMessage(ctx, channelID, msg)
 		}
 
-		return nil
+		return c.renameChannel(ctx, event.PullRequest, channelID)
 	}
 
 	// Description edited.

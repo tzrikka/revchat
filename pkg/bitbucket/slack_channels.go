@@ -170,6 +170,27 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 	return "", errors.New(msg)
 }
 
+func (c Config) renameChannel(ctx workflow.Context, pr PullRequest, channelID string) error {
+	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
+
+	for i := 1; i < 50; i++ {
+		name := fmt.Sprintf("%s-%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.ID, title)
+		if i > 1 {
+			name = fmt.Sprintf("%s_%d", name, i)
+		}
+
+		retry, err := slack.RenameChannel(ctx, channelID, name)
+		if retry {
+			continue
+		}
+		return err
+	}
+
+	msg := "too many failed attempts to rename Slack channel"
+	log.Error(ctx, msg, "pr_url", pr.Links["html"].HRef, "channel_id", channelID)
+	return errors.New(msg)
+}
+
 func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
 	// True = don't send a DM to the user if they're opted-out.
 	userID := users.BitbucketToSlackID(ctx, c.Cmd, accountID, true)

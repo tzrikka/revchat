@@ -62,6 +62,23 @@ func CreateChannel(ctx workflow.Context, name, url string, private bool) (string
 	return id, false, nil
 }
 
+func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
+	if err := slack.ConversationsRenameActivity(ctx, channelID, name); err != nil {
+		msg := "failed to rename Slack channel"
+
+		if strings.Contains(err.Error(), "name_taken") {
+			log.Debug(ctx, msg+" - already exists", "channel_id", channelID, "new_name", name)
+			return true, err // Retry with a different name.
+		}
+
+		log.Error(ctx, msg, "error", err, "channel_id", channelID, "new_name", name)
+		return false, err // Non-retryable error.
+	}
+
+	log.Info(ctx, "renamed Slack channel", "channel_id", channelID, "new_name", name)
+	return false, nil
+}
+
 func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []string) error {
 	if len(userIDs) == 0 {
 		return nil
