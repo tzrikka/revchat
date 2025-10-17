@@ -202,12 +202,12 @@ func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url
 }
 
 func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
-	files := 0
 	commits := 0
 
 	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview")
 	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", commits), url+"/commits")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff")
 }
 
 func (c Config) postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {

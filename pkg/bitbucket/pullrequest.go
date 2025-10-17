@@ -55,6 +55,8 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		return nil
 	}
 
+	defer c.updateChannelBookmarks(ctx, event, channelID, snapshot)
+
 	// Title edited.
 	if snapshot.Title != event.PullRequest.Title {
 		_ = c.mentionUserInMsg(ctx, channelID, event.Actor, "%s edited the PR title.")
@@ -94,7 +96,6 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	// Commit(s) pushed to the PR branch.
 	if snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
 		count := 0
-
 		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, count)
 		if count != 1 {
 			msg += "s"
@@ -244,6 +245,8 @@ func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent)
 		return nil
 	}
 
+	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+
 	msg := "%s "
 	switch event.Type {
 	case "approved":
@@ -281,6 +284,8 @@ func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequest
 		return nil
 	}
 
+	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+
 	// If the comment was created by RevChat, don't repost it.
 	if strings.HasSuffix(event.Comment.Content.Raw, "\n\n[This comment was created by RevChat]: #") {
 		log.Debug(ctx, "ignoring self-triggered Bitbucket event")
@@ -300,20 +305,20 @@ func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequest
 		parentURL := htmlURL(event.Comment.Parent.Links)
 		err = c.impersonateUserInReply(ctx, commentURL, parentURL, event.Comment.User, msg)
 	}
-
 	return err
 }
 
 func (c Config) prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	pr := event.PullRequest
-	_, found := lookupChannel(ctx, event.Type, pr)
+	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
 
+	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+
 	commentURL := htmlURL(event.Comment.Links)
-	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw, htmlURL(pr.Links))
+	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw, htmlURL(event.PullRequest.Links))
 	if inline := event.Comment.Inline; inline != nil {
 		msg = inlineCommentPrefix(commentURL, inline) + msg
 	}
@@ -323,20 +328,24 @@ func (c Config) prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequest
 
 func (c Config) prCommentDeletedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
+
+	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
 
 	return c.deleteMsg(ctx, htmlURL(event.Comment.Links))
 }
 
 func (c Config) prCommentResolvedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
+
+	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
 
 	url := htmlURL(event.Comment.Links)
 	_ = c.addReaction(ctx, url, "ok")
@@ -345,10 +354,12 @@ func (c Config) prCommentResolvedWorkflow(ctx workflow.Context, event PullReques
 
 func (c Config) prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	_, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
+
+	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
 
 	url := htmlURL(event.Comment.Links)
 	_ = c.removeReaction(ctx, url, "ok")
