@@ -12,11 +12,11 @@ import (
 func (c Config) issueCommentWorkflow(ctx workflow.Context, event IssueCommentEvent) error {
 	switch event.Action {
 	case "created":
-		return c.issueCommentCreated()
+		return c.issueCommentCreated(ctx)
 	case "edited":
-		return c.issueCommentEdited()
+		return c.issueCommentEdited(ctx)
 	case "deleted":
-		return c.issueCommentDeleted()
+		return c.issueCommentDeleted(ctx)
 
 	default:
 		log.Error(ctx, "unrecognized GitHub issue comment event action", "action", event.Action)
@@ -25,16 +25,19 @@ func (c Config) issueCommentWorkflow(ctx workflow.Context, event IssueCommentEve
 }
 
 // A comment on an issue or pull request was created.
-func (c Config) issueCommentCreated() error {
+func (c Config) issueCommentCreated(ctx workflow.Context) error {
+	log.Warn(ctx, "GitHub issue comment created - event handler not implemented yet")
 	return nil
 }
 
 // A comment on an issue or pull request was edited.
-func (c Config) issueCommentEdited() error {
+func (c Config) issueCommentEdited(ctx workflow.Context) error {
+	log.Warn(ctx, "GitHub issue comment edited - event handler not implemented yet")
 	return nil
 }
 
 // A comment on an issue or pull request was deleted.
-func (c Config) issueCommentDeleted() error {
+func (c Config) issueCommentDeleted(ctx workflow.Context) error {
+	log.Warn(ctx, "GitHub issue comment deleted - event handler not implemented yet")
 	return nil
 }

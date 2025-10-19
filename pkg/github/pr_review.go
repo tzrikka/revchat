@@ -13,11 +13,11 @@ import (
 func (c Config) prReviewWorkflow(ctx workflow.Context, event PullRequestReviewEvent) error {
 	switch event.Action {
 	case "submitted":
-		return c.reviewSubmitted()
+		return c.reviewSubmitted(ctx)
 	case "edited":
-		return c.reviewEdited()
+		return c.reviewEdited(ctx)
 	case "dismissed":
-		return c.reviewDismissed()
+		return c.reviewDismissed(ctx)
 
 	default:
 		log.Error(ctx, "unrecognized GitHub PR review event action", "action", event.Action)
@@ -27,16 +27,19 @@ func (c Config) prReviewWorkflow(ctx workflow.Context, event PullRequestReviewEv
 
 // A review on a pull request was submitted. This is interesting when
 // the review state is "approved", and/or the review body isn't empty.
-func (c Config) reviewSubmitted() error {
+func (c Config) reviewSubmitted(ctx workflow.Context) error {
+	log.Warn(ctx, "GitHub PR review submitted - event handler not implemented yet")
 	return nil
 }
 
 // The body comment on a pull request review was edited.
-func (c Config) reviewEdited() error {
+func (c Config) reviewEdited(ctx workflow.Context) error {
+	log.Warn(ctx, "GitHub PR review edited - event handler not implemented yet")
 	return nil
 }
 
 // A review on a pull request was dismissed.
-func (c Config) reviewDismissed() error {
+func (c Config) reviewDismissed(ctx workflow.Context) error {
+	log.Warn(ctx, "GitHub PR review dismissed - event handler not implemented yet")
 	return nil
 }
