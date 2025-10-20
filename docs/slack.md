@@ -1,6 +1,6 @@
 # Slack
 
-Detailed instructions: https://github.com/tzrikka/thrippy/blob/main/docs/slack/README.md
+Detailed instructions: <https://github.com/tzrikka/thrippy/blob/main/docs/slack/README.md>
 
 ## Slack App
 
@@ -10,15 +10,15 @@ Detailed instructions: https://github.com/tzrikka/thrippy/blob/main/docs/slack/R
 - Bookmarks
   - [bookmarks:read](https://docs.slack.dev/reference/scopes/bookmarks.read)
   - [bookmarks:write](https://docs.slack.dev/reference/scopes/bookmarks.write)
-- Chat
-  - [chat:write](https://docs.slack.dev/reference/scopes/chat.write)
-  - [chat:write.customize](https://docs.slack.dev/reference/scopes/chat.write.customize)
 - Channels
   - [channels:history](https://docs.slack.dev/reference/scopes/channels.history)
   - [channels:manage](https://docs.slack.dev/reference/scopes/channels.manage)
   - [channels:read](https://docs.slack.dev/reference/scopes/channels.read)
   - [channels:write.invites](https://docs.slack.dev/reference/scopes/channels.write.invites)
   - [channels:write.topic](https://docs.slack.dev/reference/scopes/channels.write.topic)
+- Chat
+  - [chat:write](https://docs.slack.dev/reference/scopes/chat.write)
+  - [chat:write.customize](https://docs.slack.dev/reference/scopes/chat.write.customize)
 - [commands](https://docs.slack.dev/reference/scopes/commands)
 - Groups (private channels)
   - [groups:history](https://docs.slack.dev/reference/scopes/groups.history)
@@ -39,6 +39,10 @@ Detailed instructions: https://github.com/tzrikka/thrippy/blob/main/docs/slack/R
 
 ### Bot Event Subscriptions
 
+(After configuring Thrippy and Timpani)
+
+Request URL: `https://$TIMPANI-FQDN/webhook/$THRIPPY-LINK-ID`
+
 - [app_mention](https://docs.slack.dev/reference/events/app_mention)
 - [member_joined_channel](https://docs.slack.dev/reference/events/member_joined_channel)
 - [member_left_channel](https://docs.slack.dev/reference/events/member_left_channel)
@@ -47,6 +51,19 @@ Detailed instructions: https://github.com/tzrikka/thrippy/blob/main/docs/slack/R
 - [message.im](https://docs.slack.dev/reference/events/message.im)
 - [reaction_added](https://docs.slack.dev/reference/events/reaction_added)
 - [reaction_removed](https://docs.slack.dev/reference/events/reaction_removed)
+
+### Slash Command
+
+(After configuring Thrippy and Timpani)
+
+- Name: `/revchat`
+- Request URL: `https://$TIMPANI-FQDN/webhook/$THRIPPY-LINK-ID`
+- Short description: `RevChat slash command`
+- Usage hint: `help`
+
+### App Home
+
+In the "Show Tabs" sections, enable "Message Tab" and "Allow users to send Slash commands and messages from the messages tab".
 
 ## Thrippy Link
 
