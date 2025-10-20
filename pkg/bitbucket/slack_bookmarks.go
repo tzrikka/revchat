@@ -10,20 +10,20 @@ import (
 )
 
 func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
-	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
-	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview")
-	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview")
-	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.CommitCount), url+"/commits")
-	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", 0), url+"/diff")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview", ":speech_balloon:")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview", ":white_check_mark:")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview", ":+1:")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.CommitCount), url+"/commits", ":pushpin:")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", 0), url+"/diff", ":open_file_folder:")
 }
 
 // updateChannelBookmarks updates the PR's Slack channel bookmarks based on the latest PR event. This
 // is a deferred call that doesn't return an error, because handling the event itself is more important.
 func (c Config) updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channelID string, snapshot *PullRequest) {
 	// PR update events already load the previous snapshot, so reuse it in that case.
-	countCommits := true
+	updateCommits := true
 	if snapshot == nil {
-		countCommits = false
+		updateCommits = false
 		url := event.PullRequest.Links["html"].HRef
 		snapshot, _ = switchSnapshot(ctx, url, event.PullRequest)
 		if snapshot == nil {
@@ -58,7 +58,7 @@ func (c Config) updateChannelBookmarks(ctx workflow.Context, event PullRequestEv
 		}
 	}
 
-	if len(bookmarks) > 3 && countCommits {
+	if len(bookmarks) > 3 && updateCommits {
 		title := fmt.Sprintf("Commits (%d)", event.PullRequest.CommitCount)
 		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[3].ID, title); err != nil {
 			log.Error(ctx, "failed to update Slack channel's commits bookmark", "error", err)

@@ -153,11 +153,11 @@ func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, username, url 
 func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
 	checks := 0
 
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.Comments), url)
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.Comments), url, ":speech_balloon:")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits", ":pushpin:")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks", "")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files", ":open_file_folder:")
+	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff", "")
 }
 
 func (c Config) postIntroMsg(ctx workflow.Context, channelID, action string, pr PullRequest, sender User) {
