@@ -9,6 +9,14 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
+func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.CommitCount), url+"/commits")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", 0), url+"/diff")
+}
+
 // updateChannelBookmarks updates the PR's Slack channel bookmarks based on the latest PR event. This
 // is a deferred call that doesn't return an error, because handling the event itself is more important.
 func (c Config) updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channelID string, snapshot *PullRequest) {
@@ -51,7 +59,10 @@ func (c Config) updateChannelBookmarks(ctx workflow.Context, event PullRequestEv
 	}
 
 	if len(bookmarks) > 3 && countCommits {
-		log.Warn(ctx, "count commits via API")
+		title := fmt.Sprintf("Commits (%d)", event.PullRequest.CommitCount)
+		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[3].ID, title); err != nil {
+			log.Error(ctx, "failed to update Slack channel's commits bookmark", "error", err)
+		}
 	}
 }
 

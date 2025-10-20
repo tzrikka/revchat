@@ -27,6 +27,9 @@ func (c Config) prCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 }
 
 func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	cs := commits(ctx, event)
+	event.PullRequest.CommitCount = len(cs)
+
 	url := event.PullRequest.Links["html"].HRef
 	snapshot, err := switchSnapshot(ctx, url, event.PullRequest)
 	if err != nil {
@@ -75,12 +78,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			msg = "%s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, c.Cmd, text, url)
 		}
 
-		err := c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
-		if msg := c.linkifyIDs(ctx, event.PullRequest.Description); msg != "" {
-			_, err = slack.PostMessage(ctx, channelID, msg)
-		}
-
-		return err
+		return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Reviewers added/removed.
@@ -95,12 +93,19 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 	// Commit(s) pushed to the PR branch.
 	if snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
-		count := 0
-		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, count)
-		if count != 1 {
+		cs = cs[snapshot.CommitCount:]
+		slices.Reverse(cs)
+
+		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, len(cs))
+		if len(cs) != 1 {
 			msg += "s"
 		}
-		return c.mentionUserInMsg(ctx, channelID, event.Actor, msg+"> to this PR.")
+
+		msg += "> to this PR:"
+		for _, c := range cs {
+			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], c.Message)
+		}
+		return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Retargeted destination branch.
@@ -135,6 +140,12 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 	if err := mapToStruct(prev, pr); err != nil {
 		log.Error(ctx, "previous snapshot of Bitbucket PR is invalid", "error", err, "url", url)
 		return nil, err
+	}
+
+	// the "CommitCount" field is fake and populated by RevChat, not Bitbucket.
+	// Persist it across snapshots (before the deferred call to [data.StoreBitbucketPR]).
+	if snapshot.CommitCount == 0 {
+		snapshot.CommitCount = pr.CommitCount
 	}
 
 	return pr, nil

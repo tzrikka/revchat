@@ -57,12 +57,7 @@ type Comment struct {
 	Links map[string]Link `json:"links"`
 }
 
-type Commit struct {
-	// Type string `json:"type"` // Always "commit".
-
-	Hash  string          `json:"hash"`
-	Links map[string]Link `json:"links"`
-}
+type Commit = bitbucket.Commit
 
 type Inline struct {
 	From         *int   `json:"from"`
@@ -121,6 +116,7 @@ type PullRequest struct {
 	UpdatedOn    string `json:"updated_on"`
 	CommentCount int    `json:"comment_count"`
 	TaskCount    int    `json:"task_count"`
+	CommitCount  int    `json:"commit_count"` // RevChat only.
 
 	Author       Account       `json:"author"`
 	Participants []Participant `json:"participants"`
@@ -140,13 +136,7 @@ type Reference struct {
 	Repository Repository `json:"repository"`
 }
 
-type Rendered struct {
-	// Type string `json:"type"` // Always "rendered".
-
-	Raw    string `json:"raw"`
-	Markup string `json:"markup"`
-	HTML   string `json:"html"`
-}
+type Rendered = bitbucket.Rendered
 
 type Repository struct {
 	// Type string `json:"type"` // Always "repository".

@@ -111,6 +111,7 @@ func (c Config) initPRData(ctx workflow.Context, url string, pr PullRequest, cha
 func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error {
 	pr := event.PullRequest
 	url := pr.Links["html"].HRef
+	pr.CommitCount = len(commits(ctx, event))
 
 	channelID, err := c.createChannel(ctx, pr)
 	if err != nil {
@@ -129,7 +130,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	slack.SetChannelDescription(ctx, channelID, pr.Title, url)
 	c.setChannelBookmarks(ctx, channelID, url, pr)
 	c.postIntroMsg(ctx, channelID, event.Type, pr, event.Actor)
-	if msg := c.linkifyIDs(ctx, pr.Title+pr.Description); msg != "" {
+	if msg := c.linkifyIDs(ctx, pr.Title); msg != "" {
 		_, _ = slack.PostMessage(ctx, channelID, msg)
 	}
 
@@ -199,15 +200,6 @@ func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url
 	}
 
 	_, _ = slack.PostMessage(ctx, userID, "Failed to create Slack channel for "+url)
-}
-
-func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
-	commits := 0
-
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", commits), url+"/commits")
 }
 
 func (c Config) postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
