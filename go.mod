@@ -5,11 +5,11 @@ go 1.25.3
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/rs/zerolog v1.34.0
-	github.com/tzrikka/thrippy-api v1.3.0
+	github.com/tzrikka/thrippy-api v1.4.0
 	github.com/tzrikka/timpani-api v0.6.0
 	github.com/tzrikka/xdg v1.3.1
 	github.com/urfave/cli-altsrc/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.4.1
+	github.com/urfave/cli/v3 v3.5.0
 	go.temporal.io/api v1.55.0
 	go.temporal.io/sdk v1.37.0
 	google.golang.org/grpc v1.76.0
@@ -36,8 +36,8 @@ require (
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251014184007-4626949a642f // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251014184007-4626949a642f // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
