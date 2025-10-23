@@ -31,29 +31,36 @@ const (
 	ErrLinkAuthzTimeout = "link not authorized yet" // For some reason errors.Is() doesn't work across Temporal.
 )
 
+type linkData struct {
+	ID    string `json:"id"`
+	Nonce string `json:"nonce"`
+}
+
 // createThrippyLink executes [createThrippyLinkActivity] as a local activity.
-func (c Config) createThrippyLink(ctx workflow.Context) (string, error) {
+func (c Config) createThrippyLink(ctx workflow.Context) (string, string, error) {
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: createLinkTimeout,
 	})
 
-	var linkID string
-	if err := workflow.ExecuteLocalActivity(ctx, c.createThrippyLinkActivity).Get(ctx, &linkID); err != nil {
-		return "", err
+	ld := new(linkData)
+	if err := workflow.ExecuteLocalActivity(ctx, c.createThrippyLinkActivity).Get(ctx, ld); err != nil {
+		return "", "", err
 	}
-	return linkID, nil
+
+	return ld.ID, ld.Nonce, nil
 }
 
 // createThrippyLinkActivity creates a new Thrippy link to authorize a Bitbucket or GitHub user.
-func (c Config) createThrippyLinkActivity(ctx context.Context) (string, error) {
+func (c Config) createThrippyLinkActivity(ctx context.Context) (*linkData, error) {
+	// Initialize a Thrippy client.
 	creds, err := c.secureCreds()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	conn, err := grpc.NewClient(c.thrippyGRPCAddress, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer conn.Close()
 
@@ -61,7 +68,8 @@ func (c Config) createThrippyLinkActivity(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, grpcTimeout)
 	defer cancel()
 
-	req := thrippypb.CreateLinkRequest_builder{
+	// Create the link to generate an ID.
+	createReq := thrippypb.CreateLinkRequest_builder{
 		Template: proto.String(c.thrippyLinksTemplate),
 		OauthConfig: thrippypb.OAuthConfig_builder{
 			ClientId:     proto.String(c.thrippyLinksClientID),
@@ -69,12 +77,19 @@ func (c Config) createThrippyLinkActivity(ctx context.Context) (string, error) {
 		}.Build(),
 	}.Build()
 
-	resp, err := client.CreateLink(ctx, req)
+	createResp, err := client.CreateLink(ctx, createReq)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return resp.GetLinkId(), nil
+	// Retrieve the new link's configuration to get its nonce.
+	getReq := thrippypb.GetLinkRequest_builder{LinkId: proto.String(createResp.GetLinkId())}.Build()
+	getResp, err := client.GetLink(ctx, getReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &linkData{ID: createResp.GetLinkId(), Nonce: getResp.GetOauthConfig().GetNonce()}, nil
 }
 
 // waitForThrippyLinkCreds waits for the user to complete

@@ -95,15 +95,15 @@ func (c Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, em
 		return err
 	}
 
-	linkID, err := c.createThrippyLink(ctx)
+	linkID, nonce, err := c.createThrippyLink(ctx)
 	if err != nil {
 		log.Error(ctx, "failed to create Thrippy link for Slack user", "error", err)
 		postEphemeralError(ctx, event, "internal authorization error")
 		return err
 	}
 
-	msg := ":point_right: <https://%s/start?id=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket"
-	msg = fmt.Sprintf(msg, c.thrippyHTTPAddress, linkID)
+	msg := ":point_right: <https://%s/start?id=%s&nonce=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket"
+	msg = fmt.Sprintf(msg, c.thrippyHTTPAddress, linkID, nonce)
 	if err := PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg); err != nil {
 		log.Error(ctx, "failed to post ephemeral opt-in message in Slack", "error", err)
 		return err
