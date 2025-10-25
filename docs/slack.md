@@ -60,6 +60,7 @@ Request URL: `https://$TIMPANI-FQDN/webhook/$THRIPPY-LINK-ID`
 - Request URL: `https://$TIMPANI-FQDN/webhook/$THRIPPY-LINK-ID`
 - Short description: `RevChat slash command`
 - Usage hint: `help`
+- Escape channels, users, and links sent to your app: `yes`
 
 ### App Home
 
