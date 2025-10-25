@@ -1,6 +1,7 @@
 package users
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/urfave/cli/v3"
@@ -61,7 +62,7 @@ func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 // email address. This function uses data caching, and API calls as a fallback.
 func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, error) {
 	if email == "" {
-		return "", fmt.Errorf("empty email address")
+		return "", errors.New("empty email address")
 	}
 
 	id, err := data.BitbucketUserIDByEmail(email)
