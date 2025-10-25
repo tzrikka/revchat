@@ -3,6 +3,7 @@ module github.com/tzrikka/revchat
 go 1.25.3
 
 require (
+	github.com/BurntSushi/toml v1.5.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/rs/zerolog v1.34.0
 	github.com/tzrikka/thrippy-api v1.4.0
@@ -16,7 +17,6 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/golang/mock v1.6.0 // indirect

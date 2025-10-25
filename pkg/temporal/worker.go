@@ -42,6 +42,8 @@ func Run(ctx context.Context, l zerolog.Logger, cmd *cli.Command) error {
 	github.RegisterWorkflows(w, cmd)
 	slack.RegisterWorkflows(w, cmd)
 
+	slack.CreateSchedule(l.WithContext(ctx), c, cmd)
+
 	cfg := Config{cmd: cmd}
 	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})
 

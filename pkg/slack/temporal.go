@@ -1,7 +1,12 @@
 package slack
 
 import (
+	"context"
+	"time"
+
+	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v3"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
@@ -59,9 +64,16 @@ var Signals = []string{
 	"slack.events.slash_command",
 }
 
+// Schedules is a list of workflow names that RevChat runs periodically via
+// Temporal schedules (https://docs.temporal.io/develop/go/schedules).
+var Schedules = []string{
+	"slack.schedules.reminders",
+}
+
 // RegisterWorkflows maps event handler functions to [Signals].
 func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
 	c := newConfig(cmd)
+
 	w.RegisterWorkflowWithOptions(c.appRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})
 	w.RegisterWorkflowWithOptions(c.memberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[1]})
 	w.RegisterWorkflowWithOptions(c.memberLeftWorkflow, workflow.RegisterOptions{Name: Signals[2]})
@@ -69,6 +81,8 @@ func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
 	w.RegisterWorkflowWithOptions(c.reactionAddedWorkflow, workflow.RegisterOptions{Name: Signals[4]})
 	w.RegisterWorkflowWithOptions(c.reactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[5]})
 	w.RegisterWorkflowWithOptions(c.slashCommandWorkflow, workflow.RegisterOptions{Name: Signals[6]})
+
+	w.RegisterWorkflowWithOptions(c.remindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
 }
 
 // RegisterSignals routes [Signals] to registered workflows.
@@ -92,4 +106,28 @@ func addSignalHandler[T any](sel workflow.Selector, ctx, childCtx workflow.Conte
 		log.Info(ctx, "received signal", "signal", c.Name())
 		workflow.ExecuteChildWorkflow(childCtx, c.Name(), event)
 	})
+}
+
+// CreateSchedule starts a scheduled workflow that runs every 30 minutes.
+func CreateSchedule(ctx context.Context, c client.Client, cmd *cli.Command) {
+	_, err := c.ScheduleClient().Create(ctx, client.ScheduleOptions{
+		ID: Schedules[0],
+		Spec: client.ScheduleSpec{
+			Calendars: []client.ScheduleCalendarSpec{
+				{
+					Minute:    []client.ScheduleRange{{Start: 0, End: 59, Step: 30}}, // Every 30 minutes.
+					Hour:      []client.ScheduleRange{{Start: 0, End: 23}},
+					DayOfWeek: []client.ScheduleRange{{Start: 1, End: 5}}, // Monday to Friday.
+				},
+			},
+			Jitter: 10 * time.Second,
+		},
+		Action: &client.ScheduleWorkflowAction{
+			Workflow:  Schedules[0],
+			TaskQueue: cmd.String("temporal-task-queue-revchat"),
+		},
+	})
+	if err != nil {
+		zerolog.Ctx(ctx).Warn().Err(err).Str("id", Schedules[0]).Msg("schedule creation error")
+	}
 }
