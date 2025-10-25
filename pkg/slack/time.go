@@ -20,7 +20,7 @@ func normalizeTime(timeStr, amPm string) (string, error) {
 	case 1:
 		timeStr = fmt.Sprintf("0%s:00", timeStr)
 	case 2:
-		timeStr = fmt.Sprintf("%s:00", timeStr)
+		timeStr = timeStr + ":00"
 	case 4:
 		timeStr = "0" + timeStr
 	}

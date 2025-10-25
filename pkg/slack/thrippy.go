@@ -187,7 +187,7 @@ func (c Config) secureCreds() (credentials.TransportCredentials, error) {
 	// If all 3 are specified, we use mTLS.
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load client PEM key pair for gRPC client with mTLS: %v", err)
+		return nil, fmt.Errorf("failed to load client PEM key pair for gRPC client with mTLS: %w", err)
 	}
 
 	return newClientTLSFromFile(caPath, nameOverride, []tls.Certificate{cert})
@@ -201,7 +201,7 @@ func (c Config) secureCreds() (credentials.TransportCredentials, error) {
 func newClientTLSFromFile(caPath, serverNameOverride string, certs []tls.Certificate) (credentials.TransportCredentials, error) {
 	b, err := os.ReadFile(caPath) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
-		return nil, fmt.Errorf("failed to read server CA cert file for gRPC client: %v", err)
+		return nil, fmt.Errorf("failed to read server CA cert file for gRPC client: %w", err)
 	}
 
 	cp := x509.NewCertPool()
