@@ -22,7 +22,13 @@ func BitbucketToSlackRef(ctx workflow.Context, cmd *cli.Command, accountID, disp
 	}
 
 	if displayName == "" {
-		displayName = "Display Name"
+		user, err := bitbucket.UsersGetActivity(ctx, accountID, "")
+		if err != nil {
+			log.Error(ctx, "failed to retrieve Bitbucket user info", "error", err, "account_id", accountID)
+			return accountID // Fallback: return the original Bitbucket account ID.
+		}
+
+		displayName = user.DisplayName
 	}
 
 	return displayName
