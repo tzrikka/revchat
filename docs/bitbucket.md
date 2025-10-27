@@ -38,7 +38,7 @@ Example - using a Bitbucket workspace's OAuth consumer:
 $ thrippy create-link --template bitbucket-app-oauth --client-id "..." --client-secret "..."
 New link ID: <Thrippy link ID>
 
-$ thrippy set-crefs <Thrippy link ID> --kv "webhook_secret=..."
+$ thrippy set-creds <Thrippy link ID> --kv "webhook_secret=..."
 
 $ thrippy start-oauth <Thrippy link ID>
 Opening a browser with this URL: http://localhost:14470/start?id=<Thrippy link ID>
