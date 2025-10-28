@@ -57,7 +57,7 @@ func (c *Config) memberJoinedWorkflow(ctx workflow.Context, event memberEventWra
 		return nil
 	}
 
-	log.Warn(ctx, "member joined event", "event", event)
+	log.Warn(ctx, "member joined event - not implemented yet", "event", event)
 	return nil
 }
 
@@ -66,7 +66,7 @@ func (c *Config) memberLeftWorkflow(ctx workflow.Context, event memberEventWrapp
 		return nil
 	}
 
-	log.Debug(ctx, "member left Slack channel", "event", event)
+	log.Debug(ctx, "member left Slack channel - ignoring event")
 	return nil
 }
 

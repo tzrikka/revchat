@@ -53,8 +53,8 @@ var PullRequestSignals = []string{
 var RepositorySignals = []string{
 	"bitbucket.events.repo.commit_comment_created",
 
-	"bitbucket.events.repo.build_status_created",
-	"bitbucket.events.repo.build_status_updated",
+	"bitbucket.events.repo.commit_status_created",
+	"bitbucket.events.repo.commit_status_updated",
 }
 
 // RegisterPullRequestWorkflows maps event handler functions to [PullRequestSignals].
@@ -88,8 +88,8 @@ func RegisterRepositoryWorkflows(w worker.Worker, cmd *cli.Command) {
 	fs := []repoWorkflowFunc{
 		c.commitCommentCreatedWorkflow,
 
-		c.buildStatusCreatedWorkflow,
-		c.buildStatusUpdatedWorkflow,
+		c.commitStatusCreatedWorkflow,
+		c.commitStatusUpdatedWorkflow,
 	}
 
 	for i, f := range fs {
