@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/rs/zerolog"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 	"google.golang.org/grpc"
@@ -36,8 +37,34 @@ type linkData struct {
 	Nonce string `json:"nonce"`
 }
 
+// initThrippyLinks initializes the configuration for personal Thrippy links,
+// based on the Thrippy link with the given ID. This is expected to be called
+// once at worker startup, and is used by [Config.createThrippyLinkActivity].
+func (c *Config) initThrippyLinks(ctx context.Context, id string) {
+	l := zerolog.Ctx(ctx)
+	conn, client, err := c.thrippyClient()
+	if err != nil {
+		l.Fatal().Err(err).Msg("failed to initialize Thrippy client")
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, grpcTimeout)
+	defer cancel()
+
+	req := thrippypb.GetLinkRequest_builder{LinkId: proto.String(id)}.Build()
+	resp, err := client.GetLink(ctx, req)
+	if err != nil {
+		l.Fatal().Err(err).Msgf("failed to read the Thrippy link associated with the ID %q", id)
+	}
+
+	c.thrippyLinksTemplate = resp.GetTemplate()
+	c.thrippyLinksClientID = resp.GetOauthConfig().GetClientId()
+	c.thrippyLinksClientSecret = resp.GetOauthConfig().GetClientSecret()
+	l.Info().Msg("template for personal Thrippy links: " + c.thrippyLinksTemplate)
+}
+
 // createThrippyLink executes [createThrippyLinkActivity] as a local activity.
-func (c Config) createThrippyLink(ctx workflow.Context) (string, string, error) {
+func (c *Config) createThrippyLink(ctx workflow.Context) (string, string, error) {
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: createLinkTimeout,
 	})
@@ -51,20 +78,14 @@ func (c Config) createThrippyLink(ctx workflow.Context) (string, string, error) 
 }
 
 // createThrippyLinkActivity creates a new Thrippy link to authorize a Bitbucket or GitHub user.
-func (c Config) createThrippyLinkActivity(ctx context.Context) (*linkData, error) {
-	// Initialize a Thrippy client.
-	creds, err := c.secureCreds()
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := grpc.NewClient(c.thrippyGRPCAddress, grpc.WithTransportCredentials(creds))
+// The new link is based on the details associated with the ID in [Config.initThrippyLinks].
+func (c *Config) createThrippyLinkActivity(ctx context.Context) (*linkData, error) {
+	conn, client, err := c.thrippyClient()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 
-	client := thrippypb.NewThrippyServiceClient(conn)
 	ctx, cancel := context.WithTimeout(ctx, grpcTimeout)
 	defer cancel()
 
@@ -94,7 +115,7 @@ func (c Config) createThrippyLinkActivity(ctx context.Context) (*linkData, error
 
 // waitForThrippyLinkCreds waits for the user to complete
 // the OAuth flow for the Thrippy link with the given ID.
-func (c Config) waitForThrippyLinkCreds(ctx workflow.Context, linkID string) error {
+func (c *Config) waitForThrippyLinkCreds(ctx workflow.Context, linkID string) error {
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: waitForLinkTimeout,
 		RetryPolicy: &temporal.RetryPolicy{
@@ -106,13 +127,8 @@ func (c Config) waitForThrippyLinkCreds(ctx workflow.Context, linkID string) err
 	return workflow.ExecuteLocalActivity(ctx, c.pollThrippyLinkActivity, linkID).Get(ctx, nil)
 }
 
-func (c Config) pollThrippyLinkActivity(ctx context.Context, linkID string) error {
-	creds, err := c.secureCreds()
-	if err != nil {
-		return err
-	}
-
-	conn, err := grpc.NewClient(c.thrippyGRPCAddress, grpc.WithTransportCredentials(creds))
+func (c *Config) pollThrippyLinkActivity(ctx context.Context, linkID string) error {
+	conn, client, err := c.thrippyClient()
 	if err != nil {
 		return err
 	}
@@ -122,7 +138,7 @@ func (c Config) pollThrippyLinkActivity(ctx context.Context, linkID string) erro
 	defer cancel()
 
 	req := thrippypb.GetCredentialsRequest_builder{LinkId: proto.String(linkID)}.Build()
-	resp, err := thrippypb.NewThrippyServiceClient(conn).GetCredentials(ctx, req)
+	resp, err := client.GetCredentials(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -136,19 +152,13 @@ func (c Config) pollThrippyLinkActivity(ctx context.Context, linkID string) erro
 
 // deleteThrippyLink deletes the Thrippy link with the given ID. This is a
 // best-effort cleanup in case the user opted-in but didn't authorize us in time.
-func (c Config) deleteThrippyLink(ctx workflow.Context, linkID string) error {
-	creds, err := c.secureCreds()
-	if err != nil {
-		return err
-	}
-
-	conn, err := grpc.NewClient(c.thrippyGRPCAddress, grpc.WithTransportCredentials(creds))
+func (c *Config) deleteThrippyLink(ctx workflow.Context, linkID string) error {
+	conn, client, err := c.thrippyClient()
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	client := thrippypb.NewThrippyServiceClient(conn)
 	grpcCtx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 
@@ -160,9 +170,25 @@ func (c Config) deleteThrippyLink(ctx workflow.Context, linkID string) error {
 	return nil
 }
 
+// thrippyClient initializes and returns a Thrippy gRPC client connection
+// and client stub. The caller is responsible for closing the connection.
+func (c *Config) thrippyClient() (*grpc.ClientConn, thrippypb.ThrippyServiceClient, error) {
+	creds, err := c.secureCreds()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	conn, err := grpc.NewClient(c.thrippyGRPCAddress, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return conn, thrippypb.NewThrippyServiceClient(conn), nil
+}
+
 // secureCreds initializes gRPC client credentials using TLS or mTLS,
 // based on CLI flags. Errors abort the application with a log message.
-func (c Config) secureCreds() (credentials.TransportCredentials, error) {
+func (c *Config) secureCreds() (credentials.TransportCredentials, error) {
 	// Both TLS and mTLS.
 	caPath := c.thrippyServerCACert
 	nameOverride := c.thrippyServerNameOverride

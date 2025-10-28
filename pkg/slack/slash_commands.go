@@ -47,7 +47,7 @@ var (
 
 // https://docs.slack.dev/interactivity/implementing-slash-commands#app_command_handling
 // https://docs.slack.dev/apis/events-api/using-socket-mode#command
-func (c Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEvent) error {
+func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEvent) error {
 	event.Text = strings.ToLower(event.Text)
 	switch event.Text {
 	case "", "help":
@@ -94,7 +94,7 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
-func (c Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	email, err := users.SlackIDToEmail(ctx, event.UserID)
 	if err != nil {
 		return err
@@ -121,7 +121,7 @@ func (c Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent)
 	}
 }
 
-func (c Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, email string) error {
+func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, email string) error {
 	accountID, err := users.EmailToBitbucketID(ctx, c.bitbucketWorkspace, email)
 	if err != nil {
 		postEphemeralError(ctx, event, "internal data reading error")

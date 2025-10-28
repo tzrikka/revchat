@@ -202,30 +202,13 @@ func Flags() []cli.Flag {
 
 		// Thrippy links (for Bitbucket or GitHub).
 		&cli.StringFlag{
-			Name:  "thrippy-links-template",
-			Usage: "Thrippy links template name",
+			Name:  "thrippy-links-template-id",
+			Usage: "ID of template link for personal Thrippy links",
 			Sources: cli.NewValueSourceChain(
-				cli.EnvVar("THRIPPY_LINKS_TEMPLATE"),
-				toml.TOML("thrippy.links.template", path),
+				cli.EnvVar("THRIPPY_LINKS_TEMPLATE_ID"),
+				toml.TOML("thrippy.links.template_id", path),
 			),
 			Required: true,
-		},
-		&cli.StringFlag{
-			Name:  "thrippy-links-client-id",
-			Usage: "Thrippy links OAuth client ID",
-			Sources: cli.NewValueSourceChain(
-				cli.EnvVar("THRIPPY_LINKS_CLIENT_ID"),
-				toml.TOML("thrippy.links.client_id", path),
-			),
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:  "thrippy-links-client-secret",
-			Usage: "Thrippy links OAuth client secret (Bitbucket only)",
-			Sources: cli.NewValueSourceChain(
-				cli.EnvVar("THRIPPY_LINKS_CLIENT_SECRET"),
-				toml.TOML("thrippy.links.client_secret", path),
-			),
 		},
 	}
 }

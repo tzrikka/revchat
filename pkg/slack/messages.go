@@ -59,7 +59,7 @@ type edited struct {
 }
 
 // https://docs.slack.dev/reference/events/message
-func (c Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
+func (c *Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
 	userID := extractUserID(ctx, &event.InnerEvent)
 	if userID == "" {
 		msg := "could not determine who triggered a Slack message event"
@@ -144,7 +144,7 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 	return bot.UserID
 }
 
-func (c Config) addMessage(ctx workflow.Context, event MessageEvent, userID string) error {
+func (c *Config) addMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
 		return c.addMessageInBitbucket(ctx, event, userID)
@@ -154,7 +154,7 @@ func (c Config) addMessage(ctx workflow.Context, event MessageEvent, userID stri
 	}
 }
 
-func (c Config) changeMessage(ctx workflow.Context, event MessageEvent, userID string) error {
+func (c *Config) changeMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
 		return editMessageInBitbucket(ctx, event, userID)
@@ -164,7 +164,7 @@ func (c Config) changeMessage(ctx workflow.Context, event MessageEvent, userID s
 	}
 }
 
-func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID string) error {
+func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
 		return deleteMessageInBitbucket(ctx, event, userID)
@@ -175,7 +175,7 @@ func (c Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID s
 }
 
 // addMessageInBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
-func (c Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
+func (c *Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
 	if event.Subtype == "bot_message" {
 		log.Error(ctx, "unexpected bot message", "bot_id", event.BotID, "username", event.Username)
 	}
@@ -259,7 +259,7 @@ func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID s
 	return nil
 }
 
-func (c Config) createPRComment(ctx workflow.Context, url, msg, slackChannel, slackID, slackUser string) error {
+func (c *Config) createPRComment(ctx workflow.Context, url, msg, slackChannel, slackID, slackUser string) error {
 	sub := commentURLPattern.FindStringSubmatch(url)
 	if len(sub) != ExpectedSubmatches {
 		log.Error(ctx, "failed to parse Slack message's PR comment URL", "url", url)

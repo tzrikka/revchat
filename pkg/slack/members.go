@@ -52,7 +52,7 @@ type MemberEvent struct {
 	Inviter string `json:"inviter,omitempty"`
 }
 
-func (c Config) memberJoinedWorkflow(ctx workflow.Context, event memberEventWrapper) error {
+func (c *Config) memberJoinedWorkflow(ctx workflow.Context, event memberEventWrapper) error {
 	if isSelfTriggeredEvent(ctx, event.Authorizations, event.InnerEvent.User) {
 		return nil
 	}
@@ -61,12 +61,12 @@ func (c Config) memberJoinedWorkflow(ctx workflow.Context, event memberEventWrap
 	return nil
 }
 
-func (c Config) memberLeftWorkflow(ctx workflow.Context, event memberEventWrapper) error {
+func (c *Config) memberLeftWorkflow(ctx workflow.Context, event memberEventWrapper) error {
 	if isSelfTriggeredEvent(ctx, event.Authorizations, event.InnerEvent.User) {
 		return nil
 	}
 
-	log.Warn(ctx, "member left event", "event", event)
+	log.Debug(ctx, "member left Slack channel", "event", event)
 	return nil
 }
 

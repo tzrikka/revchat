@@ -34,7 +34,7 @@ type ReactionEvent struct {
 }
 
 // https://docs.slack.dev/reference/events/reaction_added/
-func (c Config) reactionAddedWorkflow(ctx workflow.Context, event reactionEventWrapper) error {
+func (c *Config) reactionAddedWorkflow(ctx workflow.Context, event reactionEventWrapper) error {
 	if isSelfTriggeredEvent(ctx, event.Authorizations, event.InnerEvent.User) {
 		return nil
 	}
@@ -44,7 +44,7 @@ func (c Config) reactionAddedWorkflow(ctx workflow.Context, event reactionEventW
 }
 
 // https://docs.slack.dev/reference/events/reaction_removed/
-func (c Config) reactionRemovedWorkflow(ctx workflow.Context, event reactionEventWrapper) error {
+func (c *Config) reactionRemovedWorkflow(ctx workflow.Context, event reactionEventWrapper) error {
 	if isSelfTriggeredEvent(ctx, event.Authorizations, event.InnerEvent.User) {
 		return nil
 	}

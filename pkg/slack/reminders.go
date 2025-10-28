@@ -15,7 +15,7 @@ const (
 	dateTimeLayout = time.DateOnly + " " + time.Kitchen
 )
 
-func (c Config) remindersWorkflow(ctx workflow.Context) error {
+func (c *Config) remindersWorkflow(ctx workflow.Context) error {
 	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
 
 	rs, err := data.ListReminders()
@@ -50,7 +50,7 @@ func (c Config) remindersWorkflow(ctx workflow.Context) error {
 		// the current time, and there are reminders to be sent.
 		if t.Equal(now) {
 			log.Info(ctx, "sending scheduled Slack reminder to user", "user_id", userID)
-			_, _ = PostMessage(ctx, userID, "Reminder!")
+			_, _ = PostMessage(ctx, userID, "Boo!")
 		}
 	}
 

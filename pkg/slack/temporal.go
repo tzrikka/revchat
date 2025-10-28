@@ -28,8 +28,8 @@ type Config struct {
 	thrippyLinksClientSecret string
 }
 
-func newConfig(cmd *cli.Command) Config {
-	return Config{
+func newConfig(cmd *cli.Command) *Config {
+	return &Config{
 		bitbucketWorkspace: cmd.String("bitbucket-workspace"),
 
 		thrippyGRPCAddress:        cmd.String("thrippy-grpc-address"),
@@ -38,10 +38,6 @@ func newConfig(cmd *cli.Command) Config {
 		thrippyClientKey:          cmd.String("thrippy-client-key"),
 		thrippyServerCACert:       cmd.String("thrippy-server-ca-cert"),
 		thrippyServerNameOverride: cmd.String("thrippy-server-name-override"),
-
-		thrippyLinksTemplate:     cmd.String("thrippy-links-template"),
-		thrippyLinksClientID:     cmd.String("thrippy-links-client-id"),
-		thrippyLinksClientSecret: cmd.String("thrippy-links-client-secret"),
 	}
 }
 
@@ -71,8 +67,9 @@ var Schedules = []string{
 }
 
 // RegisterWorkflows maps event handler functions to [Signals].
-func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
+func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
 	c := newConfig(cmd)
+	c.initThrippyLinks(ctx, cmd.String("thrippy-links-template-id"))
 
 	w.RegisterWorkflowWithOptions(c.appRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})
 	w.RegisterWorkflowWithOptions(c.memberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[1]})

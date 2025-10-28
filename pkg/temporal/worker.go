@@ -36,13 +36,14 @@ func Run(ctx context.Context, l zerolog.Logger, cmd *cli.Command) error {
 	}
 	defer c.Close()
 
+	ctx = l.WithContext(ctx)
 	w := worker.New(c, cmd.String("temporal-task-queue-revchat"), worker.Options{})
 	bitbucket.RegisterPullRequestWorkflows(w, cmd)
 	bitbucket.RegisterRepositoryWorkflows(w, cmd)
 	github.RegisterWorkflows(w, cmd)
-	slack.RegisterWorkflows(w, cmd)
+	slack.RegisterWorkflows(ctx, w, cmd)
 
-	slack.CreateSchedule(l.WithContext(ctx), c, cmd)
+	slack.CreateSchedule(ctx, c, cmd)
 
 	cfg := Config{cmd: cmd}
 	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})
