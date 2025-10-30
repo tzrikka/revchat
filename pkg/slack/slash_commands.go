@@ -108,7 +108,7 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 	}
 
 	if found {
-		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":bell: You're already opted in")
+		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":bell: You're already opted in.")
 	}
 
 	switch {
@@ -135,7 +135,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, e
 		return err
 	}
 
-	msg := ":point_right: <https://%s/start?id=%s&nonce=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket"
+	msg := ":point_right: <https://%s/start?id=%s&nonce=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket."
 	msg = fmt.Sprintf(msg, c.thrippyHTTPAddress, linkID, nonce)
 	if err := PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg); err != nil {
 		log.Error(ctx, "failed to post ephemeral opt-in message in Slack", "error", err)
@@ -162,13 +162,13 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, e
 		return err
 	}
 
-	if err := setReminder(ctx, event, DefaultReminderTime); err != nil {
+	if err := setReminder(ctx, event, DefaultReminderTime, true); err != nil {
 		return err
 	}
 
 	msg = ":bell: You are now opted into using RevChat.\n\n"
-	msg += ":alarm_clock: The default time for weekday reminders is **8 AM** in your current timezone. "
-	msg += "To change it, run this slash command:\n```/revchat reminders at &lt;time in 12h or 24h format&gt;```"
+	msg += ":alarm_clock: Default time for weekday reminders = **8 AM** (in your current timezone). "
+	msg += "To change it, run this slash command:\n\n```/revchat reminders at &lt;time in 12h or 24h format&gt;```"
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
@@ -186,7 +186,7 @@ func optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	}
 
 	if !found {
-		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out")
+		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
 	if err := data.OptOut(email); err != nil {
@@ -195,7 +195,7 @@ func optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 
-	msg := ":no_bell: You are now opted out of using RevChat for new PRs"
+	msg := ":no_bell: You are now opted out of using RevChat for new PRs."
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
@@ -225,10 +225,10 @@ func remindersSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 		return nil // Not a *server* error as far as we are concerned.
 	}
 
-	return setReminder(ctx, event, kitchenTime)
+	return setReminder(ctx, event, kitchenTime, false)
 }
 
-func setReminder(ctx workflow.Context, event SlashCommandEvent, t string) error {
+func setReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet bool) error {
 	user, err := slack.UsersInfoActivity(ctx, event.UserID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", event.UserID)
@@ -254,9 +254,13 @@ func setReminder(ctx workflow.Context, event SlashCommandEvent, t string) error 
 		return err
 	}
 
-	t = fmt.Sprintf("%s %s", t[:len(t)-2], t[len(t)-2:]) // Insert space before AM/PM suffix.
-	msg := fmt.Sprintf(":alarm_clock: Your daily reminder time is set to **%s** _(%s)_ on weekdays", t, user.TZ)
-	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+	if !quiet {
+		t = fmt.Sprintf("%s %s", t[:len(t)-2], t[len(t)-2:]) // Insert space before AM/PM suffix.
+		msg := fmt.Sprintf(":alarm_clock: Your daily reminder time is set to **%s** _(%s)_ on weekdays.", t, user.TZ)
+		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+	}
+
+	return nil
 }
 
 func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
