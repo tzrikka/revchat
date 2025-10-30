@@ -95,21 +95,10 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 		return id, nil
 	}
 
-	users, err := bitbucket.WorkspacesListMembersActivity(ctx, workspace, []string{email})
+	users, err := jira.UsersSearchActivity(ctx, email)
 	if err != nil {
-		log.Error(ctx, "failed to search Bitbucket user by email", "error", err, "email", email)
-
-		jiraUsers, err := jira.UsersSearchActivity(ctx, email)
-		if err != nil {
-			log.Error(ctx, "failed to search Jira user by email", "error", err, "email", email)
-			return "", err
-		}
-
-		log.Debug(ctx, "falling back to Jira user search by email after Bitbucket search failed")
-		users = make([]bitbucket.User, len(jiraUsers))
-		for i, jiraUser := range jiraUsers {
-			users[i] = bitbucket.User{AccountID: jiraUser.AccountID}
-		}
+		log.Error(ctx, "failed to search Jira user by email", "error", err, "email", email)
+		return "", err
 	}
 	if len(users) == 0 {
 		log.Error(ctx, "Bitbucket user not found", "email", email)
