@@ -10,6 +10,7 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
+	"github.com/tzrikka/timpani-api/pkg/jira"
 )
 
 // BitbucketToSlackRef converts a Bitbucket account ID into a Slack user reference.
@@ -44,7 +45,21 @@ func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 		return ""
 	}
 
-	// Note: unlike GitHub, we can't see user emails unless we know them in advance.
+	// Fallback: lookup Bitbucket user in Jira to get their email address,
+	// because Bitbucket API does not expose email addresses directly.
+	if email == "" {
+		jiraUser, err := jira.UsersGetActivity(ctx, accountID)
+		if err != nil {
+			log.Error(ctx, "failed to retrieve Jira user info", "error", err, "account_id", accountID)
+			return ""
+		}
+
+		email = jiraUser.Email
+		if err := data.AddBitbucketUser(accountID, email); err != nil {
+			log.Error(ctx, "failed to save Bitbucket account ID/email mapping", "error", err, "account_id", accountID, "email", email)
+			// Don't abort - we have the email address, even if we failed to save it.
+		}
+	}
 
 	if email == "" || email == "bot" {
 		return ""
@@ -83,7 +98,18 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 	users, err := bitbucket.WorkspacesListMembersActivity(ctx, workspace, []string{email})
 	if err != nil {
 		log.Error(ctx, "failed to search Bitbucket user by email", "error", err, "email", email)
-		return "", err
+
+		jiraUsers, err := jira.UsersSearchActivity(ctx, email)
+		if err != nil {
+			log.Error(ctx, "failed to search Jira user by email", "error", err, "email", email)
+			return "", err
+		}
+
+		log.Debug(ctx, "falling back to Jira user search by email after Bitbucket search failed")
+		users = make([]bitbucket.User, len(jiraUsers))
+		for i, jiraUser := range jiraUsers {
+			users[i] = bitbucket.User{AccountID: jiraUser.AccountID}
+		}
 	}
 	if len(users) == 0 {
 		log.Error(ctx, "Bitbucket user not found", "email", email)
