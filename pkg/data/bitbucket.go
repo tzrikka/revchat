@@ -1,55 +1,63 @@
 package data
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/xdg"
 )
 
-const (
-	bitbucketFile = "bitbucket_prs.json"
-)
-
 // StoreBitbucketPR saves a snapshot of a Bitbucket pull request.
 // This is used to detect changes in the pull request over time.
 func StoreBitbucketPR(url string, pr any) error {
-	path := dataPath(bitbucketFile)
-
-	m, err := readBitbucketPRs(path)
+	f, err := os.OpenFile(prPath(url), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- verified URL
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
-	m[url] = pr
-	return writeBitbucketPRs(path, m)
+	e := json.NewEncoder(f)
+	e.SetIndent("", "  ")
+	return e.Encode(pr)
 }
 
 // LoadBitbucketPR loads a snapshot of a Bitbucket pull request.
 // This is used to detect changes in the pull request over time.
-func LoadBitbucketPR(url string) (any, error) {
-	m, err := readBitbucketPRs(dataPath(bitbucketFile))
+// This function returns nil if no snapshot is found.
+func LoadBitbucketPR(url string) (map[string]any, error) {
+	f, err := os.Open(prPath(url)) //gosec:disable G304 -- URL received from verified 3rd-party
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+
+	m := map[string]any{}
+	if err := json.NewDecoder(f).Decode(&m); err != nil {
 		return nil, err
 	}
 
-	return m[url], nil
+	return m, nil
 }
 
 // DeleteBitbucketPR deletes the snapshot of a Bitbucket pull request when it
 // becomes obsolete (i.e. when the PR is merged, closed, or marked as a draft).
+// This function is idempotent: it does not return an error if the snapshot does not exist.
 func DeleteBitbucketPR(url string) error {
-	path := dataPath(bitbucketFile)
-
-	m, err := readBitbucketPRs(path)
-	if err != nil {
+	if err := os.Remove(prPath(url)); err != nil { //gosec:disable G304 -- URL received from verified 3rd-party
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
 		return err
 	}
-
-	delete(m, url)
-	return writeBitbucketPRs(path, m)
+	return nil
 }
 
 // dataPath returns the absolute path to the given data file.
@@ -59,34 +67,12 @@ func dataPath(filename string) string {
 	return path
 }
 
-func readBitbucketPRs(path string) (map[string]any, error) {
-	f, err := os.ReadFile(path) //gosec:disable G304 -- specified by admin by design
-	if err != nil {
-		return nil, err
-	}
+func prPath(url string) string {
+	prefix, _ := xdg.CreateDir(xdg.DataHome, config.DirName)
+	suffix, _ := strings.CutPrefix(url, "https://")
+	filePath := filepath.Clean(filepath.Join(prefix, suffix))
 
-	// Special case: empty files can't be parsed as JSON,
-	// but this initial state is valid.
-	m := map[string]any{}
-	if len(f) == 0 {
-		return m, nil
-	}
+	_ = os.MkdirAll(filepath.Dir(filePath), xdg.NewDirectoryPermissions)
 
-	if err := json.NewDecoder(bytes.NewReader(f)).Decode(&m); err != nil {
-		return nil, err
-	}
-
-	return m, nil
-}
-
-func writeBitbucketPRs(path string, m map[string]any) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- specified by admin by design
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	e := json.NewEncoder(f)
-	e.SetIndent("", "  ")
-	return e.Encode(m)
+	return filePath
 }

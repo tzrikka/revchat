@@ -1,6 +1,7 @@
 package data
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -20,7 +21,7 @@ func TestBitbucket(t *testing.T) {
 	}
 
 	// Initial snapshot.
-	pr1 := "pr1"
+	pr1 := map[string]any{"title": "pr1"}
 
 	if err := StoreBitbucketPR(url, pr1); err != nil {
 		t.Fatalf("SaveBitbucketPR() error = %v", err)
@@ -30,12 +31,12 @@ func TestBitbucket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBitbucketPR() error = %v", err)
 	}
-	if got != pr1 {
+	if !reflect.DeepEqual(got, pr1) {
 		t.Fatalf("LoadBitbucketPR() = %v, want %v", got, pr1)
 	}
 
 	// Update snapshot.
-	pr2 := "pr2"
+	pr2 := map[string]any{"title": "pr2"}
 
 	if err := StoreBitbucketPR(url, pr2); err != nil {
 		t.Fatalf("SaveBitbucketPR() error = %v", err)
@@ -45,7 +46,7 @@ func TestBitbucket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBitbucketPR() error = %v", err)
 	}
-	if got != pr2 {
+	if !reflect.DeepEqual(got, pr2) {
 		t.Fatalf("LoadBitbucketPR() = %v, want %v", got, pr2)
 	}
 
