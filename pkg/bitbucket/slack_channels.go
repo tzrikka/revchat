@@ -43,9 +43,11 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 
 	if reason := event.PullRequest.Reason; reason != "" {
 		state = fmt.Sprintf("%s with this reason: `%s`", state, reason)
+	} else {
+		state += "."
 	}
 
-	_ = c.mentionUserInMsg(ctx, channelID, event.Actor, fmt.Sprintf("%%s %s.", state))
+	_ = c.mentionUserInMsg(ctx, channelID, event.Actor, fmt.Sprintf("%%s %s", state))
 
 	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
