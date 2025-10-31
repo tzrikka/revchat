@@ -67,6 +67,9 @@ func dataPath(filename string) string {
 	return path
 }
 
+// prPath returns the absolute path to the JSON snapshot file of a Bitbucket PR.
+// This function is different from [dataPath] because it supports subdirectories.
+// It creates any necessary parent directories, but not the file itself.
 func prPath(url string) string {
 	prefix, _ := xdg.CreateDir(xdg.DataHome, config.DirName)
 	suffix, _ := strings.CutPrefix(url, "https://")
@@ -74,5 +77,5 @@ func prPath(url string) string {
 
 	_ = os.MkdirAll(filepath.Dir(filePath), xdg.NewDirectoryPermissions)
 
-	return filePath
+	return filePath + "_snapshot.json"
 }
