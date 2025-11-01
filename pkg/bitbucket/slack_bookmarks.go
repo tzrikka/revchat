@@ -10,6 +10,7 @@ import (
 )
 
 func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Reviewers (%d)", len(reviewers(pr, false))), url+"/overview", ":eyes:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview", ":speech_balloon:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview", ":white_check_mark:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview", ":+1:")
@@ -37,30 +38,37 @@ func (c Config) updateChannelBookmarks(ctx workflow.Context, event PullRequestEv
 		return
 	}
 
-	if len(bookmarks) > 0 && snapshot.CommentCount != event.PullRequest.CommentCount {
-		title := fmt.Sprintf("Comments (%d)", event.PullRequest.CommentCount)
+	if cnt := len(reviewers(event.PullRequest, false)); len(bookmarks) > 0 && len(reviewers(*snapshot, false)) != cnt {
+		title := fmt.Sprintf("Reviewers (%d)", cnt)
 		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[0].ID, title); err != nil {
+			log.Error(ctx, "failed to update Slack channel's reviewers bookmark", "error", err)
+		}
+	}
+
+	if len(bookmarks) > 1 && snapshot.CommentCount != event.PullRequest.CommentCount {
+		title := fmt.Sprintf("Comments (%d)", event.PullRequest.CommentCount)
+		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[1].ID, title); err != nil {
 			log.Error(ctx, "failed to update Slack channel's comments bookmark", "error", err)
 		}
 	}
 
-	if len(bookmarks) > 1 && snapshot.TaskCount != event.PullRequest.TaskCount {
+	if len(bookmarks) > 2 && snapshot.TaskCount != event.PullRequest.TaskCount {
 		title := fmt.Sprintf("Tasks (%d)", event.PullRequest.TaskCount)
-		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[1].ID, title); err != nil {
+		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[2].ID, title); err != nil {
 			log.Error(ctx, "failed to update Slack channel's tasks bookmark", "error", err)
 		}
 	}
 
-	if len(bookmarks) > 2 && countApprovals(*snapshot) != countApprovals(event.PullRequest) {
+	if len(bookmarks) > 3 && countApprovals(*snapshot) != countApprovals(event.PullRequest) {
 		title := fmt.Sprintf("Approvals (%d)", countApprovals(event.PullRequest))
-		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[2].ID, title); err != nil {
+		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[3].ID, title); err != nil {
 			log.Error(ctx, "failed to update Slack channel's approvals bookmark", "error", err)
 		}
 	}
 
-	if len(bookmarks) > 3 && updateCommits {
+	if len(bookmarks) > 4 && updateCommits {
 		title := fmt.Sprintf("Commits (%d)", event.PullRequest.CommitCount)
-		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[3].ID, title); err != nil {
+		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[4].ID, title); err != nil {
 			log.Error(ctx, "failed to update Slack channel's commits bookmark", "error", err)
 		}
 	}
