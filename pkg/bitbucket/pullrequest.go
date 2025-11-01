@@ -172,7 +172,7 @@ func reviewers(pr PullRequest, includeParticipants bool) []string {
 		accountIDs = append(accountIDs, r.AccountID)
 	}
 
-	if !includeParticipants {
+	if includeParticipants {
 		for _, p := range pr.Participants {
 			accountIDs = append(accountIDs, p.User.AccountID)
 		}
