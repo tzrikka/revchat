@@ -68,7 +68,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			_, _ = slack.PostMessage(ctx, channelID, msg)
 		}
 
-		return c.renameChannel(ctx, event.PullRequest, channelID)
+		err = c.renameChannel(ctx, event.PullRequest, channelID)
 	}
 
 	// Description edited.
@@ -78,7 +78,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			msg = "%s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, c.Cmd, text, url)
 		}
 
-		return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Reviewers added/removed.
@@ -88,7 +88,6 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		_ = c.mentionUserInMsg(ctx, channelID, event.Actor, msg+".")
 		_ = slack.InviteUsersToChannel(ctx, channelID, c.bitbucketToSlackIDs(ctx, added))
 		_ = slack.KickUsersFromChannel(ctx, channelID, c.bitbucketToSlackIDs(ctx, removed))
-		return nil
 	}
 
 	// Commit(s) pushed to the PR branch.
@@ -105,7 +104,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		for _, c := range cs {
 			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], c.Message)
 		}
-		return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Retargeted destination branch.
@@ -115,11 +114,11 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		repoURL := event.Repository.Links["html"].HRef
 		msg := "%%s changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
-		return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	log.Warn(ctx, "unhandled Bitbucket PR update event", "url", url)
-	return nil
+	return err
 }
 
 // switchSnapshot stores the given new PR snapshot, and returns the previous one (if any).
