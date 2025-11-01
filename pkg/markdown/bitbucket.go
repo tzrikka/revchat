@@ -40,10 +40,14 @@ func bitbucketToSlackLinks(text, prURL string) string {
 	text = regexp.MustCompile(`<(\S+?)(\|.*?)?>`).ReplaceAllString(text, `&lt;${1}${2}>`)
 
 	// Links: "[text](url){ ... }" --> "<url|text>".
-	text = regexp.MustCompile(`\[(.*?)\]\((.*?)\)(\{.*?\})?`).ReplaceAllString(text, "<${2}|${1}>")
+	text = regexp.MustCompile(`\[([^[]*?)\]\((.*?)\)(\{.*?\})?`).ReplaceAllString(text, "<${2}|${1}>")
 
 	// Images: "![text](url){ ... }" --> "!<url|text>" --> ":camera: <url|text>".
 	text = regexp.MustCompile(`!(<|&lt;)(.*?)>`).ReplaceAllString(text, ":camera: <${2}>")
+
+	// Unescape non-links.
+	text = strings.ReplaceAll(text, `\[`, "[")
+	text = strings.ReplaceAll(text, `\]`, "]")
 
 	// PR references: "#123" --> "<PR URL|#123>".
 	baseURL := "<" + regexp.MustCompile(`/pull-requests/\d+$`).ReplaceAllString(prURL, "/pull-requests/")

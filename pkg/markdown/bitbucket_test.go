@@ -136,6 +136,16 @@ func TestBitbucketToSlack(t *testing.T) {
 			want: `&lt;relative_path|label>`,
 		},
 		{
+			name: "wrapped_link",
+			text: `\[[label](url)\]`,
+			want: "[<url|label>]",
+		},
+		{
+			name: "unescaped_brackets",
+			text: `i\[0\] = 1`,
+			want: "i[0] = 1",
+		},
+		{
 			name: "pr_ref_in_same_repo",
 			text: "#9",
 			url:  "https://bitbucket.org/workspace/repo/pull-requests/123",
