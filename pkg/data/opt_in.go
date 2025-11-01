@@ -1,5 +1,10 @@
 package data
 
+import (
+	"github.com/tzrikka/revchat/pkg/config"
+	"github.com/tzrikka/xdg"
+)
+
 const (
 	optInFile = "opt_in.json"
 )
@@ -72,4 +77,11 @@ func OptOut(email string) error {
 
 	delete(m, email)
 	return writeJSON(path, m)
+}
+
+// dataPath returns the absolute path to the given data file.
+// It also creates an empty file if it doesn't already exist.
+func dataPath(filename string) string {
+	path, _ := xdg.CreateFile(xdg.DataHome, config.DirName, filename)
+	return path
 }

@@ -60,13 +60,6 @@ func DeleteBitbucketPR(url string) error {
 	return nil
 }
 
-// dataPath returns the absolute path to the given data file.
-// It also creates an empty file if it doesn't already exist.
-func dataPath(filename string) string {
-	path, _ := xdg.CreateFile(xdg.DataHome, config.DirName, filename)
-	return path
-}
-
 // prPath returns the absolute path to the JSON snapshot file of a Bitbucket PR.
 // This function is different from [dataPath] because it supports subdirectories.
 // It creates any necessary parent directories, but not the file itself.
