@@ -64,6 +64,8 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 		return approveSlashCommand(ctx, event)
 	case "unapprove", "-1":
 		return unapproveSlashCommand(ctx, event)
+	case "update", "update channel":
+		return updateChannelSlashCommand(ctx, event)
 	}
 
 	if remindersPattern.MatchString(event.Text) {
@@ -89,6 +91,7 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	msg += "  •  `%s nudge &lt;1 or more @users&gt;` or `ping &lt;1 or more @users&gt;`\n"
 	msg += "  •  `%s approve` or `lgtm` or `+1`\n"
 	msg += "  •  `%s unapprove` or `-1`\n"
+	msg += "  •  `%s update channel`\n"
 	msg = strings.ReplaceAll(msg, "%s", event.Command)
 
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
@@ -283,6 +286,12 @@ func approveSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 
 func unapproveSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	log.Warn(ctx, "unapprove slash command not implemented yet")
+	postEphemeralError(ctx, event, "not implemented yet")
+	return nil
+}
+
+func updateChannelSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	log.Warn(ctx, "update channel slash command not implemented yet")
 	postEphemeralError(ctx, event, "not implemented yet")
 	return nil
 }
