@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/users"
@@ -18,7 +17,7 @@ import (
 //   - https://confluence.atlassian.com/bitbucketserver/markdown-syntax-guide-776639995.html
 //   - https://bitbucket.org/tutorials/markdowndemo/src/master/
 //   - https://docs.slack.dev/messaging/formatting-message-text/
-func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string) string {
+func BitbucketToSlack(ctx workflow.Context, text, prURL string) string {
 	// Before list styling, because our fake lists rely on whitespace prefixes.
 	text = bitbucketToSlackWhitespaces(text)
 	// Before text styling, to prevent confusion in "*"-based bullets with text that contains "*" characters.
@@ -29,7 +28,7 @@ func BitbucketToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string
 	// Mentions: "@{account:uuid}" --> "<@U123>" or "Display Name",
 	for _, bbRef := range regexp.MustCompile(`@\{[\w:-]+\}`).FindAllString(text, -1) {
 		accountID := bbRef[2 : len(bbRef)-1]
-		text = strings.ReplaceAll(text, bbRef, users.BitbucketToSlackRef(ctx, cmd, accountID, ""))
+		text = strings.ReplaceAll(text, bbRef, users.BitbucketToSlackRef(ctx, accountID, ""))
 	}
 
 	return text

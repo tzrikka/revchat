@@ -44,7 +44,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	// PR converted to a draft.
 	if snapshot != nil && event.PullRequest.Draft {
 		event.PullRequest.Draft = false
-		return c.prClosedWorkflow(ctx, event)
+		return prClosedWorkflow(ctx, event)
 	}
 
 	// Ignore drafts until they're marked as ready for review.
@@ -63,11 +63,11 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		return nil
 	}
 
-	defer c.updateChannelBookmarks(ctx, event, channelID, snapshot)
+	defer updateChannelBookmarks(ctx, event, channelID, snapshot)
 
 	// Title edited.
 	if snapshot.Title != event.PullRequest.Title {
-		_ = c.mentionUserInMsg(ctx, channelID, event.Actor, "%s edited the PR title.")
+		_ = mentionUserInMsg(ctx, channelID, event.Actor, "%s edited the PR title.")
 		slack.SetChannelDescription(ctx, channelID, event.PullRequest.Title, url)
 		if msg := c.linkifyIDs(ctx, event.PullRequest.Title); msg != "" {
 			_, _ = slack.PostMessage(ctx, channelID, msg)
@@ -80,19 +80,19 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	if snapshot.Description != event.PullRequest.Description {
 		msg := "%s deleted the PR description."
 		if text := strings.TrimSpace(event.PullRequest.Description); text != "" {
-			msg = "%s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, c.Cmd, text, url)
+			msg = "%s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, url)
 		}
 
-		err = c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Reviewers added/removed.
 	added, removed := reviewersDiff(*snapshot, event.PullRequest)
 	if len(added)+len(removed) > 0 {
-		msg := c.reviewerMentions(ctx, added, removed)
-		_ = c.mentionUserInMsg(ctx, channelID, event.Actor, msg+".")
-		_ = slack.InviteUsersToChannel(ctx, channelID, c.bitbucketToSlackIDs(ctx, added))
-		_ = slack.KickUsersFromChannel(ctx, channelID, c.bitbucketToSlackIDs(ctx, removed))
+		msg := reviewerMentions(ctx, added, removed)
+		_ = mentionUserInMsg(ctx, channelID, event.Actor, msg+".")
+		_ = slack.InviteUsersToChannel(ctx, channelID, bitbucketToSlackIDs(ctx, added))
+		_ = slack.KickUsersFromChannel(ctx, channelID, bitbucketToSlackIDs(ctx, removed))
 	}
 
 	for _, id := range added {
@@ -129,7 +129,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		for _, c := range cs {
 			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], c.Message)
 		}
-		err = c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Retargeted destination branch.
@@ -139,7 +139,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		repoURL := event.Repository.Links["html"].HRef
 		msg := "%%s changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
-		err = c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	log.Warn(ctx, "unhandled Bitbucket PR update event", "pr_url", url)
@@ -230,24 +230,24 @@ func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
 }
 
 // reviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.
-func (c Config) reviewerMentions(ctx workflow.Context, added, removed []string) string {
+func reviewerMentions(ctx workflow.Context, added, removed []string) string {
 	msg := "%s "
 	if len(added) > 0 {
-		msg += "added" + c.bitbucketAccountsToSlackMentions(ctx, added)
+		msg += "added" + bitbucketAccountsToSlackMentions(ctx, added)
 	}
 	if len(added) > 0 && len(removed) > 0 {
 		msg += ", and "
 	}
 	if len(removed) > 0 {
-		msg += "removed" + c.bitbucketAccountsToSlackMentions(ctx, removed)
+		msg += "removed" + bitbucketAccountsToSlackMentions(ctx, removed)
 	}
 	return msg
 }
 
-func (c Config) bitbucketAccountsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
+func bitbucketAccountsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
 	slackUsers := ""
 	for _, a := range accountIDs {
-		if ref := users.BitbucketToSlackRef(ctx, c.Cmd, a, ""); ref != "" {
+		if ref := users.BitbucketToSlackRef(ctx, a, ""); ref != "" {
 			slackUsers += " " + ref
 		}
 	}
@@ -261,26 +261,26 @@ func (c Config) bitbucketAccountsToSlackMentions(ctx workflow.Context, accountID
 	return slackUsers
 }
 
-func (c Config) bitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {
+func bitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {
 	slackIDs := []string{}
 	for _, aid := range accountIDs {
 		// True = don't include opted-out users. They will still be mentioned
 		// in the channel, but as non-members they won't be notified about it.
-		if sid := users.BitbucketToSlackID(ctx, c.Cmd, aid, true); sid != "" {
+		if sid := users.BitbucketToSlackID(ctx, aid, true); sid != "" {
 			slackIDs = append(slackIDs, sid)
 		}
 	}
 	return slackIDs
 }
 
-func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
 
-	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
 	url := event.PullRequest.Links["html"].HRef
 	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
@@ -313,20 +313,20 @@ func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent)
 		log.Error(ctx, "unrecognized Bitbucket PR review event type", "event_type", event.Type)
 	}
 
-	return c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
+	return mentionUserInMsg(ctx, channelID, event.Actor, msg)
 }
 
 // A PR was closed, i.e. merged or rejected (possibly a draft).
-func (c Config) prClosedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func prClosedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// Ignore drafts - they don't have an active Slack channel anyway.
 	if event.PullRequest.Draft {
 		return nil
 	}
 
-	return c.archiveChannel(ctx, event)
+	return archiveChannel(ctx, event)
 }
 
-func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	pr := event.PullRequest
 	channelID, found := lookupChannel(ctx, event.Type, pr)
@@ -334,7 +334,7 @@ func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequest
 		return nil
 	}
 
-	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
 	url := pr.Links["html"].HRef
 	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
@@ -350,77 +350,77 @@ func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequest
 	}
 
 	commentURL := htmlURL(event.Comment.Links)
-	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw, htmlURL(pr.Links))
+	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, htmlURL(pr.Links))
 	if inline := event.Comment.Inline; inline != nil {
 		msg = inlineCommentPrefix(commentURL, inline) + msg
 	}
 
 	var err error
 	if event.Comment.Parent == nil {
-		err = c.impersonateUserInMsg(ctx, commentURL, channelID, event.Comment.User, msg)
+		err = impersonateUserInMsg(ctx, commentURL, channelID, event.Comment.User, msg)
 	} else {
 		parentURL := htmlURL(event.Comment.Parent.Links)
-		err = c.impersonateUserInReply(ctx, commentURL, parentURL, event.Comment.User, msg)
+		err = impersonateUserInReply(ctx, commentURL, parentURL, event.Comment.User, msg)
 	}
 	return err
 }
 
-func (c Config) prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
 
-	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
 	commentURL := htmlURL(event.Comment.Links)
-	msg := markdown.BitbucketToSlack(ctx, c.Cmd, event.Comment.Content.Raw, htmlURL(event.PullRequest.Links))
+	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, htmlURL(event.PullRequest.Links))
 	if inline := event.Comment.Inline; inline != nil {
 		msg = inlineCommentPrefix(commentURL, inline) + msg
 	}
 
-	return c.editMsg(ctx, commentURL, msg)
+	return editMsg(ctx, commentURL, msg)
 }
 
-func (c Config) prCommentDeletedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func prCommentDeletedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
 
-	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
-	return c.deleteMsg(ctx, htmlURL(event.Comment.Links))
+	return deleteMsg(ctx, htmlURL(event.Comment.Links))
 }
 
-func (c Config) prCommentResolvedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func prCommentResolvedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
 
-	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
 	url := htmlURL(event.Comment.Links)
-	_ = c.addReaction(ctx, url, "ok")
-	return c.mentionUserInReplyByURL(ctx, url, event.Actor, "%s resolved this comment :ok:")
+	_ = addReaction(ctx, url, "ok")
+	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s resolved this comment :ok:")
 }
 
-func (c Config) prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+func prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
 	if !found {
 		return nil
 	}
 
-	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
 	url := htmlURL(event.Comment.Links)
-	_ = c.removeReaction(ctx, url, "ok")
-	return c.mentionUserInReplyByURL(ctx, url, event.Actor, "%s reopened this comment :no_good:")
+	_ = removeReaction(ctx, url, "ok")
+	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s reopened this comment :no_good:")
 }
 
 func htmlURL(links map[string]Link) string {

@@ -11,7 +11,7 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
-func (c Config) addReaction(ctx workflow.Context, url, emoji string) error {
+func addReaction(ctx workflow.Context, url, emoji string) error {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
@@ -27,7 +27,7 @@ func (c Config) addReaction(ctx workflow.Context, url, emoji string) error {
 	return slack.ReactionsAddActivity(ctx, id[0], id[len(id)-1], emoji)
 }
 
-func (c Config) removeReaction(ctx workflow.Context, url, emoji string) error {
+func removeReaction(ctx workflow.Context, url, emoji string) error {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)

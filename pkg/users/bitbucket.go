@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
@@ -47,7 +46,7 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 // BitbucketToSlackID converts a Bitbucket account ID into a Slack user ID.
 // This depends on the user's email address being the same in both systems.
 // This function returns an empty string if the account ID is not found.
-func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string, checkOptIn bool) string {
+func BitbucketToSlackID(ctx workflow.Context, accountID string, checkOptIn bool) string {
 	email, err := BitbucketToEmail(ctx, accountID)
 	if err != nil {
 		return ""
@@ -74,8 +73,8 @@ func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string
 // BitbucketToSlackRef converts a Bitbucket account ID into a Slack user reference.
 // This depends on the user's email address being the same in both systems.
 // This function returns the Bitbucket display name if the user is not found in Slack.
-func BitbucketToSlackRef(ctx workflow.Context, cmd *cli.Command, accountID, displayName string) string {
-	id := BitbucketToSlackID(ctx, cmd, accountID, false)
+func BitbucketToSlackRef(ctx workflow.Context, accountID, displayName string) string {
+	id := BitbucketToSlackID(ctx, accountID, false)
 	if id != "" {
 		return fmt.Sprintf("<@%s>", id)
 	}

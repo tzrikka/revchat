@@ -46,8 +46,10 @@ func remindersWorkflow(ctx workflow.Context) error {
 		if userPRs := prs[userID]; reminderTime.Equal(now) && len(userPRs) > 0 {
 			slices.Sort(userPRs)
 			log.Info(ctx, "sending scheduled Slack reminder to user", "user_id", userID, "pr_count", len(userPRs))
-			msg := ":bell: This is your scheduled daily reminder to check these PRs:\n  •  "
-			msg += strings.Join(userPRs, "\n  •  ")
+			msg := ":bell: This is your scheduled daily reminder to check these PRs:"
+			for _, url := range userPRs {
+				msg += prDetails(ctx, url)
+			}
 			_, _ = PostMessage(ctx, userID, msg)
 		}
 	}
@@ -128,4 +130,78 @@ func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder s
 	}
 
 	return
+}
+
+func prDetails(ctx workflow.Context, url string) string {
+	sb := strings.Builder{}
+
+	// Title.
+	title := "\n\n  •  *(Unnamed PR)*"
+	pr, err := data.LoadBitbucketPR(url)
+	if err != nil {
+		log.Error(ctx, "failed to load Bitbucket PR snapshot for reminder", "error", err, "pr_url", url)
+	} else {
+		title = fmt.Sprintf("\n\n  •  *%v*", pr["title"])
+	}
+	sb.WriteString(title)
+
+	// Slack channel link.
+	channelID, err := data.SwitchURLAndID(url)
+	if err != nil {
+		log.Error(ctx, "failed to get Slack channel ID for reminder", "error", err, "pr_url", url)
+	} else {
+		sb.WriteString(fmt.Sprintf("\n          ◦   <#%s>", channelID))
+	}
+
+	// PR URL.
+	sb.WriteString("\n          ◦   ")
+	sb.WriteString(url)
+
+	// User-specific details.
+	sb.WriteString("\n          ◦   TODO: Details... (time since last update/review, owner/high-risk, checks)")
+
+	// Approvals.
+	count, names := approvals(ctx, pr)
+	if count > 0 {
+		sb.WriteString(fmt.Sprintf("\n          ◦   Approvals: %d (%s)", count, names))
+	}
+
+	return sb.String()
+}
+
+func approvals(ctx workflow.Context, pr map[string]any) (int, string) {
+	participants, ok := pr["participants"].([]any)
+	if !ok {
+		return 0, ""
+	}
+
+	count := 0
+	names := strings.Builder{}
+	for _, p := range participants {
+		participant, ok := p.(map[string]any)
+		if !ok {
+			continue
+		}
+		approved, ok := participant["approved"].(bool)
+		if !ok || !approved {
+			continue
+		}
+
+		count++
+		user, ok := participant["user"].(map[string]any)
+		if !ok {
+			continue
+		}
+		accountID, ok := user["account_id"].(string)
+		if !ok {
+			continue
+		}
+		if count > 1 {
+			names.WriteString(" ")
+		}
+
+		names.WriteString(users.BitbucketToSlackRef(ctx, accountID, ""))
+	}
+
+	return count, names.String()
 }

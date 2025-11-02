@@ -63,18 +63,18 @@ func RegisterPullRequestWorkflows(w worker.Worker, cmd *cli.Command) {
 	fs := []prWorkflowFunc{
 		c.prCreatedWorkflow,
 		c.prUpdatedWorkflow,
-		c.prReviewedWorkflow, // Approved.
-		c.prReviewedWorkflow, // Unapproved.
-		c.prReviewedWorkflow, // Changes requested.
-		c.prReviewedWorkflow, // Changes request removed.
-		c.prClosedWorkflow,   // Fulfilled, a.k.a. merged.
-		c.prClosedWorkflow,   // Rejected, a.k.a. declined.
+		prReviewedWorkflow, // Approved.
+		prReviewedWorkflow, // Unapproved.
+		prReviewedWorkflow, // Changes requested.
+		prReviewedWorkflow, // Changes request removed.
+		prClosedWorkflow,   // Fulfilled, a.k.a. merged.
+		prClosedWorkflow,   // Rejected, a.k.a. declined.
 
-		c.prCommentCreatedWorkflow,
-		c.prCommentUpdatedWorkflow,
-		c.prCommentDeletedWorkflow,
-		c.prCommentResolvedWorkflow,
-		c.prCommentReopenedWorkflow,
+		prCommentCreatedWorkflow,
+		prCommentUpdatedWorkflow,
+		prCommentDeletedWorkflow,
+		prCommentResolvedWorkflow,
+		prCommentReopenedWorkflow,
 	}
 
 	for i, f := range fs {
@@ -83,13 +83,12 @@ func RegisterPullRequestWorkflows(w worker.Worker, cmd *cli.Command) {
 }
 
 // RegisterRepositoryWorkflows maps event handler functions to [RepositorySignals].
-func RegisterRepositoryWorkflows(w worker.Worker, cmd *cli.Command) {
-	c := Config{Cmd: cmd}
+func RegisterRepositoryWorkflows(w worker.Worker) {
 	fs := []repoWorkflowFunc{
-		c.commitCommentCreatedWorkflow,
+		commitCommentCreatedWorkflow,
 
-		c.commitStatusCreatedWorkflow,
-		c.commitStatusUpdatedWorkflow,
+		commitStatusCreatedWorkflow,
+		commitStatusUpdatedWorkflow,
 	}
 
 	for i, f := range fs {

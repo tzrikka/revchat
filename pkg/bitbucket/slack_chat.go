@@ -14,7 +14,7 @@ import (
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
-func (c Config) mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
+func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
 		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", parentURL)
@@ -27,23 +27,23 @@ func (c Config) mentionUserInReplyByURL(ctx workflow.Context, parentURL string, 
 		return errors.New("missing/bad Slack IDs")
 	}
 
-	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, c.Cmd, user.AccountID, user.DisplayName))
+	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName))
 	_, err = slack.PostReply(ctx, id[0], id[1], msg)
 	return err
 }
 
-func (c Config) mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) error {
-	return c.mentionUserInReply(ctx, channelID, "", user, msg)
+func mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) error {
+	return mentionUserInReply(ctx, channelID, "", user, msg)
 }
 
-func (c Config) mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) error {
-	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, c.Cmd, user.AccountID, user.DisplayName))
+func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) error {
+	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName))
 	_, err := slack.PostReply(ctx, channelID, threadTS, msg)
 	return err
 }
 
-func (c Config) impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string) error {
-	name, icon := c.impersonateUser(ctx, user)
+func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string) error {
+	name, icon := impersonateUser(ctx, user)
 	resp, err := slack.PostMessageAsUser(ctx, channelID, name, icon, msg)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (c Config) impersonateUserInMsg(ctx workflow.Context, url, channelID string
 	return nil
 }
 
-func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string) error {
+func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string) error {
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
 		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", parentURL)
@@ -72,7 +72,7 @@ func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL stri
 		return errors.New("missing/bad Slack IDs")
 	}
 
-	name, icon := c.impersonateUser(ctx, user)
+	name, icon := impersonateUser(ctx, user)
 	resp, err := slack.PostReplyAsUser(ctx, id[0], id[1], name, icon, msg)
 	if err != nil {
 		return err
@@ -88,8 +88,8 @@ func (c Config) impersonateUserInReply(ctx workflow.Context, url, parentURL stri
 	return nil
 }
 
-func (c Config) impersonateUser(ctx workflow.Context, user Account) (name, icon string) {
-	id := users.BitbucketToSlackID(ctx, c.Cmd, user.AccountID, false)
+func impersonateUser(ctx workflow.Context, user Account) (name, icon string) {
+	id := users.BitbucketToSlackID(ctx, user.AccountID, false)
 	if id == "" {
 		name = user.DisplayName
 		return
@@ -106,7 +106,7 @@ func (c Config) impersonateUser(ctx workflow.Context, user Account) (name, icon 
 	return
 }
 
-func (c Config) deleteMsg(ctx workflow.Context, url string) error {
+func deleteMsg(ctx workflow.Context, url string) error {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
@@ -131,7 +131,7 @@ func (c Config) deleteMsg(ctx workflow.Context, url string) error {
 	return slack.DeleteMessage(ctx, id[0], id[len(id)-1])
 }
 
-func (c Config) editMsg(ctx workflow.Context, url, msg string) error {
+func editMsg(ctx workflow.Context, url, msg string) error {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)

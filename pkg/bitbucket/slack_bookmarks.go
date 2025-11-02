@@ -9,7 +9,7 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
-func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
+func setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Reviewers (%d)", len(reviewers(pr, false))), url+"/overview", ":eyes:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview", ":speech_balloon:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview", ":white_check_mark:")
@@ -20,7 +20,7 @@ func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string,
 
 // updateChannelBookmarks updates the PR's Slack channel bookmarks based on the latest PR event. This
 // is a deferred call that doesn't return an error, because handling the event itself is more important.
-func (c Config) updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channelID string, snapshot *PullRequest) {
+func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channelID string, snapshot *PullRequest) {
 	// PR update events already load the previous snapshot, so reuse it in that case.
 	updateCommits := true
 	if snapshot == nil {

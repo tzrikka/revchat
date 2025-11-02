@@ -231,7 +231,7 @@ func TestBitbucketToSlack(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := BitbucketToSlack(nil, nil, tt.text, tt.url); got != tt.want {
+			if got := BitbucketToSlack(nil, tt.text, tt.url); got != tt.want {
 				t.Errorf("BitbucketToSlack() = %q, want %q", got, tt.want)
 			}
 		})

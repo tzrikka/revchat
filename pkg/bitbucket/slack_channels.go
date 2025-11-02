@@ -19,7 +19,7 @@ import (
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
-func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
+func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
 	pr := event.PullRequest
 	channelID, found := lookupChannel(ctx, event.Type, pr)
@@ -31,7 +31,7 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
-	c.cleanupPRData(ctx, pr.Links["html"].HRef)
+	cleanupPRData(ctx, pr.Links["html"].HRef)
 
 	state := "closed this PR"
 	switch event.Type {
@@ -47,7 +47,7 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 		state += "."
 	}
 
-	_ = c.mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
+	_ = mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
 	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
@@ -84,7 +84,7 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 
 // cleanupPRData deletes all data associated with a PR. If there are errors,
 // they are logged but ignored, as they do not affect the overall workflow.
-func (c Config) cleanupPRData(ctx workflow.Context, url string) {
+func cleanupPRData(ctx workflow.Context, url string) {
 	if err := data.DeleteBitbucketPR(url); err != nil {
 		log.Error(ctx, "failed to delete Bitbucket PR snapshot", "error", err, "pr_url", url)
 	}
@@ -100,7 +100,7 @@ func (c Config) cleanupPRData(ctx workflow.Context, url string) {
 
 // initPRData saves the initial state of a new PR: a snapshot of the
 // PR details, and mappings for 2-way syncs between Bitbucket and Slack.
-func (c Config) initPRData(ctx workflow.Context, url string, pr PullRequest, authorAccountID, channelID string) error {
+func initPRData(ctx workflow.Context, url string, pr PullRequest, authorAccountID, channelID string) error {
 	if err := data.StoreBitbucketPR(url, pr); err != nil {
 		log.Error(ctx, "failed to save Bitbucket PR snapshot", "error", err, "channel_id", channelID, "pr_url", url)
 		return err
@@ -138,29 +138,29 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 
 	channelID, err := c.createChannel(ctx, pr)
 	if err != nil {
-		c.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
 		return err
 	}
 
-	if err := c.initPRData(ctx, url, pr, event.Actor.AccountID, channelID); err != nil {
-		c.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
-		c.cleanupPRData(ctx, url)
+	if err := initPRData(ctx, url, pr, event.Actor.AccountID, channelID); err != nil {
+		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		cleanupPRData(ctx, url)
 		return err
 	}
 
 	// Channel cosmetics.
 	slack.SetChannelTopic(ctx, channelID, url)
 	slack.SetChannelDescription(ctx, channelID, pr.Title, url)
-	c.setChannelBookmarks(ctx, channelID, url, pr)
-	c.postIntroMsg(ctx, channelID, event.Type, pr, event.Actor)
+	setChannelBookmarks(ctx, channelID, url, pr)
+	postIntroMsg(ctx, channelID, event.Type, pr, event.Actor)
 	if msg := c.linkifyIDs(ctx, pr.Title); msg != "" {
 		_, _ = slack.PostMessage(ctx, channelID, msg)
 	}
 
-	err = slack.InviteUsersToChannel(ctx, channelID, c.prParticipants(ctx, pr))
+	err = slack.InviteUsersToChannel(ctx, channelID, prParticipants(ctx, pr))
 	if err != nil {
-		c.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
-		c.cleanupPRData(ctx, url)
+		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
+		cleanupPRData(ctx, url)
 		return err
 	}
 
@@ -215,9 +215,9 @@ func (c Config) renameChannel(ctx workflow.Context, pr PullRequest, channelID st
 	return errors.New(msg)
 }
 
-func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
+func reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
 	// True = don't send a DM to the user if they're opted-out.
-	userID := users.BitbucketToSlackID(ctx, c.Cmd, accountID, true)
+	userID := users.BitbucketToSlackID(ctx, accountID, true)
 	if userID == "" {
 		return
 	}
@@ -225,7 +225,7 @@ func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, accountID, url
 	_, _ = slack.PostMessage(ctx, userID, "Failed to create Slack channel for "+url)
 }
 
-func (c Config) postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
+func postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
 	action := "created"
 	if eventType == "updated" {
 		action = "marked as ready for review"
@@ -234,10 +234,10 @@ func (c Config) postIntroMsg(ctx workflow.Context, channelID, eventType string, 
 	url := pr.Links["html"].HRef
 	msg := fmt.Sprintf("%%s %s %s: `%s`", action, url, pr.Title)
 	if text := strings.TrimSpace(pr.Description); text != "" {
-		msg += "\n\n" + markdown.BitbucketToSlack(ctx, c.Cmd, text, url)
+		msg += "\n\n" + markdown.BitbucketToSlack(ctx, text, url)
 	}
 
-	_ = c.mentionUserInMsg(ctx, channelID, actor, msg)
+	_ = mentionUserInMsg(ctx, channelID, actor, msg)
 }
 
 var linkifyPattern = regexp.MustCompile(`[A-Z]+-\d+`)
@@ -298,7 +298,7 @@ func buildURL(ctx workflow.Context, base, id string) string {
 
 // prParticipants returns a list of opted-in Slack user IDs (author/participants/reviewers).
 // The output is guaranteed to be sorted, without teams/apps, and without repetitions.
-func (c Config) prParticipants(ctx workflow.Context, pr PullRequest) []string {
+func prParticipants(ctx workflow.Context, pr PullRequest) []string {
 	accounts := append([]Account{pr.Author}, pr.Reviewers...)
 	for _, p := range pr.Participants {
 		accounts = append(accounts, p.User)
@@ -315,7 +315,7 @@ func (c Config) prParticipants(ctx workflow.Context, pr PullRequest) []string {
 	for _, aid := range accountIDs {
 		// True = don't include opted-out users. They will still be mentioned
 		// in the channel, but as non-members they won't be notified about it.
-		if sid := users.BitbucketToSlackID(ctx, c.Cmd, aid, true); sid != "" {
+		if sid := users.BitbucketToSlackID(ctx, aid, true); sid != "" {
 			slackIDs = append(slackIDs, sid)
 		}
 	}
