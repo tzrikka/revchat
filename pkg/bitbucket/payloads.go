@@ -25,8 +25,9 @@ type RepositoryEvent struct {
 	Repository Repository `json:"repository"`
 	Actor      Account    `json:"actor"`
 
-	Commit  *Commit  `json:"commit,omitempty"`
-	Comment *Comment `json:"comment,omitempty"`
+	Commit       *Commit        `json:"commit,omitempty"`
+	Comment      *Comment       `json:"comment,omitempty"`
+	CommitStatus map[string]any `json:"commit_status,omitempty"`
 }
 
 type Account = bitbucket.User
