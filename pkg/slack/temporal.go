@@ -79,7 +79,7 @@ func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
 	w.RegisterWorkflowWithOptions(c.reactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[5]})
 	w.RegisterWorkflowWithOptions(c.slashCommandWorkflow, workflow.RegisterOptions{Name: Signals[6]})
 
-	w.RegisterWorkflowWithOptions(c.remindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
+	w.RegisterWorkflowWithOptions(remindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
 }
 
 // RegisterSignals routes [Signals] to registered workflows.

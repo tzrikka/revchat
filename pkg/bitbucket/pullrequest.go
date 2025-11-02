@@ -23,7 +23,12 @@ func (c Config) prCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		return nil
 	}
 
-	return c.initChannel(ctx, event)
+	if strings.Contains(event.Repository.FullName, "revchat") { // TEMPORARY!!!
+		return c.initChannel(ctx, event)
+	}
+
+	log.Debug(ctx, "New PR event", "repo", event.Repository.FullName, "pr_url", event.PullRequest.Links["html"].HRef)
+	return nil
 }
 
 func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
@@ -90,6 +95,26 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		_ = slack.KickUsersFromChannel(ctx, channelID, c.bitbucketToSlackIDs(ctx, removed))
 	}
 
+	for _, id := range added {
+		email, err := users.BitbucketToEmail(ctx, id)
+		if err != nil {
+			continue
+		}
+		if err := data.AddReviewerToPR(url, email); err != nil {
+			log.Error(ctx, "failed to add reviewer to Bitbucket PR's attention state", "error", err, "pr_url", url)
+		}
+	}
+
+	for _, id := range removed {
+		email, err := users.BitbucketToEmail(ctx, id)
+		if err != nil {
+			continue
+		}
+		if err := data.RemoveFromTurn(url, email); err != nil {
+			log.Error(ctx, "failed to remove reviewers from Bitbucket PR's attention state", "error", err, "pr_url", url)
+		}
+	}
+
 	// Commit(s) pushed to the PR branch.
 	if snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
 		cs = cs[snapshot.CommitCount:]
@@ -117,7 +142,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		err = c.mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
-	log.Warn(ctx, "unhandled Bitbucket PR update event", "url", url)
+	log.Warn(ctx, "unhandled Bitbucket PR update event", "pr_url", url)
 	return err
 }
 
@@ -127,7 +152,7 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 
 	prev, err := data.LoadBitbucketPR(url)
 	if err != nil {
-		log.Error(ctx, "failed to load Bitbucket PR snapshot", "error", err, "url", url)
+		log.Error(ctx, "failed to load Bitbucket PR snapshot", "error", err, "pr_url", url)
 		return nil, err
 	}
 
@@ -137,7 +162,7 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 
 	pr := new(PullRequest)
 	if err := mapToStruct(prev, pr); err != nil {
-		log.Error(ctx, "previous snapshot of Bitbucket PR is invalid", "error", err, "url", url)
+		log.Error(ctx, "previous snapshot of Bitbucket PR is invalid", "error", err, "pr_url", url)
 		return nil, err
 	}
 
@@ -257,13 +282,28 @@ func (c Config) prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent)
 
 	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
 
+	url := event.PullRequest.Links["html"].HRef
+	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
 	msg := "%s "
+
 	switch event.Type {
 	case "approved":
+		if err := data.RemoveFromTurn(url, email); err != nil {
+			log.Error(ctx, "failed to remove user from Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
+		}
 		msg += "approved this PR :+1:"
 	case "unapproved":
+		if err := data.AddReviewerToPR(url, email); err != nil {
+			log.Error(ctx, "failed to add user back to Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
+		}
+		if err := data.SwitchTurn(url, email); err != nil {
+			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
+		}
 		msg += "unapproved this PR :-1:"
 	case "changes_request_created":
+		if err := data.SwitchTurn(url, email); err != nil {
+			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
+		}
 		msg += "requested changes in this PR :warning:"
 
 	// Ignored event type.
@@ -295,6 +335,13 @@ func (c Config) prCommentCreatedWorkflow(ctx workflow.Context, event PullRequest
 	}
 
 	defer c.updateChannelBookmarks(ctx, event, channelID, nil)
+
+	url := pr.Links["html"].HRef
+	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
+	if err := data.SwitchTurn(url, email); err != nil {
+		log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url)
+		// Don't abort - we still want to post the comment.
+	}
 
 	// If the comment was created by RevChat, don't repost it.
 	if strings.HasSuffix(event.Comment.Content.Raw, "\n\n[This comment was created by RevChat]: #") {

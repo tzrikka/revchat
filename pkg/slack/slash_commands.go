@@ -58,7 +58,7 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 		return optOutSlashCommand(ctx, event)
 	case "stat", "state", "status":
 		return statusSlashCommand(ctx, event)
-	case "my turn", "not my turn":
+	case "who", "whose", "whose turn", "my turn", "not my turn":
 		return turnSlashCommand(ctx, event)
 	case "approve", "lgtm", "+1":
 		return approveSlashCommand(ctx, event)
@@ -87,7 +87,7 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	msg += "  •  `%s reminders at &lt;time in 12h/24h format&gt;` (weekdays, using your timezone)\n"
 	msg += "  •  `%s status` - show your current PR status, as an author and reviewer\n\n"
 	msg += "More commands inside PR channels:\n\n"
-	msg += "  •  `%s my turn` / `not my turn` / `set turn to &lt;1 or more @users&gt;`\n"
+	msg += "  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `set turn to &lt;1 or more @users&gt;`\n"
 	msg += "  •  `%s nudge &lt;1 or more @users&gt;` or `ping &lt;1 or more @users&gt;`\n"
 	msg += "  •  `%s approve` or `lgtm` or `+1`\n"
 	msg += "  •  `%s unapprove` or `-1`\n"

@@ -47,7 +47,7 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 		state += "."
 	}
 
-	_ = c.mentionUserInMsg(ctx, channelID, event.Actor, fmt.Sprintf("%%s %s", state))
+	_ = c.mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
 	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
@@ -89,6 +89,10 @@ func (c Config) cleanupPRData(ctx workflow.Context, url string) {
 		log.Error(ctx, "failed to delete Bitbucket PR snapshot", "error", err, "pr_url", url)
 	}
 
+	if err := data.DeleteTurn(url); err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR turn-taking state", "error", err, "pr_url", url)
+	}
+
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
 		log.Error(ctx, "failed to delete PR URL / Slack channel mappings", "error", err, "pr_url", url)
 	}
@@ -96,9 +100,26 @@ func (c Config) cleanupPRData(ctx workflow.Context, url string) {
 
 // initPRData saves the initial state of a new PR: a snapshot of the
 // PR details, and mappings for 2-way syncs between Bitbucket and Slack.
-func (c Config) initPRData(ctx workflow.Context, url string, pr PullRequest, channelID string) error {
+func (c Config) initPRData(ctx workflow.Context, url string, pr PullRequest, authorAccountID, channelID string) error {
 	if err := data.StoreBitbucketPR(url, pr); err != nil {
 		log.Error(ctx, "failed to save Bitbucket PR snapshot", "error", err, "channel_id", channelID, "pr_url", url)
+		return err
+	}
+
+	email, err := users.BitbucketToEmail(ctx, authorAccountID)
+	if err != nil {
+		return err
+	}
+
+	reviewers := []string{}
+	for _, r := range pr.Reviewers {
+		if e, err := users.BitbucketToEmail(ctx, r.AccountID); err == nil {
+			reviewers = append(reviewers, e)
+		}
+	}
+
+	if err := data.InitTurn(url, email, reviewers); err != nil {
+		log.Error(ctx, "failed to initialize Bitbucket PR turn-taking state", "error", err, "channel_id", channelID, "pr_url", url)
 		return err
 	}
 
@@ -121,7 +142,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 		return err
 	}
 
-	if err := c.initPRData(ctx, url, pr, channelID); err != nil {
+	if err := c.initPRData(ctx, url, pr, event.Actor.AccountID, channelID); err != nil {
 		c.reportCreationErrorToAuthor(ctx, event.Actor.AccountID, url)
 		c.cleanupPRData(ctx, url)
 		return err

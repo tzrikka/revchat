@@ -13,6 +13,64 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/jira"
 )
 
+// BitbucketToEmail converts a Bitbucket account ID into an email address.
+// This depends on the user's email address being the same in both systems.
+// This function uses data caching, and API calls as a fallback.
+func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
+	email, err := data.BitbucketUserEmailByID(accountID)
+	if err != nil {
+		log.Error(ctx, "failed to load Bitbucket user email", "error", err, "account_id", accountID)
+		return "", err
+	}
+
+	if email != "" {
+		return email, nil
+	}
+
+	// Fallback: lookup Bitbucket user in Jira to get their email address,
+	// because Bitbucket API does not expose email addresses directly.
+	jiraUser, err := jira.UsersGetActivity(ctx, accountID)
+	if err != nil {
+		log.Error(ctx, "failed to retrieve Jira user info", "error", err, "account_id", accountID)
+		return "", err
+	}
+
+	email = jiraUser.Email
+	if err := data.AddBitbucketUser(accountID, email); err != nil {
+		log.Error(ctx, "failed to save Bitbucket account ID/email mapping", "error", err, "account_id", accountID, "email", email)
+		// Don't abort - we have the email address, even if we failed to save it.
+	}
+
+	return email, nil
+}
+
+// BitbucketToSlackID converts a Bitbucket account ID into a Slack user ID.
+// This depends on the user's email address being the same in both systems.
+// This function returns an empty string if the account ID is not found.
+func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string, checkOptIn bool) string {
+	email, err := BitbucketToEmail(ctx, accountID)
+	if err != nil {
+		return ""
+	}
+
+	if email == "" || email == "bot" {
+		return ""
+	}
+
+	if checkOptIn {
+		optedIn, err := data.IsOptedIn(email)
+		if err != nil {
+			log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
+			return ""
+		}
+		if !optedIn {
+			return ""
+		}
+	}
+
+	return EmailToSlackID(ctx, email)
+}
+
 // BitbucketToSlackRef converts a Bitbucket account ID into a Slack user reference.
 // This depends on the user's email address being the same in both systems.
 // This function returns the Bitbucket display name if the user is not found in Slack.
@@ -33,50 +91,6 @@ func BitbucketToSlackRef(ctx workflow.Context, cmd *cli.Command, accountID, disp
 	}
 
 	return displayName
-}
-
-// BitbucketToSlackID converts a Bitbucket account ID into a Slack user ID.
-// This depends on the user's email address being the same in both systems.
-// This function returns an empty string if the account ID is not found.
-func BitbucketToSlackID(ctx workflow.Context, cmd *cli.Command, accountID string, checkOptIn bool) string {
-	email, err := data.BitbucketUserEmailByID(accountID)
-	if err != nil {
-		log.Error(ctx, "failed to load Bitbucket user email", "error", err, "account_id", accountID)
-		return ""
-	}
-
-	// Fallback: lookup Bitbucket user in Jira to get their email address,
-	// because Bitbucket API does not expose email addresses directly.
-	if email == "" {
-		jiraUser, err := jira.UsersGetActivity(ctx, accountID)
-		if err != nil {
-			log.Error(ctx, "failed to retrieve Jira user info", "error", err, "account_id", accountID)
-			return ""
-		}
-
-		email = jiraUser.Email
-		if err := data.AddBitbucketUser(accountID, email); err != nil {
-			log.Error(ctx, "failed to save Bitbucket account ID/email mapping", "error", err, "account_id", accountID, "email", email)
-			// Don't abort - we have the email address, even if we failed to save it.
-		}
-	}
-
-	if email == "" || email == "bot" {
-		return ""
-	}
-
-	if checkOptIn {
-		optedIn, err := data.IsOptedIn(email)
-		if err != nil {
-			log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
-			return ""
-		}
-		if !optedIn {
-			return ""
-		}
-	}
-
-	return EmailToSlackID(ctx, email)
 }
 
 // EmailToBitbucketID retrieves a Bitbucket user's account ID based on their
