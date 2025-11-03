@@ -1,6 +1,8 @@
 package data
 
-import "sync"
+import (
+	"sync"
+)
 
 const (
 	slackBotsFile = "slack_bots.json"
