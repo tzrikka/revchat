@@ -23,12 +23,7 @@ func (c Config) prCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		return nil
 	}
 
-	if strings.Contains(event.Repository.FullName, "revchat") { // TEMPORARY!!!
-		return c.initChannel(ctx, event)
-	}
-
-	log.Debug(ctx, "New PR event", "repo", event.Repository.FullName, "pr_url", event.PullRequest.Links["html"].HRef)
-	return nil
+	return c.initChannel(ctx, event)
 }
 
 func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
