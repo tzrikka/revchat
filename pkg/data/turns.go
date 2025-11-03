@@ -6,19 +6,66 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/xdg"
 )
 
-// PRTurn represents the turn-taking state for a specific pull request.
+// PRTurn represents the attention state for a specific pull request.
+//
+// The [Reviewers] map tracks which reviewers are assigned to the PR
+// and whether it's currently their turn to pay attention to it.
+//
+// Initial state:
+//
+//   - If the map is empty, the PR author is considered responsible for
+//     the PR's progress: they need to assign reviewers or merge the PR.
+//   - When any number of reviewers are assigned, at the same time or
+//     separately, the initial state of their turn flag is set to true.
+//     Each one of them needs to pay attention to the PR.
+//
+// State transitions for reviewers:
+//
+//   - When a reviewer approves the PR, or is unassigned from it, they
+//     are removed from the map. They will no longer need to pay
+//     attention to this PR, unless they are added again later.
+//   - When a reviewer creates a new comment, reply, or code suggestion,
+//     their turn flag is set to false. It is no longer their turn to
+//     pay attention to the PR. This does not affect other reviewers.
+//   - If a reviewer creates multiple-but-separate comments or code
+//     suggestions, their turn flag remains false.
+//
+// State transitions for the author:
+//
+//   - The author's state is USUALLY not tracked explicitly. They need
+//     to pay attention to the PR whenever at least one reviewer has
+//     their turn flag set to false.
+//
+//   - When the author addresses review comments (i.e. creates a new
+//     comment or reply), the turn flags of all the reviewers are reset
+//     to true. It is their turn still/again to pay attention to the PR.
+//
+//   - Pushing commits does not have the same effect for now, as it may
+//     be work in progress. Only discussions trigger state changes.
+//
+// Manual state changes:
+//
+//   - Any participant (author or reviewers) may indicate that it is
+//     or isn't their turn to pay attention to the PR, by using a Slack
+//     slash command instead of interacting within the PR discussion.
+//   - Any participant may also set the entire attention state explicitly,
+//     specifying exactly which reviewers need to pay attention to the PR.
+//     Unmentioned reviewers are not removed from the map, but their turn
+//     flags are set to false. If the author is mentioned, they are added
+//     temporarily until a regular state transition affects them.
 type PRTurn struct {
 	Author    string          `json:"author"`    // Email address of the PR author.
 	Reviewers map[string]bool `json:"reviewers"` // Email address -> is it their turn?
-	Set       bool            `json:"set"`       // Whether the turn-taking state has been set explicitly.
+	Set       bool            `json:"set"`       // Whether the attention state has been set explicitly.
 }
 
-// InitTurn initializes the turn-taking state of a new PR.
+// InitTurn initializes the attention state of a new PR.
 // Users are specified using their email addresses.
 func InitTurn(url, author string, reviewers []string) error {
 	t := &PRTurn{
@@ -30,10 +77,10 @@ func InitTurn(url, author string, reviewers []string) error {
 		t.Reviewers[reviewer] = true
 	}
 
-	return saveTurn(url, t)
+	return writeTurnFile(url, t)
 }
 
-// DeleteTurn removes the turn-taking state file of a specific PR.
+// DeleteTurn removes the attention state file of a specific PR.
 // This is used when the PR is closed or marked as a draft.
 func DeleteTurn(url string) error {
 	return os.Remove(turnPath(url))
@@ -47,7 +94,7 @@ func AddReviewerToPR(url, email string) error {
 		return nil
 	}
 
-	t, err := loadTurn(url)
+	t, err := readTurnFile(url)
 	if err != nil {
 		return err
 	}
@@ -57,7 +104,7 @@ func AddReviewerToPR(url, email string) error {
 	}
 	t.Reviewers[email] = true
 
-	return saveTurn(url, t)
+	return writeTurnFile(url, t)
 }
 
 // GetCurrentTurn returns the email addresses of all the users whose turn it is to
@@ -66,7 +113,7 @@ func AddReviewerToPR(url, email string) error {
 // reviewer has their turn flag set to false, we add the author to the list as well,
 // unless the attention list was set explicitly using [SetTurn].
 func GetCurrentTurn(url string) ([]string, error) {
-	t, err := loadTurn(url)
+	t, err := readTurnFile(url)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +148,7 @@ func RemoveFromTurn(url, email string) error {
 		return nil
 	}
 
-	t, err := loadTurn(url)
+	t, err := readTurnFile(url)
 	if err != nil {
 		return err
 	}
@@ -111,16 +158,16 @@ func RemoveFromTurn(url, email string) error {
 	}
 	delete(t.Reviewers, email)
 
-	return saveTurn(url, t)
+	return writeTurnFile(url, t)
 }
 
-// SetTurn overwrites the turn-taking state of a specific PR to an explicit set of users.
+// SetTurn overwrites the attention state of a specific PR to an explicit set of users.
 // Missing users are added, which means the caller needs to ensure they *are* valid reviewers.
 // Existing unmentioned users are not removed, but are marked as not their turn. If the
 // input contains the PR author, they *are* added (temporarily, until [SwitchTurn]
 // is called for them). It also ignores empty or "bot" email addresses.
 func SetTurn(url string, emails []string) error {
-	t, err := loadTurn(url)
+	t, err := readTurnFile(url)
 	if err != nil {
 		return err
 	}
@@ -137,7 +184,7 @@ func SetTurn(url string, emails []string) error {
 	}
 
 	t.Set = true
-	return saveTurn(url, t)
+	return writeTurnFile(url, t)
 }
 
 // SwitchTurn switches the turn of a specific user in a specific PR.
@@ -149,7 +196,7 @@ func SwitchTurn(url, email string) error {
 		return nil
 	}
 
-	t, err := loadTurn(url)
+	t, err := readTurnFile(url)
 	if err != nil {
 		return err
 	}
@@ -166,11 +213,13 @@ func SwitchTurn(url, email string) error {
 	}
 
 	t.Set = false
-	return saveTurn(url, t)
+	return writeTurnFile(url, t)
 }
 
-// turnPath returns the absolute path to the JSON file representing the turn-taking state of a PR.
-// This function is different from [dataPath] because it supports subdirectories.
+var turnMutexes = map[string]*sync.RWMutex{}
+
+// turnPath returns the absolute path to the JSON file representing the attention state of a PR.
+// This function is different from [xdg.CreateFile] because it supports subdirectories.
 // It creates any necessary parent directories, but not the file itself.
 func turnPath(url string) string {
 	prefix, _ := xdg.CreateDir(xdg.DataHome, config.DirName)
@@ -182,20 +231,19 @@ func turnPath(url string) string {
 	return filePath + "_turn.json"
 }
 
-func saveTurn(url string, t *PRTurn) error {
-	f, err := os.OpenFile(turnPath(url), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- verified URL
-	if err != nil {
-		return err
+func readTurnFile(url string) (*PRTurn, error) {
+	if _, ok := turnMutexes[url]; !ok {
+		turnMutexes[url] = &sync.RWMutex{}
 	}
-	defer f.Close()
+	turnMutexes[url].RLock()
+	defer turnMutexes[url].RUnlock()
 
-	e := json.NewEncoder(f)
-	e.SetIndent("", "  ")
-	return e.Encode(t)
-}
+	path, err := cachedDataPath(url)
+	if err != nil {
+		return nil, err
+	}
 
-func loadTurn(url string) (*PRTurn, error) {
-	f, err := os.Open(turnPath(url)) //gosec:disable G304 -- URL received from verified 3rd-party
+	f, err := os.Open(path) //gosec:disable G304 -- URL received from signature-verified 3rd-party
 	if err != nil {
 		return nil, err
 	}
@@ -207,4 +255,27 @@ func loadTurn(url string) (*PRTurn, error) {
 	}
 
 	return t, nil
+}
+
+func writeTurnFile(url string, t *PRTurn) error {
+	if _, ok := turnMutexes[url]; !ok {
+		turnMutexes[url] = &sync.RWMutex{}
+	}
+	turnMutexes[url].Lock()
+	defer turnMutexes[url].Unlock()
+
+	path, err := cachedDataPath(url)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	e := json.NewEncoder(f)
+	e.SetIndent("", "  ")
+	return e.Encode(t)
 }

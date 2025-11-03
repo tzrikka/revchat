@@ -1,20 +1,11 @@
 package data
 
-import (
-	"github.com/tzrikka/revchat/pkg/config"
-	"github.com/tzrikka/xdg"
-)
-
 const (
 	optInFile = "opt_in.json"
 )
 
 func OptInBitbucketUser(slackUserID, accountID, email, linkID string) error {
-	if err := AddSlackUser(slackUserID, email); err != nil {
-		return err
-	}
-
-	if err := AddBitbucketUser(accountID, email); err != nil {
+	if err := UpsertUser(email, accountID, "", slackUserID, linkID); err != nil {
 		return err
 	}
 
@@ -22,11 +13,7 @@ func OptInBitbucketUser(slackUserID, accountID, email, linkID string) error {
 }
 
 func OptInGitHubUser(slackUserID, username, email, linkID string) error {
-	if err := AddSlackUser(slackUserID, email); err != nil {
-		return err
-	}
-
-	if err := AddGitHubUser(username, email); err != nil {
+	if err := UpsertUser(email, "", username, slackUserID, linkID); err != nil {
 		return err
 	}
 
@@ -34,15 +21,13 @@ func OptInGitHubUser(slackUserID, username, email, linkID string) error {
 }
 
 func optInUser(email, linkID string) error {
-	path := dataPath(optInFile)
-
-	m, err := readJSON(path)
+	m, err := readJSON(optInFile)
 	if err != nil {
 		return err
 	}
 
 	m[email] = linkID
-	return writeJSON(path, m)
+	return writeJSON(optInFile, m)
 }
 
 func IsOptedIn(email string) (bool, error) {
@@ -59,7 +44,7 @@ func UserLinkID(email string) (string, error) {
 		return "", nil
 	}
 
-	m, err := readJSON(dataPath(optInFile))
+	m, err := readJSON(optInFile)
 	if err != nil {
 		return "", err
 	}
@@ -68,20 +53,11 @@ func UserLinkID(email string) (string, error) {
 }
 
 func OptOut(email string) error {
-	path := dataPath(optInFile)
-
-	m, err := readJSON(path)
+	m, err := readJSON(optInFile)
 	if err != nil {
 		return err
 	}
 
 	delete(m, email)
-	return writeJSON(path, m)
-}
-
-// dataPath returns the absolute path to the given data file.
-// It also creates an empty file if it doesn't already exist.
-func dataPath(filename string) string {
-	path, _ := xdg.CreateFile(xdg.DataHome, config.DirName, filename)
-	return path
+	return writeJSON(optInFile, m)
 }

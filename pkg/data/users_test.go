@@ -7,76 +7,47 @@ import (
 func TestUsers(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
+	pathCache = map[string]string{} // Reset global state.
 
 	id := "user_id"
 	email := "email@example.com"
 
 	// Before adding the user.
-	got, err := BitbucketUserEmailByID(id)
+	gotUser, err := SelectUserByBitbucketID(id)
 	if err != nil {
-		t.Fatalf("BitbucketUserEmail() error = %v", err)
+		t.Fatalf("SelectUserByBitbucketID() error = %v", err)
 	}
-	if got != "" {
-		t.Fatalf("BitbucketUserEmail() = %q, want %q", got, "")
+	if gotUser.Email != "" {
+		t.Fatalf("SelectUserByBitbucketID() email = %q, want %q", gotUser.Email, "")
 	}
 
 	// Add the user.
-	if err := AddBitbucketUser(id, email); err != nil {
-		t.Fatalf("AddBitbucketUser() error = %v", err)
+	if err := UpsertUser(email, id, "", "", ""); err != nil {
+		t.Fatalf("UpsertUser() error = %v", err)
 	}
 
 	// After adding the user.
-	got, err = BitbucketUserEmailByID(id)
+	gotUser, err = SelectUserByBitbucketID(id)
 	if err != nil {
-		t.Errorf("BitbucketUserEmail() error = %v", err)
+		t.Errorf("SelectUserByBitbucketID() error = %v", err)
 	}
-	if got != email {
-		t.Errorf("BitbucketUserEmail() = %q, want %q", got, email)
+	if gotUser.Email != email {
+		t.Errorf("SelectUserByBitbucketID() email = %q, want %q", gotUser.Email, email)
 	}
 
-	got, err = GitHubUserEmailByID(id)
+	gotUser, err = SelectUserByGitHubID(id)
 	if err != nil {
-		t.Errorf("GitHubUserEmail() error = %v", err)
+		t.Errorf("SelectUserByGitHubID() error = %v", err)
 	}
-	if got != "" {
-		t.Errorf("GitHubUserEmail() = %q, want %q", got, "")
+	if gotUser.Email != "" {
+		t.Errorf("SelectUserByGitHubID() email = %q, want %q", gotUser.Email, "")
 	}
 
-	got, err = SlackUserEmailByID(id)
+	gotUser, err = SelectUserBySlackID(id)
 	if err != nil {
-		t.Errorf("SlackUserEmail() error = %v", err)
+		t.Errorf("SelectUserBySlackID() error = %v", err)
 	}
-	if got != "" {
-		t.Errorf("SlackUserEmail() = %q, want %q", got, "")
-	}
-
-	// Remove the user.
-	if err := RemoveBitbucketUser(email); err != nil {
-		t.Fatalf("RemoveBitbucketUser() error = %v", err)
-	}
-
-	// After removing the usr.
-	got, err = BitbucketUserEmailByID(id)
-	if err != nil {
-		t.Errorf("BitbucketUserEmail() error = %v", err)
-	}
-	if got != "" {
-		t.Errorf("BitbucketUserEmail() = %q, want %q", got, "")
-	}
-
-	got, err = GitHubUserEmailByID(id)
-	if err != nil {
-		t.Errorf("GitHubUserEmail() error = %v", err)
-	}
-	if got != "" {
-		t.Errorf("GitHubUserEmail() = %q, want %q", got, "")
-	}
-
-	got, err = SlackUserEmailByID(id)
-	if err != nil {
-		t.Errorf("SlackUserEmail() error = %v", err)
-	}
-	if got != "" {
-		t.Errorf("SlackUserEmail() = %q, want %q", got, "")
+	if gotUser.Email != "" {
+		t.Errorf("SelectUserBySlackID() email = %q, want %q", gotUser.Email, "")
 	}
 }

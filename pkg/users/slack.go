@@ -34,35 +34,35 @@ func SlackToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackUserRef 
 // on their ID. This function uses data caching, and API calls as
 // a fallback. Not finding an email address is considered an error.
 func SlackIDToEmail(ctx workflow.Context, userID string) (string, error) {
-	email, err := data.SlackUserEmailByID(userID)
+	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
-		log.Error(ctx, "failed to load Slack user email", "error", err, "user_id", userID)
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
 		// Don't abort - try to use the Slack API as a fallback.
 	}
-	if email != "" {
-		return email, nil
+	if user.Email != "" {
+		return user.Email, nil
 	}
 
-	user, err := slack.UsersInfoActivity(ctx, userID)
+	slackUser, err := slack.UsersInfoActivity(ctx, userID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", userID)
 		return "", err
 	}
 
-	if user.IsBot {
-		if err := data.AddSlackUser(userID, "bot"); err != nil {
+	if slackUser.IsBot {
+		if err := data.UpsertUser("bot", "", "", userID, ""); err != nil {
 			log.Error(ctx, "failed to save Slack bot ID mapping", "error", err, "user_id", userID, "email", "bot")
 		}
 		return "bot", nil
 	}
 
-	if user.Profile.Email == "" {
-		log.Error(ctx, "Slack user has no email address", "user_id", userID, "real_name", user.RealName)
+	if slackUser.Profile.Email == "" {
+		log.Error(ctx, "Slack user has no email address", "user_id", userID, "real_name", slackUser.RealName)
 		return "", fmt.Errorf("slack user has no email address in their profile: %s", userID)
 	}
 
-	email = user.Profile.Email
-	if err := data.AddSlackUser(userID, email); err != nil {
+	email := slackUser.Profile.Email
+	if err := data.UpsertUser(email, "", "", userID, ""); err != nil {
 		log.Error(ctx, "failed to save Slack user ID/email", "error", err, "user_id", userID, "email", email)
 	}
 
@@ -72,24 +72,24 @@ func SlackIDToEmail(ctx workflow.Context, userID string) (string, error) {
 // EmailToSlackID retrieves a Slack user's ID based on their email address.
 // This function uses data caching, and API calls as a fallback.
 func EmailToSlackID(ctx workflow.Context, email string) string {
-	id, err := data.SlackUserIDByEmail(email)
+	user, err := data.SelectUserByEmail(email)
 	if err != nil {
-		log.Error(ctx, "failed to load Slack user ID", "error", err, "email", email)
+		log.Error(ctx, "failed to load user by email", "error", err, "email", email)
 		// Don't abort - try to use the Slack API as a fallback.
 	}
-	if id != "" {
-		return id
+	if user.SlackID != "" {
+		return user.SlackID
 	}
 
-	user, err := slack.UsersLookupByEmailActivity(ctx, email)
+	slackUser, err := slack.UsersLookupByEmailActivity(ctx, email)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "email", email)
 		return ""
 	}
 
-	if err := data.AddSlackUser(user.ID, email); err != nil {
-		log.Error(ctx, "failed to save Slack user ID/email", "error", err, "user_id", user.ID, "email", email)
+	if err := data.UpsertUser(email, "", "", slackUser.ID, ""); err != nil {
+		log.Error(ctx, "failed to save Slack user ID/email", "error", err, "user_id", slackUser.ID, "email", email)
 	}
 
-	return user.ID
+	return slackUser.ID
 }

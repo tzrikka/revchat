@@ -7,6 +7,7 @@ import (
 func TestOptIn(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
+	pathCache = map[string]string{} // Reset global state.
 
 	email := "email@example.com"
 	accountID := "BitbucketAccountID"
@@ -56,19 +57,19 @@ func TestOptIn(t *testing.T) {
 	}
 
 	// User ID/email mapping still exists.
-	got, err := BitbucketUserEmailByID(accountID)
+	gotUser, err := SelectUserByBitbucketID(accountID)
 	if err != nil {
-		t.Errorf("BitbucketUserEmailByID() error = %v", err)
+		t.Errorf("SelectUserByBitbucketID() error = %v", err)
 	}
-	if got != email {
-		t.Errorf("BitbucketUserEmailByID() = %q, want %q", got, email)
+	if gotUser.Email != email {
+		t.Errorf("SelectUserByBitbucketID() email = %q, want %q", gotUser.Email, email)
 	}
 
-	got, err = GitHubUserIDByEmail(email)
+	gotUser, err = SelectUserByEmail(email)
 	if err != nil {
-		t.Errorf("GitHubUserIDByEmail() error = %v", err)
+		t.Errorf("SelectUserByEmail() error = %v", err)
 	}
-	if got != login {
-		t.Errorf("GitHubUserIDByEmail() = %q, want %q", got, login)
+	if gotUser.GitHubID != login {
+		t.Errorf("SelectUserByEmail() GitHub ID = %q, want %q", gotUser.GitHubID, login)
 	}
 }

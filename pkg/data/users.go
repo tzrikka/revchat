@@ -1,169 +1,242 @@
 package data
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"os"
+	"sync"
+	"time"
 )
 
 const (
 	usersFile = "users.json"
 
-	bitbucketPrefix = "bitbucket"
-	githubPrefix    = "github"
-	slackPrefix     = "slack"
+	indexByEmail       = 1
+	indexByBitbucketID = 2
+	indexByGitHubID    = 3
+	indexBySlackID     = 4
 )
 
-// AddBitbucketUser saves a 2-way mapping between
-// a Bitbucket user's account ID and email address.
-func AddBitbucketUser(accountID, email string) error {
-	return addUser(bitbucketPrefix, accountID, email)
+// User represents a mapping between various user IDs and email
+// addresses across different platforms (Bitbucket, GitHub, Slack).
+type User struct {
+	Created string `json:"created,omitempty"`
+	Updated string `json:"updated,omitempty"`
+	Deleted string `json:"deleted,omitempty"`
+
+	Email       string `json:"email,omitempty"`
+	BitbucketID string `json:"bitbucket_id,omitempty"`
+	GitHubID    string `json:"github_id,omitempty"`
+	SlackID     string `json:"slack_id,omitempty"`
+	ThrippyLink string `json:"thrippy_link,omitempty"`
 }
 
-// AddBitbucketUser saves a 2-way mapping between
-// a GitHub user's username and email address.
-func AddGitHubUser(username, email string) error {
-	return addUser(githubPrefix, username, email)
+// Users is an indexed copy of a collection of [User] entries.
+// This should really be stored in a relational database.
+type Users struct {
+	entries []User
+
+	emailIndex     map[string]int
+	bitbucketIndex map[string]int
+	githubIndex    map[string]int
+	slackIndex     map[string]int
 }
 
-// AddBitbucketUser saves a 2-way mapping between
-// a Slack user's user ID and email address.
-func AddSlackUser(userID, email string) error {
-	return addUser(slackPrefix, userID, email)
-}
+var (
+	usersDB    *Users
+	usersMutex sync.Mutex
+)
 
-// BitbucketUserEmailByID returns a Bitbucket user's email based on
-// their account ID. Returns an empty string if the user is not found.
-func BitbucketUserEmailByID(accountID string) (string, error) {
-	return userEmailByID(bitbucketPrefix, accountID)
-}
+func UpsertUser(email, bitbucketID, githubID, slackID, thrippyLink string) error {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
 
-// GitHubUserEmailByID returns a GitHub user's email based on their
-// username. Returns an empty string if the user is not found.
-func GitHubUserEmailByID(username string) (string, error) {
-	return userEmailByID(githubPrefix, username)
-}
+	if usersDB == nil {
+		var err error
+		usersDB, err = readUsersFile()
+		if err != nil {
+			return err
+		}
+	}
 
-// SlackUserEmailByID returns a Slack user's email based on their
-// user ID. Returns an empty string if the user is not found.
-func SlackUserEmailByID(userID string) (string, error) {
-	return userEmailByID(slackPrefix, userID)
-}
-
-// BitbucketUserIDByEmail returns a Bitbucket user's account ID based
-// on their email. Returns an empty string if the user is not found.
-func BitbucketUserIDByEmail(email string) (string, error) {
-	return userIDByEmail(bitbucketPrefix, email)
-}
-
-// GitHubUserIDByEmail returns a GitHub user's username based on
-// their email. Returns an empty string if the user is not found.
-func GitHubUserIDByEmail(email string) (string, error) {
-	return userIDByEmail(githubPrefix, email)
-}
-
-// SlackUserIDByEmail returns a Slack user's user ID based on
-// their email. Returns an empty string if the user is not found.
-func SlackUserIDByEmail(email string) (string, error) {
-	return userIDByEmail(slackPrefix, email)
-}
-
-// RemoveBitbucketUser forgets a Bitbucket user's account ID and email.
-func RemoveBitbucketUser(email string) error {
-	return removeUser(bitbucketPrefix, email)
-}
-
-// RemoveGitHubUser forgets a GitHub user's username and email.
-func RemoveGitHubUser(email string) error {
-	return removeUser(githubPrefix, email)
-}
-
-// RemoveSlackUser forgets a Slack user's user ID and email.
-func RemoveSlackUser(email string) error {
-	return removeUser(slackPrefix, email)
-}
-
-func addUser(prefix, id, email string) error {
-	path := dataPath(usersFile)
-
-	m, err := readJSONMaps(path)
+	i, err := usersDB.findUserIndex(email, bitbucketID, githubID, slackID)
 	if err != nil {
 		return err
 	}
 
-	if ids := m["ids"]; ids == nil {
-		m["ids"] = map[string]string{}
+	now := time.Now().UTC().Format(time.RFC3339)
+	if i == -1 {
+		i = len(usersDB.entries)
+		usersDB.entries = append(usersDB.entries, User{Created: now}) // Insert a new empty entry.
 	}
-	if ids := m["emails"]; ids == nil {
-		m["emails"] = map[string]string{}
-	}
-	m["ids"][fmt.Sprintf("%s/%s", prefix, id)] = email
-	m["emails"][fmt.Sprintf("%s/%s", prefix, email)] = id
+	usersDB.entries[i].Updated = now
 
-	return writeJSONMaps(path, m)
+	// Allow partial updates, don't overwrite existing fields with empty values.
+	// (we already checked for conflicts in [Users.findIndex]).
+	if email != "" {
+		usersDB.entries[i].Email = email
+		if email != "bot" {
+			usersDB.emailIndex[email] = i
+		}
+	}
+	if bitbucketID != "" {
+		usersDB.entries[i].BitbucketID = bitbucketID
+		usersDB.bitbucketIndex[bitbucketID] = i
+	}
+	if githubID != "" {
+		usersDB.entries[i].GitHubID = githubID
+		usersDB.githubIndex[githubID] = i
+	}
+	if slackID != "" {
+		usersDB.entries[i].SlackID = slackID
+		usersDB.slackIndex[slackID] = i
+	}
+	if thrippyLink != "" {
+		usersDB.entries[i].ThrippyLink = thrippyLink
+	}
+
+	return usersDB.writeUsersFile()
 }
 
-func userEmailByID(prefix, id string) (string, error) {
-	path := dataPath(usersFile)
+func (u *Users) findUserIndex(email, bitbucketID, githubID, slackID string) (int, error) {
+	emailIndex, emailFound := u.emailIndex[email]
+	bitbucketIndex, bitbucketFound := u.bitbucketIndex[bitbucketID]
+	githubIndex, githubFound := u.githubIndex[githubID]
+	slackIndex, slackFound := u.slackIndex[slackID]
 
-	m, err := readJSONMaps(path)
+	i := -1
+	if emailFound {
+		i = emailIndex
+	}
+	if bitbucketFound {
+		if i >= 0 && i != bitbucketIndex {
+			return -1, errors.New("conflicting entries")
+		}
+		i = bitbucketIndex
+	}
+	if githubFound {
+		if i >= 0 && i != githubIndex {
+			return -1, errors.New("conflicting entries")
+		}
+		i = githubIndex
+	}
+	if slackFound {
+		if i >= 0 && i != slackIndex {
+			return -1, errors.New("conflicting entries")
+		}
+		i = slackIndex
+	}
+
+	return i, nil
+}
+
+func SelectUserByEmail(email string) (User, error) {
+	return selectUserBy(indexByEmail, email)
+}
+
+func SelectUserByBitbucketID(bitbucketID string) (User, error) {
+	return selectUserBy(indexByBitbucketID, bitbucketID)
+}
+
+func SelectUserByGitHubID(githubID string) (User, error) {
+	return selectUserBy(indexByGitHubID, githubID)
+}
+
+func SelectUserBySlackID(slackID string) (User, error) {
+	return selectUserBy(indexBySlackID, slackID)
+}
+
+func selectUserBy(indexType int, id string) (User, error) {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if usersDB == nil {
+		var err error
+		usersDB, err = readUsersFile()
+		if err != nil {
+			return User{}, err
+		}
+	}
+
+	var index map[string]int
+	switch indexType {
+	case indexByEmail:
+		index = usersDB.emailIndex
+	case indexByBitbucketID:
+		index = usersDB.bitbucketIndex
+	case indexByGitHubID:
+		index = usersDB.githubIndex
+	case indexBySlackID:
+		index = usersDB.slackIndex
+	default:
+		return User{}, errors.New("invalid index type")
+	}
+
+	i, found := index[id]
+	if !found {
+		return User{}, nil
+	}
+
+	entryCopy := usersDB.entries[i]
+	return entryCopy, nil
+}
+
+func readUsersFile() (*Users, error) {
+	path, err := cachedDataPath(usersFile)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return m["ids"][fmt.Sprintf("%s/%s", prefix, id)], nil
-}
-
-func userIDByEmail(prefix, email string) (string, error) {
-	path := dataPath(usersFile)
-
-	m, err := readJSONMaps(path)
+	// Special case: empty files can't be parsed as JSON, but this initial state is valid.
+	fi, err := os.Stat(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return m["emails"][fmt.Sprintf("%s/%s", prefix, email)], nil
+	u := &Users{entries: []User{}}
+	if fi.Size() > 0 {
+		f, err := os.Open(path) //gosec:disable G304 -- specified by admin by design
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		if err := json.NewDecoder(f).Decode(&u.entries); err != nil {
+			return nil, err
+		}
+	}
+
+	// Build indexes for fast lookups.
+	u.emailIndex = map[string]int{}
+	u.bitbucketIndex = map[string]int{}
+	u.githubIndex = map[string]int{}
+	u.slackIndex = map[string]int{}
+
+	for i, user := range u.entries {
+		if user.Email != "" && user.Email != "bot" {
+			u.emailIndex[user.Email] = i
+		}
+		if user.BitbucketID != "" {
+			u.bitbucketIndex[user.BitbucketID] = i
+		}
+		if user.GitHubID != "" {
+			u.githubIndex[user.GitHubID] = i
+		}
+		if user.SlackID != "" {
+			u.slackIndex[user.SlackID] = i
+		}
+	}
+
+	return u, nil
 }
 
-func removeUser(prefix, email string) error {
-	path := dataPath(usersFile)
-
-	m, err := readJSONMaps(path)
+func (u *Users) writeUsersFile() error {
+	path, err := cachedDataPath(usersFile)
 	if err != nil {
 		return err
 	}
 
-	email = fmt.Sprintf("%s/%s", prefix, email)
-	id := fmt.Sprintf("%s/%s", prefix, m["emails"][email])
-	delete(m["emails"], email)
-	delete(m["ids"], id)
-
-	return writeJSONMaps(path, m)
-}
-
-func readJSONMaps(path string) (map[string]map[string]string, error) {
-	f, err := os.ReadFile(path) //gosec:disable G304 -- specified by admin by design
-	if err != nil {
-		return nil, err
-	}
-
-	// Special case: empty files can't be parsed as JSON,
-	// but they still represent a valid initial state.
-	m := map[string]map[string]string{}
-	if len(f) == 0 {
-		return m, nil
-	}
-
-	if err := json.NewDecoder(bytes.NewReader(f)).Decode(&m); err != nil {
-		return nil, err
-	}
-
-	return m, nil
-}
-
-func writeJSONMaps(path string, m map[string]map[string]string) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- specified by admin by design
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
 		return err
 	}
@@ -171,5 +244,5 @@ func writeJSONMaps(path string, m map[string]map[string]string) error {
 
 	e := json.NewEncoder(f)
 	e.SetIndent("", "  ")
-	return e.Encode(m)
+	return e.Encode(u.entries)
 }

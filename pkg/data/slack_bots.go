@@ -1,38 +1,52 @@
 package data
 
+import "sync"
+
 const (
-	slackBotsFile = "slack_bots.toml"
+	slackBotsFile = "slack_bots.json"
 )
 
 func SetSlackBotUserID(botID, userID string) error {
-	path := dataPath(slackBotsFile)
-
-	m, err := readTOML(path)
+	m, err := readSlackBotsFile()
 	if err != nil {
 		return err
 	}
 
 	m[botID] = userID
-	return writeTOML(path, m)
+	return writeSlackBotsFile(m)
 }
 
 func DeleteSlackBotIDs(botID string) error {
-	path := dataPath(slackBotsFile)
-
-	m, err := readTOML(path)
+	m, err := readSlackBotsFile()
 	if err != nil {
 		return err
 	}
 
 	delete(m, botID)
-	return writeTOML(path, m)
+	return writeSlackBotsFile(m)
 }
 
 func GetSlackBotUserID(botID string) (string, error) {
-	m, err := readTOML(dataPath(slackBotsFile))
+	m, err := readSlackBotsFile()
 	if err != nil {
 		return "", err
 	}
 
 	return m[botID], nil
+}
+
+var slackBotsMutex sync.RWMutex
+
+func readSlackBotsFile() (map[string]string, error) {
+	slackBotsMutex.RLock()
+	defer slackBotsMutex.RUnlock()
+
+	return readJSON(slackBotsFile)
+}
+
+func writeSlackBotsFile(m map[string]string) error {
+	slackBotsMutex.Lock()
+	defer slackBotsMutex.Unlock()
+
+	return writeJSON(slackBotsFile, m)
 }

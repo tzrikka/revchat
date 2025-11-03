@@ -8,6 +8,7 @@ import (
 func TestBitbucket(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
+	pathCache = map[string]string{} // Reset global state.
 
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 

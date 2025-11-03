@@ -7,6 +7,7 @@ import (
 func TestURLsIDs(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
+	pathCache = map[string]string{} // Reset global state.
 
 	url := "url"
 	channel := "channel"

@@ -8,6 +8,7 @@ import (
 func TestReminders(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
+	pathCache = map[string]string{} // Reset global state.
 
 	uid1 := "U123456"
 	kt1 := "9:00AM"

@@ -34,20 +34,20 @@ func GitHubToSlackID(ctx workflow.Context, cmd *cli.Command, username string, ch
 		return ""
 	}
 
-	email, err := data.GitHubUserEmailByID(username)
+	user, err := data.SelectUserByGitHubID(username)
 	if err != nil {
-		log.Error(ctx, "failed to load GitHub user email", "error", err, "username", username)
+		log.Error(ctx, "failed to load user by GitHub ID", "error", err, "username", username)
 		return ""
 	}
 
-	if email == "" || email == "bot" {
+	if user.Email == "" || user.Email == "bot" {
 		return ""
 	}
 
 	if checkOptIn {
-		optedIn, err := data.IsOptedIn(email)
+		optedIn, err := data.IsOptedIn(user.Email)
 		if err != nil {
-			log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
+			log.Error(ctx, "failed to load user opt-in status", "error", err, "email", user.Email)
 			return ""
 		}
 		if !optedIn {
@@ -55,5 +55,5 @@ func GitHubToSlackID(ctx workflow.Context, cmd *cli.Command, username string, ch
 		}
 	}
 
-	return EmailToSlackID(ctx, email)
+	return EmailToSlackID(ctx, user.Email)
 }

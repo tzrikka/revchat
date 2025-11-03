@@ -16,14 +16,14 @@ import (
 // This depends on the user's email address being the same in both systems.
 // This function uses data caching, and API calls as a fallback.
 func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
-	email, err := data.BitbucketUserEmailByID(accountID)
+	user, err := data.SelectUserByBitbucketID(accountID)
 	if err != nil {
-		log.Error(ctx, "failed to load Bitbucket user email", "error", err, "account_id", accountID)
+		log.Error(ctx, "failed to load user by Bitbucket ID", "error", err, "account_id", accountID)
 		return "", err
 	}
 
-	if email != "" {
-		return email, nil
+	if user.Email != "" {
+		return user.Email, nil
 	}
 
 	// Fallback: lookup Bitbucket user in Jira to get their email address,
@@ -34,8 +34,8 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 		return "", err
 	}
 
-	email = jiraUser.Email
-	if err := data.AddBitbucketUser(accountID, email); err != nil {
+	email := jiraUser.Email
+	if err := data.UpsertUser(email, accountID, "", "", ""); err != nil {
 		log.Error(ctx, "failed to save Bitbucket account ID/email mapping", "error", err, "account_id", accountID, "email", email)
 		// Don't abort - we have the email address, even if we failed to save it.
 	}
@@ -99,13 +99,13 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 		return "", errors.New("empty email address")
 	}
 
-	id, err := data.BitbucketUserIDByEmail(email)
+	user, err := data.SelectUserByEmail(email)
 	if err != nil {
-		log.Error(ctx, "failed to load Bitbucket account ID", "error", err, "email", email)
+		log.Error(ctx, "failed to load user by email", "error", err, "email", email)
 		// Don't abort - try to use the Bitbucket API as a fallback.
 	}
-	if id != "" {
-		return id, nil
+	if user.BitbucketID != "" {
+		return user.BitbucketID, nil
 	}
 
 	users, err := jira.UsersSearchActivity(ctx, email)
@@ -122,8 +122,8 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 		return "", fmt.Errorf("multiple (%d) Bitbucket accounts found for %q", len(users), email)
 	}
 
-	id = users[0].AccountID
-	if err := data.AddBitbucketUser(users[0].AccountID, email); err != nil {
+	id := users[0].AccountID
+	if err := data.UpsertUser(email, id, "", "", ""); err != nil {
 		log.Error(ctx, "failed to save Bitbucket account ID/email mapping", "error", err, "account_id", id, "email", email)
 	}
 
