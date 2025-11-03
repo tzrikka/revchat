@@ -25,9 +25,9 @@ type RepositoryEvent struct {
 	Repository Repository `json:"repository"`
 	Actor      Account    `json:"actor"`
 
-	Commit       *Commit        `json:"commit,omitempty"`
-	Comment      *Comment       `json:"comment,omitempty"`
-	CommitStatus map[string]any `json:"commit_status,omitempty"`
+	Commit       *Commit       `json:"commit,omitempty"`
+	Comment      *Comment      `json:"comment,omitempty"`
+	CommitStatus *CommitStatus `json:"commit_status,omitempty"`
 }
 
 type Account = bitbucket.User
@@ -59,6 +59,25 @@ type Comment struct {
 }
 
 type Commit = bitbucket.Commit
+
+type CommitStatus struct {
+	// Type string `json:"type"` // Always "build".
+
+	Name        string `json:"name"`
+	State       string `json:"state"`
+	Description string `json:"description"`
+	Key         string `json:"key"`
+	URL         string `json:"url"`
+
+	Refname *string `json:"refname"`
+	Commit  *Commit `json:"commit,omitempty"`
+	// Repository *Repository `json:"repository,omitempty"` // Unnecessary.
+
+	CreatedOn string `json:"created_on"`
+	UpdatedOn string `json:"updated_on"`
+
+	Links map[string]Link `json:"links"`
+}
 
 type Inline struct {
 	From         *int   `json:"from"`
