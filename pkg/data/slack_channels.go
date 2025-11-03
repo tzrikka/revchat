@@ -49,7 +49,7 @@ func appendToCSVFile(record []string) error {
 		return err
 	}
 
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, filePerms)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, filePerms) //gosec:disable G304 -- specified by admin by design
 	if err != nil {
 		return err
 	}
