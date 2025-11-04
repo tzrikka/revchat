@@ -27,7 +27,7 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 		return err
 	}
 	if pr == nil {
-		log.Debug(ctx, "PR not found for commit status", "hash", cs.Commit.Hash)
+		log.Debug(ctx, "PR not found for commit status", "hash", cs.Commit.Hash, "build_name", cs.Name, "build_url", cs.URL)
 		// Not an error: the commit may not belong to any open PR,
 		// or may be obsoleted by a newer commit in the snapshot.
 		return nil
