@@ -162,13 +162,14 @@ func prDetails(ctx workflow.Context, url string) string {
 	sb.WriteString(fmt.Sprintf("\n          ◦   Created `%s` ago", created))
 
 	if updated := timeSince(now, pr["updated_on"]); updated != "" {
-		sb.WriteString(fmt.Sprintf(", updated: `%s` ago", updated))
+		sb.WriteString(fmt.Sprintf(", updated `%s` ago", updated))
 	}
 
 	sb.WriteString(", TODO: build states")
 
 	// User-specific details.
-	sb.WriteString("\n          ◦   TODO: time since user's review, code-owner/high-risk files > 0")
+	sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
+	sb.WriteString("\n          ◦   TODO: Code owner / high risk files?")
 
 	// Approvals.
 	count, names := approvals(ctx, pr)
@@ -177,29 +178,6 @@ func prDetails(ctx workflow.Context, url string) string {
 	}
 
 	return sb.String()
-}
-
-func timeSince(now time.Time, timestamp any) string {
-	s, ok := timestamp.(string)
-	if !ok || s == "" {
-		return ""
-	}
-
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return ""
-	}
-
-	d := now.Sub(t).Round(time.Minute)
-	if d.Hours() < 24 {
-		s, _ = strings.CutSuffix(d.String(), "0s")
-		return s
-	}
-
-	days := int(d.Hours()) / 24
-	d -= time.Hour * time.Duration(24*days)
-	s, _ = strings.CutSuffix(fmt.Sprintf("%dd%s", days, d), "0s")
-	return s
 }
 
 func approvals(ctx workflow.Context, pr map[string]any) (int, string) {

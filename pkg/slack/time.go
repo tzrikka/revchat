@@ -42,3 +42,26 @@ func normalizeTime(timeStr, amPm string) (string, error) {
 
 	return t.Format(time.Kitchen), nil
 }
+
+func timeSince(now time.Time, timestamp any) string {
+	s, ok := timestamp.(string)
+	if !ok || s == "" {
+		return ""
+	}
+
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return ""
+	}
+
+	d := now.Sub(t).Round(time.Minute)
+	if d.Hours() < 24 {
+		s, _ = strings.CutSuffix(d.String(), "0s")
+		return s
+	}
+
+	days := int(d.Hours()) / 24
+	d -= time.Hour * time.Duration(24*days)
+	s, _ = strings.CutSuffix(fmt.Sprintf("%dd%s", days, d), "0s")
+	return s
+}
