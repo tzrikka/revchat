@@ -8,6 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 type Config struct {
@@ -105,13 +106,14 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 			e := PullRequestEvent{}
 			c.Receive(ctx, &e)
 
-			var found bool
 			signal := c.Name()
+			log.Info(ctx, "received signal", "signal", signal)
+			metrics.IncrementSignalCounter(ctx, signal)
+
+			var found bool
 			if _, e.Type, found = strings.Cut(signal, "pullrequest."); !found {
 				e.Type = signal
 			}
-
-			log.Info(ctx, "received signal", "signal", signal)
 			wf := workflow.ExecuteChildWorkflow(childCtx, signal, e)
 
 			// Wait for [Config.prCreated] completion before returning, to ensure we handle
@@ -132,13 +134,14 @@ func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, task
 			e := RepositoryEvent{}
 			c.Receive(ctx, &e)
 
-			var found bool
 			signal := c.Name()
+			log.Info(ctx, "received signal", "signal", signal)
+			metrics.IncrementSignalCounter(ctx, signal)
+
+			var found bool
 			if _, e.Type, found = strings.Cut(signal, "repo."); !found {
 				e.Type = signal
 			}
-
-			log.Info(ctx, "received signal", "signal", signal)
 			workflow.ExecuteChildWorkflow(childCtx, signal, e)
 		})
 	}

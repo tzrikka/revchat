@@ -6,6 +6,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 type Config struct {
@@ -45,8 +46,11 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		e := PullRequestEvent{}
 		c.Receive(ctx, &e)
 
-		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
-		wf := workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+		signal := c.Name()
+		log.Info(ctx, "received signal", "signal", signal, "action", e.Action)
+		metrics.IncrementSignalCounter(ctx, signal)
+
+		wf := workflow.ExecuteChildWorkflow(childCtx, signal, e)
 
 		// Wait for [Config.prOpened] completion before returning, to ensure we handle
 		// subsequent PR initialization events appropriately (e.g. check states).
@@ -59,31 +63,43 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		e := PullRequestReviewEvent{}
 		c.Receive(ctx, &e)
 
-		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
-		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+		signal := c.Name()
+		log.Info(ctx, "received signal", "signal", signal, "action", e.Action)
+		metrics.IncrementSignalCounter(ctx, signal)
+
+		workflow.ExecuteChildWorkflow(childCtx, signal, e)
 	})
 
 	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[2]), func(c workflow.ReceiveChannel, _ bool) {
 		e := PullRequestReviewCommentEvent{}
 		c.Receive(ctx, &e)
 
-		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
-		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+		signal := c.Name()
+		log.Info(ctx, "received signal", "signal", signal, "action", e.Action)
+		metrics.IncrementSignalCounter(ctx, signal)
+
+		workflow.ExecuteChildWorkflow(childCtx, signal, e)
 	})
 
 	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[3]), func(c workflow.ReceiveChannel, _ bool) {
 		e := PullRequestReviewThreadEvent{}
 		c.Receive(ctx, &e)
 
-		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
-		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+		signal := c.Name()
+		log.Info(ctx, "received signal", "signal", signal, "action", e.Action)
+		metrics.IncrementSignalCounter(ctx, signal)
+
+		workflow.ExecuteChildWorkflow(childCtx, signal, e)
 	})
 
 	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[4]), func(c workflow.ReceiveChannel, _ bool) {
 		e := IssueCommentEvent{}
 		c.Receive(ctx, &e)
 
-		log.Info(ctx, "received signal", "signal", c.Name(), "action", e.Action)
-		workflow.ExecuteChildWorkflow(childCtx, c.Name(), e)
+		signal := c.Name()
+		log.Info(ctx, "received signal", "signal", signal, "action", e.Action)
+		metrics.IncrementSignalCounter(ctx, signal)
+
+		workflow.ExecuteChildWorkflow(childCtx, signal, e)
 	})
 }

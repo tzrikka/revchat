@@ -11,6 +11,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 type Config struct {
@@ -100,8 +101,11 @@ func addSignalHandler[T any](sel workflow.Selector, ctx, childCtx workflow.Conte
 		var event T
 		c.Receive(ctx, &event)
 
-		log.Info(ctx, "received signal", "signal", c.Name())
-		workflow.ExecuteChildWorkflow(childCtx, c.Name(), event)
+		signal := c.Name()
+		log.Info(ctx, "received signal", "signal", signal)
+		metrics.IncrementSignalCounter(ctx, signal)
+
+		workflow.ExecuteChildWorkflow(childCtx, signal, event)
 	})
 }
 
