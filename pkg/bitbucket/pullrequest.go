@@ -112,8 +112,8 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 	// Commit(s) pushed to the PR branch.
 	if snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
+		slices.Reverse(cs) // Switch from reverse order to chronological order.
 		cs = cs[snapshot.CommitCount:]
-		slices.Reverse(cs)
 
 		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, len(cs))
 		if len(cs) != 1 {
