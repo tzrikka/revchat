@@ -68,7 +68,10 @@ func bitbucketToSlackLists(text string) string {
 
 	// Up to 2 levels: "-" or "+" or "*" --> "•" and "◦".
 	text = regexp.MustCompile(`(?m)^[-*+]\s+`).ReplaceAllString(text, "  •  ")
-	return regexp.MustCompile(`(?m)^\s{2,4}[-*+]\s+`).ReplaceAllString(text, "          ◦   ")
+	text = regexp.MustCompile(`(?m)^\s{2,4}[-*+]\s+`).ReplaceAllString(text, "          ◦   ")
+
+	// Sometimes Bitbucket escapes the "." in ordered lists.
+	return regexp.MustCompile(`(?m)^(\s*\d+)\\\.(\s+)`).ReplaceAllString(text, "${1}.${2}")
 }
 
 func bitbucketToSlackTextStyles(text string) string {
@@ -87,7 +90,10 @@ func bitbucketToSlackTextStyles(text string) string {
 	text = regexp.MustCompile(`~~(.+?)~~`).ReplaceAllString(text, "~${1}~")
 
 	// Header lines --> bold lines: "# ..." --> "*# ...*".
-	return regexp.MustCompile(`(?m)^(#+)\s+(.+)`).ReplaceAllString(text, "*${1} ${2}*")
+	text = regexp.MustCompile(`(?m)^(#+)\s+(.+)`).ReplaceAllString(text, "*${1} ${2}*")
+
+	// Fix header lines with explicit boldface: "# **...**" --> "*# ...*".
+	return regexp.MustCompile(`(?m)^\*(#+) \*(.+?)\*\*`).ReplaceAllString(text, "*${1} ${2}*")
 }
 
 func bitbucketToSlackWhitespaces(text string) string {

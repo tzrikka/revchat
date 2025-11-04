@@ -31,6 +31,16 @@ func TestBitbucketToSlack(t *testing.T) {
 			want: "*### H3*",
 		},
 		{
+			name: "bolded_h1",
+			text: "# **Bolded H1**",
+			want: "*# Bolded H1*",
+		},
+		{
+			name: "bolded_h2",
+			text: "## **Bolded H2**",
+			want: "*## Bolded H2*",
+		},
+		{
 			name: "multiple_headers",
 			text: "# Title 1\n\nFoo\n\n## Subtitle 2\nBar",
 			want: "*# Title 1*\n\nFoo\n\n*## Subtitle 2*\nBar",
@@ -194,6 +204,11 @@ func TestBitbucketToSlack(t *testing.T) {
 			name: "simple_list_6",
 			text: "+ 111 + 222\n+ 333",
 			want: "  •  111 + 222\n  •  333",
+		},
+		{
+			name: "escaped_ordered_list",
+			text: "1\\. First item\n2\\. Second item",
+			want: "1. First item\n2. Second item",
 		},
 		// Embedded lists.
 		{
