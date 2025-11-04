@@ -147,6 +147,10 @@ func SelectUserBySlackID(slackID string) (User, error) {
 }
 
 func selectUserBy(indexType int, id string) (User, error) {
+	if id == "" {
+		return User{}, nil
+	}
+
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
 

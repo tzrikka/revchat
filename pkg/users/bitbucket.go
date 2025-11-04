@@ -16,6 +16,10 @@ import (
 // This depends on the user's email address being the same in both systems.
 // This function uses data caching, and API calls as a fallback.
 func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
+	if accountID == "" {
+		return "", errors.New("missing Bitbucket account ID")
+	}
+
 	user, err := data.SelectUserByBitbucketID(accountID)
 	if err != nil {
 		log.Error(ctx, "failed to load user by Bitbucket ID", "error", err, "account_id", accountID)
@@ -48,11 +52,7 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 // This function returns an empty string if the account ID is not found.
 func BitbucketToSlackID(ctx workflow.Context, accountID string, checkOptIn bool) string {
 	email, err := BitbucketToEmail(ctx, accountID)
-	if err != nil {
-		return ""
-	}
-
-	if email == "" || email == "bot" {
+	if err != nil || email == "" || email == "bot" {
 		return ""
 	}
 
@@ -79,17 +79,20 @@ func BitbucketToSlackRef(ctx workflow.Context, accountID, displayName string) st
 		return fmt.Sprintf("<@%s>", id)
 	}
 
-	if displayName == "" {
-		user, err := bitbucket.UsersGetActivity(ctx, accountID, "")
-		if err != nil {
-			log.Error(ctx, "failed to retrieve Bitbucket user info", "error", err, "account_id", accountID)
-			return accountID // Fallback: return the original Bitbucket account ID.
-		}
-
-		displayName = user.DisplayName
+	if displayName != "" {
+		return displayName
+	}
+	if accountID == "" {
+		return "A bot"
 	}
 
-	return displayName
+	user, err := bitbucket.UsersGetActivity(ctx, accountID, "")
+	if err != nil {
+		log.Error(ctx, "failed to retrieve Bitbucket user info", "error", err, "account_id", accountID)
+		return accountID // Fallback: return the original Bitbucket account ID.
+	}
+
+	return user.DisplayName
 }
 
 // EmailToBitbucketID retrieves a Bitbucket user's account ID based on their
