@@ -88,8 +88,8 @@ func RegisterRepositoryWorkflows(w worker.Worker) {
 	fs := []repoWorkflowFunc{
 		commitCommentCreatedWorkflow,
 
-		commitStatusCreatedWorkflow,
-		commitStatusUpdatedWorkflow,
+		commitStatusWorkflow,
+		commitStatusWorkflow,
 	}
 
 	for i, f := range fs {

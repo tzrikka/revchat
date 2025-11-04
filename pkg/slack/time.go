@@ -56,12 +56,10 @@ func timeSince(now time.Time, timestamp any) string {
 
 	d := now.Sub(t).Round(time.Minute)
 	if d.Hours() < 24 {
-		s, _ = strings.CutSuffix(d.String(), "0s")
-		return s
+		return strings.TrimSuffix(d.String(), "0s")
 	}
 
 	days := int(d.Hours()) / 24
 	d -= time.Hour * time.Duration(24*days)
-	s, _ = strings.CutSuffix(fmt.Sprintf("%dd%s", days, d), "0s")
-	return s
+	return strings.TrimSuffix(fmt.Sprintf("%dd%s", days, d), "0s")
 }
