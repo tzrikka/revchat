@@ -137,7 +137,6 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
-	log.Warn(ctx, "unhandled Bitbucket PR update event", "pr_url", url)
 	return err
 }
 
