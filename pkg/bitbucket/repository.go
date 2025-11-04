@@ -23,8 +23,14 @@ func commitCommentCreatedWorkflow(ctx workflow.Context, event RepositoryEvent) e
 func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	cs := event.CommitStatus
 	pr, err := findPRByCommit(ctx, cs.Commit.Hash)
-	if err != nil || pr == nil {
+	if err != nil {
 		return err
+	}
+	if pr == nil {
+		log.Debug(ctx, "PR not found for commit status", "hash", cs.Commit.Hash)
+		// Not an error: the commit may not belong to any open PR,
+		// or may be obsoleted by a newer commit in the snapshot.
+		return nil
 	}
 
 	eventType := strings.TrimPrefix(event.Type, "commit_status_")
@@ -73,11 +79,6 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 		return nil
 	})
 
-	if pr != nil {
-		log.Debug(ctx, "found PR for commit status", "pr_url", prURL(pr))
-	} else {
-		log.Debug(ctx, "PR not found for commit status", "hash", eventHash)
-	}
 	return
 }
 
