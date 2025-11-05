@@ -13,7 +13,7 @@ import (
 func commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 	workspace, repo, found := strings.Cut(event.Repository.FullName, "/")
 	if !found {
-		log.Error(ctx, "failed to parse Bitbucket workspace and repository name", "ful_name", event.Repository.FullName)
+		log.Error(ctx, "failed to parse Bitbucket workspace and repository name", "full_name", event.Repository.FullName)
 		return nil
 	}
 
@@ -25,7 +25,8 @@ func commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 	})
 	if err != nil {
 		url := event.PullRequest.Links["html"].HRef
-		log.Error(ctx, "failed to list Bitbucket PR commits", "error", err, "url", url)
+		log.Error(ctx, "failed to list Bitbucket PR commits", "error", err, "pr_url", url,
+			"workspace", workspace, "repo", repo, "pr_id", event.PullRequest.ID)
 		return nil
 	}
 
