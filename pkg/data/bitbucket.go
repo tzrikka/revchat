@@ -65,7 +65,7 @@ func DeleteBitbucketPR(url string) error {
 // It creates any necessary parent directories, but not the file itself.
 func prPath(url string) string {
 	prefix, _ := xdg.CreateDir(xdg.DataHome, config.DirName)
-	suffix, _ := strings.CutPrefix(url, "https://")
+	suffix := strings.TrimPrefix(url, "https://")
 	filePath := filepath.Clean(filepath.Join(prefix, suffix))
 
 	_ = os.MkdirAll(filepath.Dir(filePath), xdg.NewDirectoryPermissions)
