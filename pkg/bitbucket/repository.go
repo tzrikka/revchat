@@ -47,6 +47,13 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 		return nil
 	}
 
+	url := pr.Links["html"].HRef
+	status := data.CommitStatus{State: cs.State, Desc: cs.Description, URL: cs.URL}
+	if err := data.UpdateBitbucketBuilds(url, cs.Commit.Hash, cs.Name, status); err != nil {
+		log.Error(ctx, "failed to update Bitbucket build states", "error", err, "pr_url", url, "commit_hash", cs.Commit.Hash)
+		// Continue anyway.
+	}
+
 	var msg string
 	switch cs.State {
 	case "INPROGRESS":
@@ -58,7 +65,6 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	}
 	msg = fmt.Sprintf(`%s "%s" build status: <%s|%s>`, msg, cs.Name, cs.URL, cs.Description)
 	_, err = slack.PostMessage(ctx, channelID, msg)
-
 	return err
 }
 

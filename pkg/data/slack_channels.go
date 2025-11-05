@@ -63,6 +63,6 @@ func LogSlackChannelRenamed(channelID, name string) error {
 
 func timestampAndPath() (now, path string, err error) {
 	now = time.Now().UTC().Format(time.RFC3339)
-	path, err = cachedDataPath(slackChannelsFile)
+	path, err = cachedDataPath(slackChannelsFile, "")
 	return
 }

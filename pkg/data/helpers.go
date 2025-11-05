@@ -2,8 +2,11 @@ package data
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/xdg"
@@ -17,7 +20,7 @@ const (
 var pathCache = map[string]string{}
 
 func readJSON(filename string) (map[string]string, error) {
-	path, err := cachedDataPath(filename)
+	path, err := cachedDataPath(filename, "")
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +49,7 @@ func readJSON(filename string) (map[string]string, error) {
 }
 
 func writeJSON(filename string, m map[string]string) error {
-	path, err := cachedDataPath(filename)
+	path, err := cachedDataPath(filename, "")
 	if err != nil {
 		return err
 	}
@@ -62,15 +65,15 @@ func writeJSON(filename string, m map[string]string) error {
 	return e.Encode(m)
 }
 
-func cachedDataPath(filename string) (string, error) {
+func cachedDataPath(filename, suffix string) (string, error) {
 	path, found := pathCache[filename]
 	if found {
 		return path, nil
 	}
 
-	// Special handling for PR turn files.
+	// Special handling for PR turn and status files.
 	if strings.HasPrefix(filename, "https://") {
-		path := turnPath(filename)
+		path := urlBasedPath(filename, suffix)
 		pathCache[filename] = path
 		return path, nil
 	}
@@ -83,4 +86,26 @@ func cachedDataPath(filename string) (string, error) {
 
 	pathCache[filename] = path
 	return path, nil
+}
+
+// urlBasedPath returns the absolute path to a JSON file related to a specific PR.
+// This function is different from [xdg.CreateFile] because it supports subdirectories.
+// It creates any necessary parent directories, but not the file itself.
+func urlBasedPath(url, suffix string) string {
+	prefix, _ := xdg.CreateDir(xdg.DataHome, config.DirName)
+	subdirs := strings.TrimPrefix(url, "https://")
+	filePath := filepath.Clean(filepath.Join(prefix, subdirs))
+
+	_ = os.MkdirAll(filepath.Dir(filePath), xdg.NewDirectoryPermissions)
+
+	return fmt.Sprintf("%s_%s.json", filePath, suffix)
+}
+
+type RWMutexMap struct {
+	sm sync.Map
+}
+
+func (mm *RWMutexMap) Get(key string) *sync.RWMutex {
+	actual, _ := mm.sm.LoadOrStore(key, &sync.RWMutex{})
+	return actual.(*sync.RWMutex)
 }

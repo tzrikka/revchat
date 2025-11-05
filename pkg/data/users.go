@@ -186,7 +186,7 @@ func selectUserBy(indexType int, id string) (User, error) {
 }
 
 func readUsersFile() (*Users, error) {
-	path, err := cachedDataPath(usersFile)
+	path, err := cachedDataPath(usersFile, "")
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func readUsersFile() (*Users, error) {
 }
 
 func (u *Users) writeUsersFile() error {
-	path, err := cachedDataPath(usersFile)
+	path, err := cachedDataPath(usersFile, "")
 	if err != nil {
 		return err
 	}

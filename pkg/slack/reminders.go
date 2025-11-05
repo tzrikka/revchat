@@ -165,7 +165,10 @@ func prDetails(ctx workflow.Context, url string) string {
 		sb.WriteString(fmt.Sprintf(", updated `%s` ago", updated))
 	}
 
-	sb.WriteString(", TODO: build states")
+	if b := data.SummarizeBitbucketBuilds(url); b != "" {
+		sb.WriteString(", build states: ")
+		sb.WriteString(b)
+	}
 
 	// User-specific details.
 	sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")

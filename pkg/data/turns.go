@@ -3,13 +3,7 @@ package data
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"slices"
-	"strings"
-	"sync"
-
-	"github.com/tzrikka/revchat/pkg/config"
-	"github.com/tzrikka/xdg"
 )
 
 // PRTurn represents the attention state for a specific pull request.
@@ -65,6 +59,8 @@ type PRTurn struct {
 	Set       bool            `json:"set"`       // Whether the attention state has been set explicitly.
 }
 
+var turnMutexes RWMutexMap
+
 // InitTurn initializes the attention state of a new PR.
 // Users are specified using their email addresses.
 func InitTurn(url, author string, reviewers []string) error {
@@ -77,13 +73,17 @@ func InitTurn(url, author string, reviewers []string) error {
 		t.Reviewers[reviewer] = true
 	}
 
-	return writeTurnFile(url, t)
+	return writeTurnFile(url, t) // Happens only once per PR, so no need for mutex here.
 }
 
 // DeleteTurn removes the attention state file of a specific PR.
 // This is used when the PR is closed or marked as a draft.
 func DeleteTurn(url string) error {
-	return os.Remove(turnPath(url))
+	mu := turnMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
+
+	return os.Remove(urlBasedPath(url, "turn")) //gosec:disable G304 -- URL received from signature-verified 3rd-party
 }
 
 // AddReviewerToPR adds a new reviewer to the attention list of a specific PR.
@@ -93,6 +93,10 @@ func AddReviewerToPR(url, email string) error {
 	if email == "" || email == "bot" {
 		return nil
 	}
+
+	mu := turnMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
 
 	t, err := readTurnFile(url)
 	if err != nil {
@@ -113,6 +117,10 @@ func AddReviewerToPR(url, email string) error {
 // reviewer has their turn flag set to false, we add the author to the list as well,
 // unless the attention list was set explicitly using [SetTurn].
 func GetCurrentTurn(url string) ([]string, error) {
+	mu := turnMutexes.Get(url)
+	mu.RLock()
+	defer mu.RUnlock()
+
 	t, err := readTurnFile(url)
 	if err != nil {
 		return nil, err
@@ -148,6 +156,10 @@ func RemoveFromTurn(url, email string) error {
 		return nil
 	}
 
+	mu := turnMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
+
 	t, err := readTurnFile(url)
 	if err != nil {
 		return err
@@ -167,6 +179,10 @@ func RemoveFromTurn(url, email string) error {
 // input contains the PR author, they *are* added (temporarily, until [SwitchTurn]
 // is called for them). It also ignores empty or "bot" email addresses.
 func SetTurn(url string, emails []string) error {
+	mu := turnMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
+
 	t, err := readTurnFile(url)
 	if err != nil {
 		return err
@@ -196,6 +212,10 @@ func SwitchTurn(url, email string) error {
 		return nil
 	}
 
+	mu := turnMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
+
 	t, err := readTurnFile(url)
 	if err != nil {
 		return err
@@ -216,29 +236,9 @@ func SwitchTurn(url, email string) error {
 	return writeTurnFile(url, t)
 }
 
-var turnMutexes = map[string]*sync.RWMutex{}
-
-// turnPath returns the absolute path to the JSON file representing the attention state of a PR.
-// This function is different from [xdg.CreateFile] because it supports subdirectories.
-// It creates any necessary parent directories, but not the file itself.
-func turnPath(url string) string {
-	prefix, _ := xdg.CreateDir(xdg.DataHome, config.DirName)
-	suffix := strings.TrimPrefix(url, "https://")
-	filePath := filepath.Clean(filepath.Join(prefix, suffix))
-
-	_ = os.MkdirAll(filepath.Dir(filePath), xdg.NewDirectoryPermissions)
-
-	return filePath + "_turn.json"
-}
-
+// readTurnFile expects the caller to hold the appropriate mutex.
 func readTurnFile(url string) (*PRTurn, error) {
-	if _, ok := turnMutexes[url]; !ok {
-		turnMutexes[url] = &sync.RWMutex{}
-	}
-	turnMutexes[url].RLock()
-	defer turnMutexes[url].RUnlock()
-
-	path, err := cachedDataPath(url)
+	path, err := cachedDataPath(url, "turn")
 	if err != nil {
 		return nil, err
 	}
@@ -257,14 +257,9 @@ func readTurnFile(url string) (*PRTurn, error) {
 	return t, nil
 }
 
+// writeTurnFile expects the caller to hold the appropriate mutex.
 func writeTurnFile(url string, t *PRTurn) error {
-	if _, ok := turnMutexes[url]; !ok {
-		turnMutexes[url] = &sync.RWMutex{}
-	}
-	turnMutexes[url].Lock()
-	defer turnMutexes[url].Unlock()
-
-	path, err := cachedDataPath(url)
+	path, err := cachedDataPath(url, "turn")
 	if err != nil {
 		return err
 	}
