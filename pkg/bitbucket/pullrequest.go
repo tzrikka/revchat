@@ -111,8 +111,15 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	}
 
 	// Commit(s) pushed to the PR branch.
-	if snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
+	if len(cs) > 0 && snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
 		slices.Reverse(cs) // Switch from reverse order to chronological order.
+
+		if snapshot.CommitCount >= len(cs) {
+			log.Error(ctx, "commit count in Bitbucket PR snapshot >= actual commit count",
+				"pr_url", url, "snapshot_count", snapshot.CommitCount, "actual_commits", len(cs))
+			// Workaround: announce just the latest commit.
+			snapshot.CommitCount = len(cs) - 1
+		}
 		cs = cs[snapshot.CommitCount:]
 
 		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, len(cs))
