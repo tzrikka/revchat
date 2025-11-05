@@ -1,7 +1,7 @@
 package bitbucket
 
 import (
-	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -12,6 +12,7 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/xdg"
 )
 
@@ -21,29 +22,44 @@ func commitCommentCreatedWorkflow(ctx workflow.Context, event RepositoryEvent) e
 }
 
 func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
+	// Commit status --> commit hash --> PR snapshot (JSON map) --> [PullRequest] struct.
 	cs := event.CommitStatus
-	pr, err := findPRByCommit(ctx, cs.Commit.Hash)
+	m, err := findPRByCommit(ctx, cs.Commit.Hash)
 	if err != nil {
 		return err
 	}
-	if pr == nil {
+	if m == nil {
 		log.Debug(ctx, "PR not found for commit status", "hash", cs.Commit.Hash, "build_name", cs.Name, "build_url", cs.URL)
 		// Not an error: the commit may not belong to any open PR,
 		// or may be obsoleted by a newer commit in the snapshot.
 		return nil
 	}
 
-	eventType := strings.TrimPrefix(event.Type, "commit_status_")
-	if eventType != "created" && eventType != "updated" {
-		log.Error(ctx, "unrecognized Bitbucket commit status type", "event", event.Type)
-		return errors.New("unrecognized Bitbucket commit status type: " + event.Type)
+	pr := new(PullRequest)
+	if err := mapToStruct(m, pr); err != nil {
+		log.Error(ctx, "invalid Bitbucket PR", "error", err, "pr_url", prURL(m))
+		return err
 	}
 
-	log.Info(ctx, "Bitbucket commit status "+eventType,
-		"pr_url", prURL(pr), "build_name", cs.Name, "build_state", cs.State,
-		"build_desc", cs.Description, "build_url", cs.URL)
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	channelID, found := lookupChannel(ctx, event.Type, *pr)
+	if !found {
+		return nil
+	}
 
-	return nil
+	var msg string
+	switch cs.State {
+	case "INPROGRESS":
+		msg = ":hourglass_flowing_sand:"
+	case "SUCCESSFUL":
+		msg = ":green_circle:"
+	default: // "FAILED", "STOPPED".
+		msg = ":red_circle:"
+	}
+	msg = fmt.Sprintf(`%s "%s" build status: <%s|%s>`, msg, cs.Name, cs.URL, cs.Description)
+	_, err = slack.PostMessage(ctx, channelID, msg)
+
+	return err
 }
 
 func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, err error) {
