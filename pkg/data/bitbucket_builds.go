@@ -17,7 +17,7 @@ type PRStatus struct {
 
 type CommitStatus struct {
 	State string `json:"state"`
-	Desc  string `json:"description"`
+	Desc  string `json:"desc"`
 	URL   string `json:"url"`
 }
 
