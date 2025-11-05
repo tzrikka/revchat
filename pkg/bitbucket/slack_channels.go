@@ -52,7 +52,7 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 
 	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
-		msg := fmt.Sprintf("Failed to archive this channel, even though its PR was %s.", state)
+		msg := fmt.Sprintf("Failed to archive this channel, even though its PR was %s", state)
 		_, _ = slack.PostMessage(ctx, channelID, msg)
 
 		return err
