@@ -78,7 +78,7 @@ func UpdateBitbucketBuilds(prURL, commitHash, name string, cs CommitStatus) erro
 
 // readStatusFile expects the caller to hold the appropriate mutex.
 func readStatusFile(url string) (*PRStatus, error) {
-	path, err := cachedDataPath(url, "status")
+	path, err := cachedDataPath(url, "_status")
 	if err != nil {
 		return nil, err
 	}

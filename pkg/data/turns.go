@@ -83,7 +83,7 @@ func DeleteTurn(url string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	return os.Remove(urlBasedPath(url, "turn")) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	return os.Remove(urlBasedPath(url, "_turn")) //gosec:disable G304 -- URL received from signature-verified 3rd-party
 }
 
 // AddReviewerToPR adds a new reviewer to the attention list of a specific PR.
@@ -238,7 +238,7 @@ func SwitchTurn(url, email string) error {
 
 // readTurnFile expects the caller to hold the appropriate mutex.
 func readTurnFile(url string) (*PRTurn, error) {
-	path, err := cachedDataPath(url, "turn")
+	path, err := cachedDataPath(url, "_turn")
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func readTurnFile(url string) (*PRTurn, error) {
 
 // writeTurnFile expects the caller to hold the appropriate mutex.
 func writeTurnFile(url string, t *PRTurn) error {
-	path, err := cachedDataPath(url, "turn")
+	path, err := cachedDataPath(url, "_turn")
 	if err != nil {
 		return err
 	}

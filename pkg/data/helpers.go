@@ -66,7 +66,7 @@ func writeJSON(filename string, m map[string]string) error {
 }
 
 func cachedDataPath(filename, suffix string) (string, error) {
-	path, found := pathCache[filename]
+	path, found := pathCache[filename+suffix]
 	if found {
 		return path, nil
 	}
@@ -74,7 +74,7 @@ func cachedDataPath(filename, suffix string) (string, error) {
 	// Special handling for PR turn and status files.
 	if strings.HasPrefix(filename, "https://") {
 		path := urlBasedPath(filename, suffix)
-		pathCache[filename] = path
+		pathCache[filename+suffix] = path
 		return path, nil
 	}
 
@@ -84,7 +84,7 @@ func cachedDataPath(filename, suffix string) (string, error) {
 		return "", err
 	}
 
-	pathCache[filename] = path
+	pathCache[filename+suffix] = path
 	return path, nil
 }
 
@@ -98,7 +98,7 @@ func urlBasedPath(url, suffix string) string {
 
 	_ = os.MkdirAll(filepath.Dir(filePath), xdg.NewDirectoryPermissions)
 
-	return fmt.Sprintf("%s_%s.json", filePath, suffix)
+	return fmt.Sprintf("%s%s.json", filePath, suffix)
 }
 
 type RWMutexMap struct {
