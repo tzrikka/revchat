@@ -20,7 +20,7 @@ func addReaction(ctx workflow.Context, url, emoji string) error {
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		log.Error(ctx, "can't add reaction to Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		log.Warn(ctx, "can't add reaction to Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 

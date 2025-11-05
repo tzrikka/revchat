@@ -23,7 +23,7 @@ func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Accoun
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		log.Debug(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
+		log.Warn(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 
@@ -68,7 +68,7 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		log.Error(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
+		log.Warn(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 
@@ -119,7 +119,7 @@ func deleteMsg(ctx workflow.Context, url string) error {
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		log.Error(ctx, "can't delete Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		log.Warn(ctx, "can't delete Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 
@@ -140,7 +140,7 @@ func editMsg(ctx workflow.Context, url, msg string) error {
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		log.Error(ctx, "can't update Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		log.Warn(ctx, "can't update Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
 		return errors.New("missing/bad Slack IDs")
 	}
 
