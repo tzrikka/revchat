@@ -41,7 +41,7 @@ type SlashCommandEvent struct {
 const DefaultReminderTime = "8:00AM"
 
 var (
-	remindersPattern = regexp.MustCompile(`^reminders?(\s+at)?\s+(\S+)\s*(a|am|p|pm)?`)
+	remindersPattern = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
 	usersPattern     = regexp.MustCompile(`^(nudge|ping|set turn to)\s+`)
 )
 
