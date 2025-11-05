@@ -99,7 +99,7 @@ func readStatusFile(url string) (*PRStatus, error) {
 
 // writeStatusFile expects the caller to hold the appropriate mutex.
 func writeStatusFile(url string, pr *PRStatus) error {
-	path, err := cachedDataPath(url, "status")
+	path, err := cachedDataPath(url, "_status")
 	if err != nil {
 		return err
 	}
