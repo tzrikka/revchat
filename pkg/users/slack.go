@@ -72,6 +72,10 @@ func SlackIDToEmail(ctx workflow.Context, userID string) (string, error) {
 // EmailToSlackID retrieves a Slack user's ID based on their email address.
 // This function uses data caching, and API calls as a fallback.
 func EmailToSlackID(ctx workflow.Context, email string) string {
+	if email == "" || email == "bot" {
+		return ""
+	}
+
 	user, err := data.SelectUserByEmail(email)
 	if err != nil {
 		log.Error(ctx, "failed to load user by email", "error", err, "email", email)
