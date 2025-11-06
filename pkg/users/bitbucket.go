@@ -23,15 +23,14 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 	user, err := data.SelectUserByBitbucketID(accountID)
 	if err != nil {
 		log.Error(ctx, "failed to load user by Bitbucket ID", "error", err, "account_id", accountID)
-		return "", err
+		// Don't abort - try to use the Jira API as a fallback
+		// (Bitbucket API does not expose email addresses directly).
 	}
 
 	if user.Email != "" {
 		return user.Email, nil
 	}
 
-	// Fallback: lookup Bitbucket user in Jira to get their email address,
-	// because Bitbucket API does not expose email addresses directly.
 	jiraUser, err := jira.UsersGetActivity(ctx, accountID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Jira user info", "error", err, "account_id", accountID)
@@ -51,23 +50,17 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 // This depends on the user's email address being the same in both systems.
 // This function returns an empty string if the account ID is not found.
 func BitbucketToSlackID(ctx workflow.Context, accountID string, checkOptIn bool) string {
-	email, err := BitbucketToEmail(ctx, accountID)
-	if err != nil || email == "" || email == "bot" {
+	user, err := data.SelectUserByBitbucketID(accountID)
+	if err != nil {
+		log.Error(ctx, "failed to load user by Bitbucket ID", "error", err, "account_id", accountID)
 		return ""
 	}
 
-	if checkOptIn {
-		optedIn, err := data.IsOptedIn(email)
-		if err != nil {
-			log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
-			return ""
-		}
-		if !optedIn {
-			return ""
-		}
+	if checkOptIn && user.ThrippyLink == "" {
+		return ""
 	}
 
-	return EmailToSlackID(ctx, email)
+	return user.SlackID
 }
 
 // BitbucketToSlackRef converts a Bitbucket account ID into a Slack user reference.
@@ -107,6 +100,7 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 		log.Error(ctx, "failed to load user by email", "error", err, "email", email)
 		// Don't abort - try to use the Bitbucket API as a fallback.
 	}
+
 	if user.BitbucketID != "" {
 		return user.BitbucketID, nil
 	}
@@ -128,6 +122,7 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 	id := users[0].AccountID
 	if err := data.UpsertUser(email, id, "", "", ""); err != nil {
 		log.Error(ctx, "failed to save Bitbucket account ID/email mapping", "error", err, "account_id", id, "email", email)
+		// Don't abort - we have the account ID, even if we failed to save it.
 	}
 
 	return id, nil

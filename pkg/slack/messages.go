@@ -11,7 +11,6 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
-	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -235,17 +234,19 @@ func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID s
 		// Don't abort - we still want to attempt to delete the PR comment.
 	}
 
-	linkID, err := userIDToLinkID(ctx, userID)
+	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
 		return err
 	}
-	if linkID == "" {
+
+	if user.ThrippyLink == "" {
 		msg := "Cannot mirror deletion in Bitbucket, you need to run the slash command `/revchat opt-in`"
 		return PostEphemeralMessage(ctx, event.Channel, userID, msg)
 	}
 
 	err = bitbucket.PullRequestsDeleteCommentActivity(ctx, bitbucket.PullRequestsDeleteCommentRequest{
-		ThrippyLinkID: linkID,
+		ThrippyLinkID: user.ThrippyLink,
 		Workspace:     sub[1],
 		RepoSlug:      sub[2],
 		PullRequestID: sub[3],
@@ -266,11 +267,13 @@ func (c *Config) createPRComment(ctx workflow.Context, url, msg, slackChannel, s
 		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
 	}
 
-	linkID, err := userIDToLinkID(ctx, slackUser)
+	user, err := data.SelectUserBySlackID(slackUser)
 	if err != nil {
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", slackUser)
 		return err
 	}
-	if linkID == "" {
+
+	if user.ThrippyLink == "" {
 		msg := "Cannot mirror message in Bitbucket, you need to run the slash command `/revchat opt-in`"
 		return PostEphemeralMessage(ctx, slackChannel, slackUser, msg)
 	}
@@ -278,7 +281,7 @@ func (c *Config) createPRComment(ctx workflow.Context, url, msg, slackChannel, s
 	msg = markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, msg) + "\n\n[This comment was created by RevChat]: #"
 
 	resp, err := bitbucket.PullRequestsCreateCommentActivity(ctx, bitbucket.PullRequestsCreateCommentRequest{
-		ThrippyLinkID: linkID,
+		ThrippyLinkID: user.ThrippyLink,
 		Workspace:     sub[1],
 		RepoSlug:      sub[2],
 		PullRequestID: sub[3],
@@ -298,18 +301,4 @@ func (c *Config) createPRComment(ctx workflow.Context, url, msg, slackChannel, s
 	}
 
 	return nil
-}
-
-func userIDToLinkID(ctx workflow.Context, userID string) (string, error) {
-	email, err := users.SlackIDToEmail(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-
-	linkID, err := data.UserLinkID(email)
-	if err != nil {
-		return "", err
-	}
-
-	return linkID, nil
 }

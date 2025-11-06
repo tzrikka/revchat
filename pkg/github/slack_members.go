@@ -95,17 +95,13 @@ func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, s
 	}
 
 	slackID := strings.TrimSuffix(strings.TrimPrefix(slackRef, "<@"), ">")
-	email, err := users.SlackIDToEmail(ctx, slackID)
+	user, err := data.SelectUserBySlackID(slackID)
 	if err != nil {
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", slackID)
 		return ""
 	}
 
-	optedIn, err := data.IsOptedIn(email)
-	if err != nil {
-		log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
-		return ""
-	}
-	if !optedIn {
+	if user.ThrippyLink == "" {
 		return ""
 	}
 

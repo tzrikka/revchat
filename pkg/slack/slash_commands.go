@@ -11,7 +11,6 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -98,25 +97,20 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 }
 
 func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	email, err := users.SlackIDToEmail(ctx, event.UserID)
+	user, err := data.SelectUserBySlackID(event.UserID)
 	if err != nil {
-		return err
-	}
-
-	found, err := data.IsOptedIn(email)
-	if err != nil {
-		log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", event.UserID)
 		postEphemeralError(ctx, event, "internal data reading error")
 		return err
 	}
 
-	if found {
+	if user.ThrippyLink != "" {
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":bell: You're already opted in.")
 	}
 
 	switch {
 	case c.bitbucketWorkspace != "":
-		return c.optInBitbucket(ctx, event, email)
+		return c.optInBitbucket(ctx, event, user)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		postEphemeralError(ctx, event, "internal configuration error")
@@ -124,13 +118,7 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 	}
 }
 
-func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, email string) error {
-	accountID, err := users.EmailToBitbucketID(ctx, c.bitbucketWorkspace, email)
-	if err != nil {
-		postEphemeralError(ctx, event, "internal data reading error")
-		return err
-	}
-
+func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, user data.User) error {
 	linkID, nonce, err := c.createThrippyLink(ctx)
 	if err != nil {
 		log.Error(ctx, "failed to create Thrippy link for Slack user", "error", err)
@@ -149,18 +137,18 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, e
 	if err != nil {
 		_ = c.deleteThrippyLink(ctx, linkID)
 		if err.Error() == ErrLinkAuthzTimeout { // For some reason errors.Is() doesn't work across Temporal.
-			log.Warn(ctx, "user did not complete Thrippy OAuth flow in time", "email", email)
+			log.Warn(ctx, "user did not complete Thrippy OAuth flow in time", "email", user.Email)
 			postEphemeralError(ctx, event, "Bitbucket authorization timed out - please try opting in again")
 			return nil // Not a *server* error as far as we are concerned.
 		} else {
-			log.Error(ctx, "failed to authorize Bitbucket user", "error", err, "email", email)
+			log.Error(ctx, "failed to authorize Bitbucket user", "error", err, "email", user.Email)
 			postEphemeralError(ctx, event, "failed to authorize you in Bitbucket")
 			return err
 		}
 	}
 
-	if err := data.OptInBitbucketUser(event.UserID, accountID, email, linkID); err != nil {
-		log.Error(ctx, "failed to opt-in user", "error", err, "email", email)
+	if err := data.UpsertUser("", "", "", user.SlackID, linkID); err != nil {
+		log.Error(ctx, "failed to opt-in user", "error", err, "email", user.Email)
 		postEphemeralError(ctx, event, "internal data writing error")
 		return err
 	}
@@ -176,24 +164,19 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, e
 }
 
 func optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	email, err := users.SlackIDToEmail(ctx, event.UserID)
+	user, err := data.SelectUserBySlackID(event.UserID)
 	if err != nil {
-		return err
-	}
-
-	found, err := data.IsOptedIn(email)
-	if err != nil {
-		log.Error(ctx, "failed to load user opt-in status", "error", err, "email", email)
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", event.UserID)
 		postEphemeralError(ctx, event, "internal data reading error")
 		return err
 	}
 
-	if !found {
+	if user.ThrippyLink == "" {
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
-	if err := data.OptOut(email); err != nil {
-		log.Error(ctx, "failed to opt-out user", "error", err, "email", email)
+	if err := data.UpsertUser(user.Email, user.BitbucketID, user.GitHubID, user.SlackID, ""); err != nil {
+		log.Error(ctx, "failed to opt-out user", "error", err, "email", user.Email)
 		postEphemeralError(ctx, event, "internal data writing error")
 		return err
 	}
