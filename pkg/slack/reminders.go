@@ -170,15 +170,14 @@ func prDetails(ctx workflow.Context, url string) string {
 		sb.WriteString(b)
 	}
 
-	// User-specific details.
-	sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
-	sb.WriteString("\n          ◦   TODO: Code owner / high risk files?")
-
-	// Approvals.
 	count, names := approvals(ctx, pr)
 	if count > 0 {
 		sb.WriteString(fmt.Sprintf("\n          ◦   Approvals: %d (%s)", count, names))
 	}
+
+	// User-specific details.
+	sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
+	sb.WriteString("\n          ◦   TODO: Code owner / high risk files?")
 
 	return sb.String()
 }
