@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -250,9 +251,19 @@ func setReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 }
 
 func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	log.Warn(ctx, "status slash command not implemented yet")
-	postEphemeralError(ctx, event, "not implemented yet")
-	return nil
+	prs := loadPRTurns(ctx)[event.UserID]
+
+	if len(prs) == 0 {
+		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":joy: No PRs require your attention at this time!")
+	}
+
+	slices.Sort(prs)
+	var msg strings.Builder
+	for _, url := range prs {
+		msg.WriteString(prDetails(ctx, url))
+	}
+
+	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
 }
 
 func turnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
