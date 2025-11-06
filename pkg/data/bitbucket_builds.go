@@ -34,24 +34,23 @@ func SummarizeBitbucketBuilds(url string) string {
 	}
 
 	names := slices.Sorted(maps.Keys(pr.Builds))
-	if len(names) == 0 {
-		return ""
-	}
-
-	summary := make([]string, len(names))
-	for i, name := range names {
+	var summary []string
+	for _, name := range names {
 		switch s := pr.Builds[name].State; s {
 		case "INPROGRESS":
-			summary[i] = "hourglass_flowing_sand"
+			// Don't show in-progress builds in summary.
 		case "SUCCESSFUL":
-			summary[i] = "green_circle"
+			summary = append(summary, "large_green_circle")
 		default: // "FAILED", "STOPPED".
-			summary[i] = "red_circle"
+			summary = append(summary, "red_circle")
 		}
 	}
 
 	// Returns a sequence of space-separated emoji.
-	return ":" + strings.Join(summary, ": :") + ":"
+	if len(summary) > 0 {
+		return ":" + strings.Join(summary, ": :") + ":"
+	}
+	return ""
 }
 
 func UpdateBitbucketBuilds(prURL, commitHash, name string, cs CommitStatus) error {

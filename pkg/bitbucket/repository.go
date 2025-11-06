@@ -59,7 +59,7 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	case "INPROGRESS":
 		msg = ":hourglass_flowing_sand:"
 	case "SUCCESSFUL":
-		msg = ":green_circle:"
+		msg = ":large_green_circle:"
 	default: // "FAILED", "STOPPED".
 		msg = ":red_circle:"
 	}
