@@ -193,7 +193,7 @@ func (c *Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent,
 	}
 	if url == "" {
 		log.Debug(ctx, "Slack message's PR comment URL is empty", "msg_subtype", event.Subtype, "channel_id", event.Channel, "msg_ts", event.ThreadTS)
-		return fmt.Errorf("no associated URL for Slack channel %q and message timestamp %q", event.Channel, event.ThreadTS)
+		return nil // If we're not tracking this PR, there's no need/way to announce this event.
 	}
 
 	return c.createPRComment(ctx, url, event.Text, event.Channel, fmt.Sprintf("%s/%s", id, event.TS), userID)
