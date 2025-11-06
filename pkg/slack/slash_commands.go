@@ -159,7 +159,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 	}
 
 	msg = ":bell: You are now opted into using RevChat.\n\n"
-	msg += ":alarm_clock: Default time for weekday reminders = **8 AM** (in your current timezone). "
+	msg += ":alarm_clock: Default time for weekday reminders = *8 AM* (in your current timezone). "
 	msg += "To change it, run this slash command:\n\n```/revchat reminders at &lt;time in 12h or 24h format&gt;```"
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
@@ -243,7 +243,7 @@ func setReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 
 	if !quiet {
 		t = fmt.Sprintf("%s %s", t[:len(t)-2], t[len(t)-2:]) // Insert space before AM/PM suffix.
-		msg := fmt.Sprintf(":alarm_clock: Your daily reminder time is set to **%s** _(%s)_ on weekdays.", t, user.TZ)
+		msg := fmt.Sprintf(":alarm_clock: Your daily reminder time is set to *%s* _(%s)_ on weekdays.", t, user.TZ)
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
 

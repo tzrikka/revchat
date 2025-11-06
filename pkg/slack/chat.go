@@ -16,7 +16,7 @@ func DeleteMessage(ctx workflow.Context, channelID, timestamp string) error {
 }
 
 func PostEphemeralMessage(ctx workflow.Context, channelID, userID, msg string) error {
-	req := slack.ChatPostEphemeralRequest{Channel: channelID, User: userID, MarkdownText: msg}
+	req := slack.ChatPostEphemeralRequest{Channel: channelID, User: userID, Text: msg}
 	if err := slack.ChatPostEphemeralActivity(ctx, req); err != nil {
 		log.Error(ctx, "failed to post Slack ephemeral message", "error", err)
 		return err
