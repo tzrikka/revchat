@@ -2,6 +2,8 @@ package data
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"slices"
 )
@@ -118,8 +120,8 @@ func AddReviewerToPR(url, email string) error {
 // unless the attention list was set explicitly using [SetTurn].
 func GetCurrentTurn(url string) ([]string, error) {
 	mu := turnMutexes.Get(url)
-	mu.RLock()
-	defer mu.RUnlock()
+	mu.Lock()
+	defer mu.Unlock()
 
 	t, err := readTurnFile(url)
 	if err != nil {
@@ -245,13 +247,16 @@ func readTurnFile(url string) (*PRTurn, error) {
 
 	f, err := os.Open(path) //gosec:disable G304 -- URL received from signature-verified 3rd-party
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return resetTurn(url)
+		}
 		return nil, err
 	}
 	defer f.Close()
 
 	t := new(PRTurn)
 	if err := json.NewDecoder(f).Decode(&t); err != nil {
-		return nil, err
+		return resetTurn(url)
 	}
 
 	return t, nil
@@ -273,4 +278,44 @@ func writeTurnFile(url string, t *PRTurn) error {
 	e := json.NewEncoder(f)
 	e.SetIndent("", "  ")
 	return e.Encode(t)
+}
+
+// resetTurn recreates the attention state file for a specific PR, based on the current
+// PR snapshot. This is a fallback for when the turn file is missing or corrupted.
+func resetTurn(url string) (*PRTurn, error) {
+	snapshot, err := LoadBitbucketPR(url)
+	if err != nil {
+		return nil, err
+	}
+
+	author := bitbucketIDToEmail(snapshot["author"])
+
+	reviewers := map[string]bool{}
+	jsonList, ok := snapshot["reviewers"].([]any)
+	if !ok {
+		jsonList = []any{}
+	}
+	for _, r := range jsonList {
+		reviewers[bitbucketIDToEmail(r)] = true
+	}
+
+	t := &PRTurn{Author: author, Reviewers: reviewers}
+	return t, writeTurnFile(url, t)
+}
+
+// bitbucketIDToEmail converts the "account_id" value in the given map
+// to the user's email address, based on RevChat's own user database.
+func bitbucketIDToEmail(snapshot any) string {
+	m, ok := snapshot.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	accountID, ok := m["account_id"].(string)
+	if !ok {
+		return ""
+	}
+
+	user, _ := SelectUserByBitbucketID(accountID)
+	return user.Email
 }
