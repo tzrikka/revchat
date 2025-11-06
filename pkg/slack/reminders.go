@@ -44,13 +44,15 @@ func remindersWorkflow(ctx workflow.Context) error {
 		// Send a reminder to the user if their reminder time matches
 		// the current time, and there are reminders to be sent to them.
 		if userPRs := prs[userID]; reminderTime.Equal(now) && len(userPRs) > 0 {
-			slices.Sort(userPRs)
 			log.Info(ctx, "sending scheduled Slack reminder to user", "user_id", userID, "pr_count", len(userPRs))
-			msg := ":bell: This is your scheduled daily reminder to check these PRs:"
+			slices.Sort(userPRs)
+
+			var msg strings.Builder
+			msg.WriteString(":bell: This is your scheduled daily reminder to check these PRs:")
 			for _, url := range userPRs {
-				msg += prDetails(ctx, url)
+				msg.WriteString(prDetails(ctx, url))
 			}
-			_, _ = PostMessage(ctx, userID, msg)
+			_, _ = PostMessage(ctx, userID, msg.String())
 		}
 	}
 
