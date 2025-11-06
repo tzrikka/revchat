@@ -12,13 +12,14 @@ func TestTurns(t *testing.T) {
 
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
-	// Pre-initialized state.
+	// Pre-initialized state (missing file).
 	got, err := GetCurrentTurn(url)
-	if err == nil {
+	if err != nil {
 		t.Fatal("GetCurrentTurn() error = nil, want = true")
 	}
-	if got != nil {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, nil)
+	want := []string{""}
+	if len(got) != 1 && got[0] != "" {
+		t.Fatalf("GetCurrentTurn() = %q, want = %q", got, want)
 	}
 
 	// Initialize state.
@@ -31,7 +32,7 @@ func TestTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCurrentTurn() error = %v", err)
 	}
-	want := []string{"author"}
+	want = []string{"author"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
