@@ -258,6 +258,9 @@ func readTurnFile(url string) (*PRTurn, error) {
 	if err := json.NewDecoder(f).Decode(&t); err != nil {
 		return resetTurn(url)
 	}
+	if t.Author == "" {
+		return resetTurn(url)
+	}
 
 	return t, nil
 }
