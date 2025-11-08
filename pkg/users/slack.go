@@ -83,6 +83,8 @@ func EmailToSlackID(ctx workflow.Context, email string) string {
 	}
 	if user.SlackID != "" {
 		return user.SlackID
+	} else if user.Email == email {
+		log.Warn(ctx, "user in DB without Slack ID", "email", email, "user", user)
 	}
 
 	slackUser, err := slack.UsersLookupByEmailActivity(ctx, email)

@@ -84,7 +84,9 @@ func loadPRTurns(ctx workflow.Context) map[string][]string {
 		for _, email := range emails {
 			if id := users.EmailToSlackID(ctx, email); id != "" {
 				slackIDs = append(slackIDs, id)
+				continue
 			}
+			log.Warn(ctx, "Slack email lookup error", "email", email, "pr_url", url)
 		}
 
 		slackUserIDs[url] = slackIDs
@@ -177,7 +179,6 @@ func prDetails(ctx workflow.Context, url string) string {
 		sb.WriteString(fmt.Sprintf("\n          ◦   Approvals: %d (%s)", count, names))
 	}
 
-	// User-specific details.
 	// sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
 	// sb.WriteString("\n          ◦   TODO: Code owner / high risk files?")
 
