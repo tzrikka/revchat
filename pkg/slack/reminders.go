@@ -86,7 +86,7 @@ func loadPRTurns(ctx workflow.Context) map[string][]string {
 				slackIDs = append(slackIDs, id)
 				continue
 			}
-			log.Warn(ctx, "Slack email lookup error", "email", email, "pr_url", url)
+			log.Warn(ctx, "Slack email lookup error", "all_emails", emails, "missing_email", email, "pr_url", url)
 		}
 
 		slackUserIDs[url] = slackIDs
