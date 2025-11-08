@@ -1,6 +1,9 @@
 package slack
 
 import (
+	"fmt"
+	"strings"
+
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
@@ -18,7 +21,11 @@ func DeleteMessage(ctx workflow.Context, channelID, timestamp string) error {
 func PostEphemeralMessage(ctx workflow.Context, channelID, userID, msg string) error {
 	req := slack.ChatPostEphemeralRequest{Channel: channelID, User: userID, Text: msg}
 	if err := slack.ChatPostEphemeralActivity(ctx, req); err != nil {
-		log.Error(ctx, "failed to post Slack ephemeral message", "error", err)
+		if strings.HasSuffix(err.Error(), "channel_not_found") || strings.HasSuffix(err.Error(), "not_in_channel") {
+			_, err = PostMessage(ctx, userID, fmt.Sprintf("Couldn't send you this message in <#%s>:\n\n%s", channelID, msg))
+		} else {
+			log.Error(ctx, "failed to post Slack ephemeral message", "error", err, "channel_id", channelID)
+		}
 		return err
 	}
 	return nil
