@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"encoding/csv"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -16,7 +17,7 @@ import (
 )
 
 const (
-	DefaultMetricsFileSignals = "revchat_metrics_signals.csv"
+	DefaultMetricsFileSignals = "metrics/revchat_signals_%s.csv"
 
 	fileFlags = os.O_APPEND | os.O_CREATE | os.O_WRONLY
 	filePerms = xdg.NewFilePermissions
@@ -30,14 +31,15 @@ func IncrementSignalCounter(ctx workflow.Context, name string) {
 	muSignals.Lock()
 	defer muSignals.Unlock()
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := AppendToCSVFile(DefaultMetricsFileSignals, []string{now, name}); err != nil {
+	now := time.Now().UTC()
+	path := fmt.Sprintf(DefaultMetricsFileSignals, now.Format(time.DateOnly))
+	if err := AppendToCSVFile(path, []string{now.Format(time.RFC3339), name}); err != nil && ctx != nil {
 		log.Error(ctx, "metrics error: failed to increment signal counter", "signal", name, "error", err)
 	}
 }
 
 func AppendToCSVFile(path string, record []string) error {
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- false positive
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- hardcoded path
 	if err != nil {
 		return err
 	}
