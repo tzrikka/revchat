@@ -79,12 +79,7 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 		return "", false
 	}
 
-	if channelID == "" {
-		log.Debug(ctx, "PR's Slack channel ID is empty", "event_type", eventType, "pr_url", u)
-		return "", false
-	}
-
-	return channelID, true
+	return channelID, channelID != ""
 }
 
 // cleanupPRData deletes all data associated with a PR. If there are errors,
