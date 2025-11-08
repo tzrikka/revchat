@@ -84,7 +84,7 @@ func EmailToSlackID(ctx workflow.Context, email string) string {
 	if user.SlackID != "" {
 		return user.SlackID
 	} else if user.Email == email {
-		log.Debug(ctx, "user in DB without Slack ID", "email", email, "user_entry", user)
+		log.Debug(ctx, "user in DB without Slack ID", "email", email)
 	}
 
 	slackUser, err := slack.UsersLookupByEmailActivity(ctx, email)
@@ -93,7 +93,6 @@ func EmailToSlackID(ctx workflow.Context, email string) string {
 		return ""
 	}
 
-	log.Debug(ctx, "saving mapping between user's email address and Slack ID", "email", email, "user_id", slackUser.ID)
 	if err := data.UpsertUser(email, "", "", slackUser.ID, ""); err != nil {
 		log.Error(ctx, "failed to save Slack user ID/email", "error", err, "user_id", slackUser.ID, "email", email)
 	}
