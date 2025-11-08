@@ -106,7 +106,6 @@ func loadPRTurns(ctx workflow.Context) map[string][]string {
 		}
 	}
 
-	log.Debug(ctx, "loaded PR attention states", "pr_count", len(slackUserIDs), "user_count", len(prs))
 	return prs
 }
 
