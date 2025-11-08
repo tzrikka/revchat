@@ -52,7 +52,7 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 
 	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
-		msg := fmt.Sprintf("Failed to archive this channel, even though its PR was %s", state)
+		msg := "Failed to archive this channel, even though its PR was " + state
 		_, _ = slack.PostMessage(ctx, channelID, msg)
 
 		return err
@@ -114,6 +114,9 @@ func initPRData(ctx workflow.Context, u string, pr PullRequest, authorAccountID,
 	email, err := users.BitbucketToEmail(ctx, authorAccountID)
 	if err != nil {
 		return err
+	}
+	if email == "" {
+		log.Error(ctx, "initializing Bitbucket PR data without author's email", "pr_url", u)
 	}
 
 	reviewers := []string{}
