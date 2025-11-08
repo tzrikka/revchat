@@ -87,7 +87,7 @@ func loadPRTurns(ctx workflow.Context) map[string][]string {
 				continue
 			}
 			log.Warn(ctx, "Slack email lookup error - removing from turn", "missing_email", email, "pr_url", url)
-			data.RemoveFromTurn(url, email) // Example: user deactivated after being added to the PR.
+			_ = data.RemoveFromTurn(url, email) // Example: user deactivated after being added to the PR.
 		}
 
 		slackUserIDs[url] = slackIDs
