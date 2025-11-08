@@ -12,6 +12,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -41,8 +42,9 @@ type SlashCommandEvent struct {
 const DefaultReminderTime = "8:00AM"
 
 var (
-	remindersPattern = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
-	usersPattern     = regexp.MustCompile(`^(nudge|ping|set turn to)\s+`)
+	bitbucketURLPattern = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
+	remindersPattern    = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
+	usersPattern        = regexp.MustCompile(`^(nudge|ping|set turn to)\s+`)
 )
 
 // https://docs.slack.dev/interactivity/implementing-slash-commands#app_command_handling
@@ -61,9 +63,9 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 	case "who", "whose", "whose turn", "my turn", "not my turn":
 		return turnSlashCommand(ctx, event)
 	case "approve", "lgtm", "+1":
-		return approveSlashCommand(ctx, event)
+		return c.approveSlashCommand(ctx, event)
 	case "unapprove", "-1":
-		return unapproveSlashCommand(ctx, event)
+		return c.unapproveSlashCommand(ctx, event)
 	case "update", "update channel":
 		return updateChannelSlashCommand(ctx, event)
 	}
@@ -268,27 +270,97 @@ func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 }
 
 func turnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	url := extractPR(ctx, event)
+	if url == nil {
+		return nil
+	}
+
 	log.Warn(ctx, "turn slash command not implemented yet")
 	postEphemeralError(ctx, event, "not implemented yet")
 	return nil
 }
 
-func approveSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	log.Warn(ctx, "approve slash command not implemented yet")
-	postEphemeralError(ctx, event, "not implemented yet")
+func (c *Config) approveSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	url := extractPR(ctx, event)
+	if url == nil {
+		return nil
+	}
+
+	var err error
+	switch {
+	case c.bitbucketWorkspace != "":
+		req := bitbucket.PullRequestsApproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
+		err = bitbucket.PullRequestsApproveActivity(ctx, req)
+	default:
+		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		postEphemeralError(ctx, event, "internal configuration error")
+		return errors.New("neither Bitbucket nor GitHub are configured")
+	}
+
+	if err != nil {
+		log.Error(ctx, "failed to approve PR", "error", err, "pr_url", url[0])
+		postEphemeralError(ctx, event, "failed to approve "+url[0])
+		return err
+	}
 	return nil
 }
 
-func unapproveSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	log.Warn(ctx, "unapprove slash command not implemented yet")
-	postEphemeralError(ctx, event, "not implemented yet")
+func (c *Config) unapproveSlashCommand(ctx workflow.Context, event SlashCommandEvent) (err error) {
+	url := extractPR(ctx, event)
+	if url == nil {
+		return nil
+	}
+
+	switch {
+	case c.bitbucketWorkspace != "":
+		req := bitbucket.PullRequestsUnapproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
+		err = bitbucket.PullRequestsUnapproveActivity(ctx, req)
+	default:
+		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		postEphemeralError(ctx, event, "internal configuration error")
+		return errors.New("neither Bitbucket nor GitHub are configured")
+	}
+
+	if err != nil {
+		log.Error(ctx, "failed to unapprove PR", "error", err, "pr_url", url[0])
+		postEphemeralError(ctx, event, "failed to unapprove "+url[0])
+		return err
+	}
 	return nil
 }
 
 func updateChannelSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	url := extractPR(ctx, event)
+	if url == nil {
+		return nil
+	}
+
 	log.Warn(ctx, "update channel slash command not implemented yet")
 	postEphemeralError(ctx, event, "not implemented yet")
 	return nil
+}
+
+func extractPR(ctx workflow.Context, event SlashCommandEvent) []string {
+	url, err := data.SwitchURLAndID(event.ChannelID)
+	if err != nil {
+		log.Error(ctx, "failed to convert Slack channel to PR URL", "error", err)
+		postEphemeralError(ctx, event, "internal data reading error")
+		return nil
+	}
+
+	if url == "" {
+		postEphemeralError(ctx, event, "this command can only be used inside RevChat PR channels")
+		return nil // Not a *server* error as far as we are concerned.
+	}
+
+	match := bitbucketURLPattern.FindStringSubmatch(url)
+	if len(match) != 4 {
+		log.Error(ctx, "failed to parse Bitbucket PR URL", "pr_url", url)
+		postEphemeralError(ctx, event, "this command can only be used inside RevChat PR channels")
+		return nil
+	}
+
+	return match
 }
 
 func postEphemeralError(ctx workflow.Context, event SlashCommandEvent, msg string) {
