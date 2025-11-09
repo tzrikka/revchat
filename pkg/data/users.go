@@ -92,6 +92,9 @@ func UpsertUser(email, bitbucketID, githubID, slackID, thrippyLink string) error
 		usersDB.slackIndex[slackID] = i
 	}
 	if thrippyLink != "" {
+		if thrippyLink == "X" {
+			thrippyLink = ""
+		}
 		usersDB.entries[i].ThrippyLink = thrippyLink
 	}
 

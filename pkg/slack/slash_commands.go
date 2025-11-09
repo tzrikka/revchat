@@ -44,7 +44,9 @@ const DefaultReminderTime = "8:00AM"
 var (
 	bitbucketURLPattern = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
 	remindersPattern    = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
-	usersPattern        = regexp.MustCompile(`^(nudge|ping|set turn to)\s+`)
+	userCommandsPattern = regexp.MustCompile(`^(invite|nudge|ping|set\s+turn\s+to)`)
+	userIDsPattern      = regexp.MustCompile(`<@(\w+)(\|[^>]*)?>`)
+	unescapeTextPattern = regexp.MustCompile(`<(@|#|!)\w+\|([^>]*)>`)
 )
 
 // https://docs.slack.dev/interactivity/implementing-slash-commands#app_command_handling
@@ -57,7 +59,7 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 	case "opt-in", "opt in", "optin":
 		return c.optInSlashCommand(ctx, event)
 	case "opt-out", "opt out", "optout":
-		return optOutSlashCommand(ctx, event)
+		return c.optOutSlashCommand(ctx, event)
 	case "stat", "state", "status":
 		return statusSlashCommand(ctx, event)
 	case "who", "whose", "whose turn", "my turn", "not my turn":
@@ -73,8 +75,13 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 	if remindersPattern.MatchString(event.Text) {
 		return remindersSlashCommand(ctx, event)
 	}
-	if usersPattern.MatchString(event.Text) {
-		return turnSlashCommand(ctx, event)
+	if cmd := userCommandsPattern.FindStringSubmatch(event.Text); cmd != nil {
+		switch cmd[1] {
+		case "invite":
+			return c.inviteSlashCommand(ctx, event)
+		default:
+			return turnSlashCommand(ctx, event)
+		}
 	}
 
 	log.Warn(ctx, "unrecognized Slack slash command", "username", event.UserName, "text", event.Text)
@@ -97,6 +104,39 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	msg = strings.ReplaceAll(msg, "%s", event.Command)
 
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+}
+
+func (c *Config) inviteSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	invitees := userIDsPattern.FindAllStringSubmatch(event.Text, -1)
+	if len(invitees) == 0 {
+		postEphemeralError(ctx, event, "please mention at least one `@user`")
+		return nil // Not a *server* error as far as we are concerned.
+	}
+
+	for _, match := range invitees {
+		userID := strings.ToUpper(match[1])
+		user, err := data.SelectUserBySlackID(userID)
+		if err != nil {
+			log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
+			postEphemeralError(ctx, event, fmt.Sprintf("internal data reading error for <@%s>", userID))
+			continue
+		}
+
+		// No need to invite users who are already opted-in.
+		if user.ThrippyLink != "" {
+			msg := fmt.Sprintf(":bell: <@%s> is already opted-in.", userID)
+			_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+			continue
+		}
+
+		msg := fmt.Sprintf("Inviting <@%s> to opt into RevChat.", userID)
+		_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+
+		msg = ":wave: <@%s> is inviting you to use RevChat. Please type below this slash command:\n\n```%s opt-in```"
+		_, _ = PostMessage(ctx, userID, fmt.Sprintf(msg, event.UserID, event.Command))
+	}
+
+	return nil
 }
 
 func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
@@ -133,6 +173,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 	msg = fmt.Sprintf(msg, c.thrippyHTTPAddress, linkID, nonce)
 	if err := PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg); err != nil {
 		log.Error(ctx, "failed to post ephemeral opt-in message in Slack", "error", err)
+		_ = c.deleteThrippyLink(ctx, linkID)
 		return err
 	}
 
@@ -153,20 +194,22 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 	if err := data.UpsertUser("", "", "", user.SlackID, linkID); err != nil {
 		log.Error(ctx, "failed to opt-in user", "error", err, "email", user.Email)
 		postEphemeralError(ctx, event, "internal data writing error")
+		_ = c.deleteThrippyLink(ctx, linkID)
 		return err
 	}
 
 	if err := setReminder(ctx, event, DefaultReminderTime, true); err != nil {
+		_ = c.deleteThrippyLink(ctx, linkID)
 		return err
 	}
 
 	msg = ":bell: You are now opted into using RevChat.\n\n"
 	msg += ":alarm_clock: Default time for weekday reminders = *8 AM* (in your current timezone). "
-	msg += "To change it, run this slash command:\n\n```/revchat reminders at &lt;time in 12h or 24h format&gt;```"
-	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+	msg += "To change it, run this slash command:\n\n```%s reminders at &lt;time in 12h or 24h format&gt;```"
+	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, fmt.Sprintf(msg, event.Command))
 }
 
-func optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+func (c *Config) optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	user, err := data.SelectUserBySlackID(event.UserID)
 	if err != nil {
 		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", event.UserID)
@@ -178,10 +221,15 @@ func optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
-	if err := data.UpsertUser(user.Email, user.BitbucketID, user.GitHubID, user.SlackID, ""); err != nil {
+	if err := data.UpsertUser(user.Email, user.BitbucketID, user.GitHubID, user.SlackID, "X"); err != nil {
 		log.Error(ctx, "failed to opt-out user", "error", err, "email", user.Email)
 		postEphemeralError(ctx, event, "internal data writing error")
 		return err
+	}
+
+	if err := c.deleteThrippyLink(ctx, user.ThrippyLink); err != nil {
+		log.Error(ctx, "failed to delete Thrippy link for opted-out user", "error", err, "link_id", user.ThrippyLink)
+		// This is an internal error, it doesn't concern or affect the user.
 	}
 
 	msg := ":no_bell: You are now opted out of using RevChat for new PRs."
@@ -335,7 +383,7 @@ func updateChannelSlashCommand(ctx workflow.Context, event SlashCommandEvent) er
 		return nil
 	}
 
-	log.Warn(ctx, "update channel slash command not implemented yet")
+	log.Warn(ctx, "this slash command is not implemented yet")
 	postEphemeralError(ctx, event, "not implemented yet")
 	return nil
 }
@@ -364,7 +412,8 @@ func extractPR(ctx workflow.Context, event SlashCommandEvent) []string {
 }
 
 func postEphemeralError(ctx workflow.Context, event SlashCommandEvent, msg string) {
-	msg = fmt.Sprintf(":warning: Error in `%s %s`: %s", event.Command, event.Text, msg)
+	text := unescapeTextPattern.ReplaceAllString(event.Text, "@${2}")
+	msg = fmt.Sprintf(":warning: Error in `%s %s`: %s", event.Command, text, msg)
 	// We're already reporting another error, there's nothing to do if this fails.
 	_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
