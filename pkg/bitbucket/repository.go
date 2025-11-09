@@ -48,24 +48,28 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	}
 
 	url := pr.Links["html"].HRef
+	defer updateChannelBuildsBookmark(ctx, channelID, url)
+
 	status := data.CommitStatus{State: cs.State, Desc: cs.Description, URL: cs.URL}
 	if err := data.UpdateBitbucketBuilds(url, cs.Commit.Hash, cs.Name, status); err != nil {
 		log.Error(ctx, "failed to update Bitbucket build states", "error", err, "pr_url", url, "commit_hash", cs.Commit.Hash)
 		// Continue anyway.
 	}
 
-	var msg string
-	switch cs.State {
-	case "INPROGRESS":
-		msg = ":hourglass_flowing_sand:"
-	case "SUCCESSFUL":
-		msg = ":large_green_circle:"
-	default: // "FAILED", "STOPPED".
-		msg = ":red_circle:"
-	}
-	msg = fmt.Sprintf(`%s "%s" build status: <%s|%s>`, msg, cs.Name, cs.URL, cs.Description)
+	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, cs.Description)
 	_, err = slack.PostMessage(ctx, channelID, msg)
 	return err
+}
+
+func buildStateEmoji(state string) string {
+	switch state {
+	case "INPROGRESS":
+		return ":hourglass_flowing_sand:"
+	case "SUCCESSFUL":
+		return ":large_green_circle:"
+	default: // "FAILED", "STOPPED".
+		return ":red_circle:"
+	}
 }
 
 func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, err error) {

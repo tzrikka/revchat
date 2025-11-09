@@ -2,10 +2,15 @@ package bitbucket
 
 import (
 	"fmt"
+	"maps"
+	"regexp"
+	"slices"
+	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -16,6 +21,7 @@ func setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullReq
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview", ":+1:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.CommitCount), url+"/commits", ":pushpin:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", 0), url+"/diff", ":open_file_folder:")
+	_ = slack.BookmarksAddActivity(ctx, channelID, "Builds: no results", url+"/overview", ":vertical_traffic_light:")
 }
 
 // updateChannelBookmarks updates the PR's Slack channel bookmarks based on the latest PR event. This
@@ -82,4 +88,43 @@ func countApprovals(pr PullRequest) int {
 		}
 	}
 	return count
+}
+
+// updateChannelBuildsBookmark updates the "Builds" bookmark in the PR's Slack channel based on the latest repo
+// event. This is a deferred call that doesn't return an error, because handling the event itself is more important.
+func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
+	bookmarks, err := slack.BookmarksListActivity(ctx, channelID)
+	if err != nil {
+		log.Error(ctx, "failed to list Slack channel bookmarks", "error", err)
+		return
+	}
+	if len(bookmarks) < 7 {
+		return
+	}
+
+	results := data.ReadBitbucketBuilds(url)
+	if results == nil {
+		return
+	}
+
+	title := strings.Builder{}
+	title.WriteString("Builds: ")
+	if len(results.Builds) == 0 {
+		title.WriteString("no results")
+	}
+
+	names := slices.Sorted(maps.Keys(results.Builds))
+	for i, n := range names {
+		if i > 0 {
+			title.WriteString(" ")
+		}
+
+		b := results.Builds[n]
+		desc := regexp.MustCompile(`\.+$`).ReplaceAllString(strings.TrimSpace(b.Desc), "")
+		title.WriteString(fmt.Sprintf("%s %s", buildStateEmoji(b.State), desc))
+	}
+
+	if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[6].ID, title.String()); err != nil {
+		log.Error(ctx, "failed to update Slack channel's builds bookmark", "error", err)
+	}
 }

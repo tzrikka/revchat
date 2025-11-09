@@ -23,6 +23,19 @@ type CommitStatus struct {
 
 var prStatusMutexes RWMutexMap
 
+func ReadBitbucketBuilds(url string) *PRStatus {
+	mu := prStatusMutexes.Get(url)
+	mu.RLock()
+	defer mu.RUnlock()
+
+	pr, err := readStatusFile(url)
+	if err != nil {
+		return nil
+	}
+
+	return pr
+}
+
 func SummarizeBitbucketBuilds(url string) string {
 	mu := prStatusMutexes.Get(url)
 	mu.RLock()
