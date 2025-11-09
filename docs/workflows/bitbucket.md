@@ -4,24 +4,24 @@
 
 ### PR Created
 
-- If the PR is a draft - abort
+- If the PR is a draft - abort (ignore this event)
 - Initialize a new Slack channel
   - Create a normalized version of the PR title
   - Create the Slack channel with the normalized name
     - If the channel already exists, retry with a numeric counter suffix
-  - Set the channel's topic (Bitbucker URL)
-  - Set the channel's description (PR title)
-  - Set the channel's bookmarks (comments, tasks, approvals, commits)
-  - Post an intro Slack message: mention PR author and the PR description
-  - Post another message with a list of linkified references in the PR title
-  - For all opted-in participants (author + reviewers)
+  - Set the channel's topic (to the Bitbucket URL)
+  - Set the channel's description (to the PR title)
+  - Set the channel's bookmarks (reviewers, comments, tasks, approvals, commits, files)
+  - Post an intro Slack message: mention the PR author and the PR description
+  - Post another message with a list of linkified references from the PR title
+  - For all **opted-in** participants (author + reviewers)
     - Add to the Slack channel
     - Send a DM about it
 
 ### PR Updated
 
 > [!NOTE]
-> Bitbucket events don't pinpoint changes like GitHub, details can be determined only by storing a snapshot of the PR's metadata and comparing it between update events.
+> Bitbucket events don't pinpoint changes like GitHub, details can be determined only by storing a snapshot of the PR's metadata and comparing it between update events (or with Bitbucket API calls, but we're avoiding doing that whenever possible).
 
 - If the PR is a draft - abort (ignore this event)
 - If converted into a draft - same as [PR Declined](#pr-declined)
@@ -133,10 +133,14 @@
 
 ### Build Status Created
 
-> [!CAUTION]
-> Not implemented yet.
+- Find the commit hash from the event in RevChat's collection of PR snapshots
+  - We could use a Bitbucket API call, but we're avoiding doing that whenever possible
+  - Finding a match in RevChat's data instead of using the Bitbucket API also ensures that the PR is being tracked (i.e. not a draft), and that the commit's status is relevant (i.e. this commit is still the latest in the branch)
+- Update RevChat's snapshot of PR build results
+  - If RevChat's snaphot references a different commit hash, forget the current results (they are obsolete)
+- Post a message in the Slack channel
+- Update the Slack channel's bookmarks
 
 ### Build Status Updated
 
-> [!CAUTION]
-> Not implemented yet.
+- Same as [PR Approved](#build-status-created)
