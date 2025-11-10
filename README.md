@@ -14,4 +14,4 @@ No more:
 
 - Delays due to missed requests, unnoticed comments, and state changes latency
 - Notification fatigue due to a firehose of updates that don't concern you
-- Questions like "Who's turn is it" or "What should I do now"
+- Questions like "Who's turn is it" or "When should I look at this again"
