@@ -1,15 +1,15 @@
 module github.com/tzrikka/revchat
 
-go 1.25.3
+go 1.25.4
 
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/rs/zerolog v1.34.0
-	github.com/tzrikka/thrippy-api v1.4.0
+	github.com/tzrikka/thrippy-api v1.4.1
 	github.com/tzrikka/timpani-api v1.0.0
-	github.com/tzrikka/xdg v1.3.2
+	github.com/tzrikka/xdg v1.3.3
 	github.com/urfave/cli-altsrc/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.5.0
+	github.com/urfave/cli/v3 v3.6.0
 	go.temporal.io/api v1.57.0
 	go.temporal.io/sdk v1.37.0
 	google.golang.org/grpc v1.76.0
@@ -32,8 +32,8 @@ require (
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	golang.org/x/net v0.46.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251103181224-f26f9409b101 // indirect
