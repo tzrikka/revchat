@@ -146,7 +146,7 @@ func GetCurrentTurn(url string) ([]string, error) {
 	}
 
 	slices.Sort(emails)
-	return emails, nil
+	return slices.Compact(emails), nil
 }
 
 // RemoveFromTurn completely removes a reviewer from the attention list of a specific PR.
@@ -224,7 +224,7 @@ func SwitchTurn(url, email string) error {
 	}
 
 	if email == t.Author {
-		delete(t.Reviewers, email) // In case the author was added via [SetTurn].
+		delete(t.Reviewers, email) // In case the author was added via [SetTurn] or [Nudge].
 		for reviewer := range t.Reviewers {
 			t.Reviewers[reviewer] = true
 		}
@@ -236,6 +236,43 @@ func SwitchTurn(url, email string) error {
 
 	t.Set = false
 	return writeTurnFile(url, t)
+}
+
+// Nudge records that a specific user has been nudged about a specific PR,
+// so it becomes their turn to pay attention to that PR if it wasn't already.
+// It returns true if the nudge is valid (the user is in the current turn list).
+func Nudge(url, email string) (bool, error) {
+	if email == "" || email == "bot" {
+		return false, nil
+	}
+
+	mu := turnMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
+
+	t, err := readTurnFile(url)
+	if err != nil {
+		return false, err
+	}
+
+	isTheirTurn, foundInTurns := t.Reviewers[email]
+	if email == t.Author {
+		// PR author's turn can be implicit (no reviewers) or set explicitly.
+		if len(t.Reviewers) == 0 || foundInTurns {
+			return true, nil // Valid nudge, but a no-op.
+		}
+	} else {
+		if !foundInTurns {
+			return false, nil // Invalid nudge.
+		}
+		if isTheirTurn {
+			return true, nil // Valid nudge, but a no-op.
+		}
+	}
+
+	// Valid nudge that requires a state change.
+	t.Reviewers[email] = true
+	return true, writeTurnFile(url, t)
 }
 
 // readTurnFile expects the caller to hold the appropriate mutex.

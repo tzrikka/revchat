@@ -48,7 +48,7 @@ func remindersWorkflow(ctx workflow.Context) error {
 			slices.Sort(userPRs)
 
 			var msg strings.Builder
-			msg.WriteString(":bell: This is your scheduled daily reminder to check these PRs:")
+			msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
 			for _, url := range userPRs {
 				msg.WriteString(prDetails(ctx, url))
 			}
