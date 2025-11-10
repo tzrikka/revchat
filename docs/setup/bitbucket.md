@@ -53,4 +53,4 @@ Opening a browser with this URL: http://localhost:14470/start?id=<Thrippy link I
 >    - **PR** comments (as opposed to a file/commit comments)
 >    - **Replies** to PR/file/commit comments
 > 2. Bitbucket does not send a webhook event when a user un/likes a PR/file/commit comment/reply
-> 3. Bitbucket does not send a webhook event when a user create/updates a task
+> 3. Bitbucket does not send a webhook event when a user creates/updates a task

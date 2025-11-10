@@ -47,7 +47,7 @@ func newConfig(cmd *cli.Command) *Config {
 //
 // This is based on:
 //   - https://docs.slack.dev/reference/events?APIs=Events
-//   - https://github.com/tzrikka/revchat/blob/main/docs/slack.md#bot-event-subscriptions
+//   - https://github.com/tzrikka/revchat/blob/main/docs/setup/slack.md#bot-event-subscriptions
 //   - https://github.com/tzrikka/timpani/blob/main/pkg/listeners/slack/dispatch.go
 var Signals = []string{
 	"slack.events.app_rate_limited",

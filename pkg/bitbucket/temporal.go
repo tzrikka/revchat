@@ -25,7 +25,7 @@ type (
 //
 // This is based on:
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Pull-request-events
-//   - https://github.com/tzrikka/revchat/blob/main/docs/bitbucket.md#webhook-triggers
+//   - https://github.com/tzrikka/revchat/blob/main/docs/setup/bitbucket.md#webhook-triggers
 //   - https://github.com/tzrikka/timpani/blob/main/pkg/listeners/bitbucket/webhook.go
 var PullRequestSignals = []string{
 	"bitbucket.events.pullrequest.created",
@@ -49,7 +49,7 @@ var PullRequestSignals = []string{
 //
 // This is based on:
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Repository-events
-//   - https://github.com/tzrikka/revchat/blob/main/docs/bitbucket.md#webhook-triggers
+//   - https://github.com/tzrikka/revchat/blob/main/docs/setup/bitbucket.md#webhook-triggers
 //   - https://github.com/tzrikka/timpani/blob/main/pkg/listeners/bitbucket/webhook.go
 var RepositorySignals = []string{
 	"bitbucket.events.repo.commit_comment_created",

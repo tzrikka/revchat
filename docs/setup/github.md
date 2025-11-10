@@ -1,6 +1,6 @@
 # GitHub
 
-Detailed instructions: https://github.com/tzrikka/thrippy/blob/main/docs/github/README.md
+Detailed instructions: <https://github.com/tzrikka/thrippy/blob/main/docs/github/README.md>
 
 ## GitHub App
 

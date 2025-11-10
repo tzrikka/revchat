@@ -17,7 +17,7 @@ type Config struct {
 // from Timpani, to trigger event handling workflows.
 //
 // This is based on:
-//   - https://github.com/tzrikka/revchat/blob/main/docs/github.md#subscribe-to-event
+//   - https://github.com/tzrikka/revchat/blob/main/docs/setup/github.md#subscribe-to-event
 //   - https://github.com/tzrikka/timpani/blob/main/pkg/listeners/github/webhook.go
 var Signals = []string{
 	"github.events.pull_request",
