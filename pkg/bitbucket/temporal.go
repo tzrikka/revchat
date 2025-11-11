@@ -142,9 +142,9 @@ func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, task
 }
 
 // DrainPullRequestSignals drains all pending [PullRequestSignals] channels, starts
-// their corresponding workflows as usual, and returns the number of drained events.
+// their corresponding workflows as usual, and returns true if any signals were found.
 // This is called in preparation for resetting the dispatcher workflow's history.
-func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) int {
+func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) bool {
 	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 	totalEvents := 0
 
@@ -174,13 +174,13 @@ func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) int {
 		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
 	}
 
-	return totalEvents
+	return totalEvents > 0
 }
 
 // DrainRepositorySignals drains all pending [RepositorySignals] channels, starts
-// their corresponding workflows as usual, and returns the number of drained events.
+// their corresponding workflows as usual, and returns true if any signals were found.
 // This is called in preparation for resetting the dispatcher workflow's history.
-func DrainRepositorySignals(ctx workflow.Context, taskQueue string) int {
+func DrainRepositorySignals(ctx workflow.Context, taskQueue string) bool {
 	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 	totalEvents := 0
 
@@ -204,5 +204,5 @@ func DrainRepositorySignals(ctx workflow.Context, taskQueue string) int {
 		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
 	}
 
-	return totalEvents
+	return totalEvents > 0
 }

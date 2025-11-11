@@ -58,15 +58,12 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 
 			// "Lame duck" mode: drain all signal channels before resetting workflow history.
 			// This minimizes - but doesn't entirely eliminate - the chance of losing signals.
-			// That's why we run this in a slowed-down loop until no signals are left to process:
-			// it will continue until the worker is relatively idle.
-			counter := 1
-			for counter > 0 {
-				workflow.Sleep(ctx, 5*time.Second)
-				counter = bitbucket.DrainPullRequestSignals(ctx, tq)
-				counter += bitbucket.DrainRepositorySignals(ctx, tq)
-				counter += github.DrainSignals(ctx, tq)
-				counter += slack.DrainSignals(ctx, tq)
+			// We run in this mode until the worker is relatively idle.
+			for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 5; cyclesSinceLastSignal++ {
+				workflow.Sleep(ctx, time.Second)
+				if drainCycle(ctx, tq) {
+					cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
+				}
 			}
 
 			msg = "triggering workflow continue-as-new"
@@ -74,4 +71,14 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 			return workflow.NewContinueAsNewError(ctx, EventDispatcher)
 		}
 	}
+}
+
+// drainCycle processes each event source and returns true if any signals were found.
+func drainCycle(ctx workflow.Context, taskQueue string) bool {
+	bitbucketPRSignalsFound := bitbucket.DrainPullRequestSignals(ctx, taskQueue)
+	bitbucketRepoSignalsFound := bitbucket.DrainRepositorySignals(ctx, taskQueue)
+	githubSignalsFound := github.DrainSignals(ctx, taskQueue)
+	slackSignalsFound := slack.DrainSignals(ctx, taskQueue)
+
+	return bitbucketPRSignalsFound || bitbucketRepoSignalsFound || githubSignalsFound || slackSignalsFound
 }

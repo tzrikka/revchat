@@ -79,9 +79,9 @@ func addReceive[T any](ctx, childCtx workflow.Context, sel workflow.Selector, si
 }
 
 // DrainSignals drains all pending [Signals] channels, starts their
-// corresponding workflows as usual, and returns the number of drained events.
+// corresponding workflows as usual, and returns true if any signals were found.
 // This is called in preparation for resetting the dispatcher workflow's history.
-func DrainSignals(ctx workflow.Context, taskQueue string) int {
+func DrainSignals(ctx workflow.Context, taskQueue string) bool {
 	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 	totalEvents := 0
 
@@ -110,7 +110,7 @@ func DrainSignals(ctx workflow.Context, taskQueue string) int {
 	totalEvents += receiveAsync[PullRequestReviewThreadEvent](ctx, childCtx, Signals[3])
 	totalEvents += receiveAsync[IssueCommentEvent](ctx, childCtx, Signals[4])
 
-	return totalEvents
+	return totalEvents > 0
 }
 
 func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
