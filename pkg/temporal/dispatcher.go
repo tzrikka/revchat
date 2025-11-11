@@ -60,7 +60,9 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 			// This minimizes - but doesn't entirely eliminate - the chance of losing signals.
 			// We run in this mode until the worker is relatively idle.
 			for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 5; cyclesSinceLastSignal++ {
-				workflow.Sleep(ctx, time.Second)
+				if err := workflow.Sleep(ctx, time.Second); err != nil {
+					log.Error(ctx, "failed to wait 1 second between drain cycles", "error", err, "cycle", cyclesSinceLastSignal)
+				}
 				if drainCycle(ctx, tq) {
 					cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
 				}
