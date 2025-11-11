@@ -170,8 +170,10 @@ func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) bool {
 			}
 		}
 
+		if signalEvents > 0 {
+			log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+		}
 		totalEvents += signalEvents
-		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
 	}
 
 	return totalEvents > 0
@@ -200,8 +202,10 @@ func DrainRepositorySignals(ctx workflow.Context, taskQueue string) bool {
 			workflow.ExecuteChildWorkflow(childCtx, signal, payload)
 		}
 
+		if signalEvents > 0 {
+			log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+		}
 		totalEvents += signalEvents
-		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
 	}
 
 	return totalEvents > 0

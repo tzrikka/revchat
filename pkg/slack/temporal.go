@@ -141,7 +141,9 @@ func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
 		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
 	}
 
-	log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+	if signalEvents > 0 {
+		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+	}
 	return signalEvents
 }
 

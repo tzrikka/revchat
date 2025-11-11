@@ -103,8 +103,10 @@ func DrainSignals(ctx workflow.Context, taskQueue string) bool {
 			_ = wf.Get(ctx, nil)
 		}
 	}
+	if totalEvents > 0 {
+		log.Info(ctx, "drained signal channel", "signal_name", Signals[0], "event_count", totalEvents)
+	}
 
-	log.Info(ctx, "drained signal channel", "signal_name", Signals[0], "event_count", totalEvents)
 	totalEvents += receiveAsync[PullRequestReviewEvent](ctx, childCtx, Signals[1])
 	totalEvents += receiveAsync[PullRequestReviewCommentEvent](ctx, childCtx, Signals[2])
 	totalEvents += receiveAsync[PullRequestReviewThreadEvent](ctx, childCtx, Signals[3])
@@ -128,6 +130,8 @@ func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
 		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
 	}
 
-	log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+	if signalEvents > 0 {
+		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+	}
 	return signalEvents
 }
