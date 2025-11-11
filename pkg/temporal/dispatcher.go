@@ -62,7 +62,7 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 			// it will continue until the worker is relatively idle.
 			counter := 1
 			for counter > 0 {
-				time.Sleep(5 * time.Second)
+				workflow.Sleep(ctx, 5*time.Second)
 				counter = bitbucket.DrainPullRequestSignals(ctx, tq)
 				counter += bitbucket.DrainRepositorySignals(ctx, tq)
 				counter += github.DrainSignals(ctx, tq)
