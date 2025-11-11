@@ -28,6 +28,12 @@ var muSignals sync.Mutex
 // IncrementSignalCounter monitors incoming Temporal signals
 // (triggered by webhook events which were received by Timpani).
 func IncrementSignalCounter(ctx workflow.Context, name string) {
+	workflow.SideEffect(ctx, func(ctx workflow.Context) any {
+		return incrementSignalCounterAsSideEffect(ctx, name)
+	})
+}
+
+func incrementSignalCounterAsSideEffect(ctx workflow.Context, name string) any {
 	muSignals.Lock()
 	defer muSignals.Unlock()
 
@@ -36,6 +42,8 @@ func IncrementSignalCounter(ctx workflow.Context, name string) {
 	if err := AppendToCSVFile(path, []string{now.Format(time.RFC3339), name}); err != nil && ctx != nil {
 		log.Error(ctx, "metrics error: failed to increment signal counter", "signal", name, "error", err)
 	}
+
+	return nil
 }
 
 func AppendToCSVFile(path string, record []string) error {

@@ -1,4 +1,4 @@
-package metrics_test
+package metrics
 
 import (
 	"errors"
@@ -8,17 +8,15 @@ import (
 	"regexp"
 	"testing"
 	"time"
-
-	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 func TestIncrementSignalCounter(t *testing.T) {
 	t.Chdir(t.TempDir())
 	now := time.Now().UTC()
-	path := fmt.Sprintf(metrics.DefaultMetricsFileSignals, now.Format(time.DateOnly))
+	path := fmt.Sprintf(DefaultMetricsFileSignals, now.Format(time.DateOnly))
 
 	// Test 1: "metrics" directory does not exist - no file, but also no runtime effect.
-	metrics.IncrementSignalCounter(nil, "signal1")
+	incrementSignalCounterAsSideEffect(nil, "signal1")
 
 	_, err := os.ReadFile(path) //gosec:disable G304 -- unit test with fake files
 	if !errors.Is(err, fs.ErrNotExist) {
@@ -30,9 +28,9 @@ func TestIncrementSignalCounter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	metrics.IncrementSignalCounter(nil, "signal1")
-	metrics.IncrementSignalCounter(nil, "signal2")
-	metrics.IncrementSignalCounter(nil, "signal3")
+	incrementSignalCounterAsSideEffect(nil, "signal1")
+	incrementSignalCounterAsSideEffect(nil, "signal2")
+	incrementSignalCounterAsSideEffect(nil, "signal3")
 
 	f, err := os.ReadFile(path) //gosec:disable G304 -- unit test with fake files
 	if err != nil {
