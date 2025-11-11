@@ -58,7 +58,7 @@ var RepositorySignals = []string{
 	"bitbucket.events.repo.commit_status_updated",
 }
 
-// RegisterPullRequestWorkflows maps event handler functions to [PullRequestSignals].
+// RegisterPullRequestWorkflows maps event-handling workflow functions to [PullRequestSignals].
 func RegisterPullRequestWorkflows(w worker.Worker, cmd *cli.Command) {
 	c := Config{Cmd: cmd}
 	fs := []prWorkflowFunc{
@@ -83,7 +83,7 @@ func RegisterPullRequestWorkflows(w worker.Worker, cmd *cli.Command) {
 	}
 }
 
-// RegisterRepositoryWorkflows maps event handler functions to [RepositorySignals].
+// RegisterRepositoryWorkflows maps event-handling workflow functions to [RepositorySignals].
 func RegisterRepositoryWorkflows(w worker.Worker) {
 	fs := []repoWorkflowFunc{
 		commitCommentCreatedWorkflow,
@@ -97,24 +97,21 @@ func RegisterRepositoryWorkflows(w worker.Worker) {
 	}
 }
 
-// RegisterPullRequestSignals routes [PullRequestSignals] to registered workflows.
+// RegisterPullRequestSignals routes [PullRequestSignals] to their registered workflows.
 func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
 	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 
-	for _, sig := range PullRequestSignals {
-		sel.AddReceive(workflow.GetSignalChannel(ctx, sig), func(c workflow.ReceiveChannel, _ bool) {
-			e := PullRequestEvent{}
-			c.Receive(ctx, &e)
+	for _, signalName := range PullRequestSignals {
+		sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
+			payload := new(PullRequestEvent)
+			ch.Receive(ctx, payload)
 
-			signal := c.Name()
+			signal := ch.Name()
 			log.Info(ctx, "received signal", "signal", signal)
 			metrics.IncrementSignalCounter(ctx, signal)
 
-			var found bool
-			if _, e.Type, found = strings.Cut(signal, "pullrequest."); !found {
-				e.Type = signal
-			}
-			wf := workflow.ExecuteChildWorkflow(childCtx, signal, e)
+			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
+			wf := workflow.ExecuteChildWorkflow(childCtx, signal, payload)
 
 			// Wait for [Config.prCreated] completion before returning, to ensure we handle
 			// subsequent PR initialization events appropriately (e.g. check states).
@@ -125,24 +122,87 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 	}
 }
 
-// RegisterRepositorySignals routes [RepositorySignals] to registered workflows.
+// RegisterRepositorySignals routes [RepositorySignals] to their registered workflows.
 func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
 	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 
-	for _, sig := range RepositorySignals {
-		sel.AddReceive(workflow.GetSignalChannel(ctx, sig), func(c workflow.ReceiveChannel, _ bool) {
-			e := RepositoryEvent{}
-			c.Receive(ctx, &e)
+	for _, signalName := range RepositorySignals {
+		sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
+			payload := new(RepositoryEvent)
+			ch.Receive(ctx, payload)
 
-			signal := c.Name()
+			signal := ch.Name()
 			log.Info(ctx, "received signal", "signal", signal)
 			metrics.IncrementSignalCounter(ctx, signal)
 
-			var found bool
-			if _, e.Type, found = strings.Cut(signal, "repo."); !found {
-				e.Type = signal
-			}
-			workflow.ExecuteChildWorkflow(childCtx, signal, e)
+			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
+			workflow.ExecuteChildWorkflow(childCtx, signal, payload)
 		})
 	}
+}
+
+// DrainPullRequestSignals drains all pending [PullRequestSignals] channels, starts
+// their corresponding workflows as usual, and returns the number of drained events.
+// This is called in preparation for resetting the dispatcher workflow's history.
+func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) int {
+	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
+	totalEvents := 0
+
+	for _, signal := range PullRequestSignals {
+		signalEvents := 0
+		for {
+			payload := new(PullRequestEvent)
+			if !workflow.GetSignalChannel(ctx, signal).ReceiveAsync(payload) {
+				break
+			}
+
+			log.Info(ctx, "received signal while draining", "signal", signal)
+			metrics.IncrementSignalCounter(ctx, signal)
+			signalEvents++
+
+			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
+			wf := workflow.ExecuteChildWorkflow(childCtx, signal, payload)
+
+			// Wait for [Config.prCreated] completion before returning, to ensure we handle
+			// subsequent PR initialization events appropriately (e.g. check states).
+			if signal == "bitbucket.events.pullrequest.created" {
+				_ = wf.Get(ctx, nil)
+			}
+		}
+
+		totalEvents += signalEvents
+		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+	}
+
+	return totalEvents
+}
+
+// DrainRepositorySignals drains all pending [RepositorySignals] channels, starts
+// their corresponding workflows as usual, and returns the number of drained events.
+// This is called in preparation for resetting the dispatcher workflow's history.
+func DrainRepositorySignals(ctx workflow.Context, taskQueue string) int {
+	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
+	totalEvents := 0
+
+	for _, signal := range RepositorySignals {
+		signalEvents := 0
+		for {
+			payload := new(RepositoryEvent)
+			if !workflow.GetSignalChannel(ctx, signal).ReceiveAsync(payload) {
+				break
+			}
+
+			log.Info(ctx, "received signal while draining", "signal", signal)
+			metrics.IncrementSignalCounter(ctx, signal)
+			signalEvents++
+
+			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
+			workflow.ExecuteChildWorkflow(childCtx, signal, payload)
+		}
+
+		totalEvents += signalEvents
+		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+	}
+
+	return totalEvents
 }

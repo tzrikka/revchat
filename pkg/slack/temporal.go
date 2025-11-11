@@ -67,7 +67,7 @@ var Schedules = []string{
 	"slack.schedules.reminders",
 }
 
-// RegisterWorkflows maps event handler functions to [Signals].
+// RegisterWorkflows maps event-handling workflow functions to [Signals].
 func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
 	c := newConfig(cmd)
 	c.initThrippyLinks(ctx, cmd.String("thrippy-links-template-id"))
@@ -83,30 +83,66 @@ func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
 	w.RegisterWorkflowWithOptions(remindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
 }
 
-// RegisterSignals routes [Signals] to registered workflows.
+// RegisterSignals routes [Signals] to their registered workflows.
 func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
 	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 
-	addSignalHandler[map[string]any](sel, ctx, childCtx, Signals[0])
-	addSignalHandler[memberEventWrapper](sel, ctx, childCtx, Signals[1])
-	addSignalHandler[memberEventWrapper](sel, ctx, childCtx, Signals[2])
-	addSignalHandler[messageEventWrapper](sel, ctx, childCtx, Signals[3])
-	addSignalHandler[reactionEventWrapper](sel, ctx, childCtx, Signals[4])
-	addSignalHandler[reactionEventWrapper](sel, ctx, childCtx, Signals[5])
-	addSignalHandler[SlashCommandEvent](sel, ctx, childCtx, Signals[6])
+	addReceive[map[string]any](ctx, childCtx, sel, Signals[0])
+	addReceive[memberEventWrapper](ctx, childCtx, sel, Signals[1])
+	addReceive[memberEventWrapper](ctx, childCtx, sel, Signals[2])
+	addReceive[messageEventWrapper](ctx, childCtx, sel, Signals[3])
+	addReceive[reactionEventWrapper](ctx, childCtx, sel, Signals[4])
+	addReceive[reactionEventWrapper](ctx, childCtx, sel, Signals[5])
+	addReceive[SlashCommandEvent](ctx, childCtx, sel, Signals[6])
 }
 
-func addSignalHandler[T any](sel workflow.Selector, ctx, childCtx workflow.Context, signal string) {
-	sel.AddReceive(workflow.GetSignalChannel(ctx, signal), func(c workflow.ReceiveChannel, _ bool) {
-		var event T
-		c.Receive(ctx, &event)
+func addReceive[T any](ctx, childCtx workflow.Context, sel workflow.Selector, signalName string) {
+	sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
+		payload := new(T)
+		ch.Receive(ctx, payload)
+		signal := ch.Name()
 
-		signal := c.Name()
 		log.Info(ctx, "received signal", "signal", signal)
 		metrics.IncrementSignalCounter(ctx, signal)
 
-		workflow.ExecuteChildWorkflow(childCtx, signal, event)
+		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
 	})
+}
+
+// DrainSignals drains all pending [Signals] channels, starts their
+// corresponding workflows as usual, and returns the number of drained events.
+// This is called in preparation for resetting the dispatcher workflow's history.
+func DrainSignals(ctx workflow.Context, taskQueue string) int {
+	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
+
+	totalEvents := receiveAsync[map[string]any](ctx, childCtx, Signals[0])
+	totalEvents += receiveAsync[memberEventWrapper](ctx, childCtx, Signals[1])
+	totalEvents += receiveAsync[memberEventWrapper](ctx, childCtx, Signals[2])
+	totalEvents += receiveAsync[messageEventWrapper](ctx, childCtx, Signals[3])
+	totalEvents += receiveAsync[reactionEventWrapper](ctx, childCtx, Signals[4])
+	totalEvents += receiveAsync[reactionEventWrapper](ctx, childCtx, Signals[5])
+	totalEvents += receiveAsync[SlashCommandEvent](ctx, childCtx, Signals[6])
+
+	return totalEvents
+}
+
+func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
+	signalEvents := 0
+	for {
+		payload := new(T)
+		if !workflow.GetSignalChannel(ctx, signal).ReceiveAsync(payload) {
+			break
+		}
+
+		log.Info(ctx, "received signal while draining", "signal", signal)
+		metrics.IncrementSignalCounter(ctx, signal)
+		signalEvents++
+
+		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
+	}
+
+	log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+	return signalEvents
 }
 
 // CreateSchedule starts a scheduled workflow that runs every 30 minutes.

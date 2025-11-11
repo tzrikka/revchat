@@ -3,6 +3,7 @@ package temporal
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/temporal"
@@ -52,9 +53,24 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 		// https://docs.temporal.io/develop/go/continue-as-new
 		// https://docs.temporal.io/develop/go/message-passing#wait-for-message-handlers
 		if info := workflow.GetInfo(ctx); info.GetContinueAsNewSuggested() {
-			hlen := info.GetCurrentHistoryLength()
-			size := info.GetCurrentHistorySize()
-			log.Warn(ctx, "continue-as-new suggested by Temporal server", "history_length", hlen, "history_size", size)
+			msg := "continue-as-new suggested by Temporal server"
+			log.Info(ctx, msg, "history_length", info.GetCurrentHistoryLength(), "history_size", info.GetCurrentHistorySize())
+
+			// "Lame duck" mode: drain all signal channels before resetting workflow history.
+			// This minimizes - but doesn't entirely eliminate - the chance of losing signals.
+			// That's why we run this in a slowed-down loop until no signals are left to process:
+			// it will continue until the worker is relatively idle.
+			counter := 1
+			for counter > 0 {
+				time.Sleep(5 * time.Second)
+				counter = bitbucket.DrainPullRequestSignals(ctx, tq)
+				counter += bitbucket.DrainRepositorySignals(ctx, tq)
+				counter += github.DrainSignals(ctx, tq)
+				counter += slack.DrainSignals(ctx, tq)
+			}
+
+			msg = "triggering workflow continue-as-new"
+			log.Warn(ctx, msg, "history_length", info.GetCurrentHistoryLength(), "history_size", info.GetCurrentHistorySize())
 			return workflow.NewContinueAsNewError(ctx, EventDispatcher)
 		}
 	}
