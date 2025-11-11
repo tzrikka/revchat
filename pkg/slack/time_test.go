@@ -236,12 +236,12 @@ func TestTimeSince(t *testing.T) {
 		{
 			name:      "within_hours",
 			timestamp: "2025-11-10T18:15:40.000000+00:00",
-			want:      "2h15m",
+			want:      "2h 15m",
 		},
 		{
 			name:      "almost_1_day",
 			timestamp: "2025-11-09T20:32:00.000000+00:00",
-			want:      "23h59m",
+			want:      "23h 59m",
 		},
 		{
 			name:      "1_day",
@@ -251,7 +251,7 @@ func TestTimeSince(t *testing.T) {
 		{
 			name:      "over_days",
 			timestamp: "2025-10-13T21:26:20.352995+00:00",
-			want:      "27d23h4m",
+			want:      "27d 23h 4m",
 		},
 	}
 
