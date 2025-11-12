@@ -153,7 +153,7 @@ func inviteSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 			continue
 		}
 
-		msg := ":wave: <@%s> is inviting you to use RevChat. Please type below this slash command:\n\n```%s opt-in```"
+		msg := ":wave: <@%s> is inviting you to use RevChat. Please run this slash command:\n\n```%s opt-in```"
 		if _, err := PostMessage(ctx, userID, fmt.Sprintf(msg, event.UserID, event.Command)); err != nil {
 			postEphemeralError(ctx, event, fmt.Sprintf("failed to send an invite to <@%s>.", userID))
 			continue
@@ -406,27 +406,27 @@ func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
 }
 
-func commonTurnData(ctx workflow.Context, event SlashCommandEvent) ([]string, []string, data.User, error) {
+func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []string, data.User, error) {
 	url := prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return nil, nil, data.User{}, nil // Not a *server* error as far as we're concerned.
+		return "", nil, data.User{}, nil // Not a *server* error as far as we're concerned.
 	}
 
 	emails, err := data.GetCurrentTurn(url[0])
 	if err != nil {
 		log.Error(ctx, "failed to get current turn for PR", "error", err, "pr_url", url[0])
 		postEphemeralError(ctx, event, "failed to read internal data about the PR.")
-		return nil, nil, data.User{}, err
+		return "", nil, data.User{}, err
 	}
 
 	user, err := data.SelectUserBySlackID(event.UserID)
 	if err != nil {
 		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", event.UserID)
 		postEphemeralError(ctx, event, "failed to read internal data about you.")
-		return nil, nil, data.User{}, err
+		return "", nil, data.User{}, err
 	}
 
-	return url, emails, user, nil
+	return url[0], emails, user, nil
 }
 
 func myTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
@@ -434,40 +434,40 @@ func myTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	if err != nil {
 		return err
 	}
-	if url == nil {
+	if url == "" {
 		return nil
 	}
 
 	// If this is a no-op, inform the user.
 	if slices.Contains(emails, user.Email) {
-		msg := whoseTurnText(ctx, url, emails, user, " already")
+		msg := whoseTurnText(ctx, emails, user, " already")
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
 
 	msg := "Thanks for letting me know!\n\n"
 
-	ok, err := data.Nudge(url[0], user.Email)
+	ok, err := data.Nudge(url, user.Email)
 	if err != nil {
-		log.Error(ctx, "failed to self-nudge", "error", err, "pr_url", url[0], "email", user.Email)
+		log.Error(ctx, "failed to self-nudge", "error", err, "pr_url", url, "email", user.Email)
 		postEphemeralError(ctx, event, "failed to write internal data about this PR.")
 	}
 	if !ok {
 		msg = ":thinking_face: I didn't think you're supposed to review this PR, thanks for letting me know!\n\n"
 
-		if err := data.AddReviewerToPR(url[0], user.Email); err != nil {
-			log.Error(ctx, "failed to add reviewer to PR", "error", err, "pr_url", url[0], "email", user.Email)
+		if err := data.AddReviewerToPR(url, user.Email); err != nil {
+			log.Error(ctx, "failed to add reviewer to PR", "error", err, "pr_url", url, "email", user.Email)
 			postEphemeralError(ctx, event, "failed to write internal data about this.")
 		}
 	}
 
-	emails, err = data.GetCurrentTurn(url[0])
+	emails, err = data.GetCurrentTurn(url)
 	if err != nil {
-		log.Error(ctx, "failed to get current turn for PR after switching", "error", err, "pr_url", url[0])
+		log.Error(ctx, "failed to get current turn for PR after switching", "error", err, "pr_url", url)
 		postEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
 	}
 
-	msg += whoseTurnText(ctx, url, emails, user, " now")
+	msg += whoseTurnText(ctx, emails, user, " now")
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
@@ -476,30 +476,30 @@ func notMyTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 	if err != nil {
 		return err
 	}
-	if url == nil {
+	if url == "" {
 		return nil
 	}
 
 	// If this is a no-op, inform the user.
 	if !slices.Contains(currentTurn, user.Email) {
-		msg := ":joy: I didn't think it's your turn anyway!\n\n" + whoseTurnText(ctx, url, currentTurn, user, " already")
+		msg := ":joy: I didn't think it's your turn anyway!\n\n" + whoseTurnText(ctx, currentTurn, user, " already")
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
 
-	if err := data.SwitchTurn(url[0], user.Email); err != nil {
-		log.Error(ctx, "failed to switch PR turn", "error", err, "pr_url", url[0], "email", user.Email)
+	if err := data.SwitchTurn(url, user.Email); err != nil {
+		log.Error(ctx, "failed to switch PR turn", "error", err, "pr_url", url, "email", user.Email)
 		postEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}
 
-	newTurn, err := data.GetCurrentTurn(url[0])
+	newTurn, err := data.GetCurrentTurn(url)
 	if err != nil {
-		log.Error(ctx, "failed to get current turn for PR after switching", "error", err, "pr_url", url[0])
+		log.Error(ctx, "failed to get current turn for PR after switching", "error", err, "pr_url", url)
 		postEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
 	}
 
-	msg := "Thanks for letting me know!\n\n" + whoseTurnText(ctx, url, newTurn, user, " now")
+	msg := "Thanks for letting me know!\n\n" + whoseTurnText(ctx, newTurn, user, " now")
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
@@ -523,16 +523,16 @@ func whoseTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 	if err != nil {
 		return err
 	}
-	if url == nil {
+	if url == "" {
 		return nil
 	}
 
-	msg := whoseTurnText(ctx, url, emails, user, "")
+	msg := whoseTurnText(ctx, emails, user, "")
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
 // whoseTurnText builds a "whose turn is it" summary message, reused by multiple slash commands.
-func whoseTurnText(ctx workflow.Context, url, emails []string, user data.User, tweak string) string {
+func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak string) string {
 	// If the user who ran the command is in the list, highlight that to them.
 	msg := strings.Builder{}
 	i := slices.Index(emails, user.Email)

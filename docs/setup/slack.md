@@ -44,6 +44,8 @@ Detailed instructions: <https://github.com/tzrikka/thrippy/blob/main/docs/slack/
 Request URL: `https://$TIMPANI-FQDN/webhook/$THRIPPY-LINK-ID`
 
 - [app_mention](https://docs.slack.dev/reference/events/app_mention)
+- [channel_archive](https://docs.slack.dev/reference/events/channel_archive)
+- [group_archive](https://docs.slack.dev/reference/events/group_archive)
 - [member_joined_channel](https://docs.slack.dev/reference/events/member_joined_channel)
 - [member_left_channel](https://docs.slack.dev/reference/events/member_left_channel)
 - [message.channels](https://docs.slack.dev/reference/events/message.channels)
