@@ -90,6 +90,10 @@ func countApprovals(pr PullRequest) int {
 	return count
 }
 
+const (
+	maxBookmarkTitleLen = 257
+)
+
 // updateChannelBuildsBookmark updates the "Builds" bookmark in the PR's Slack channel based on the latest repo
 // event. This is a deferred call that doesn't return an error, because handling the event itself is more important.
 func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
@@ -121,10 +125,26 @@ func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 
 		b := results.Builds[n]
 		desc := regexp.MustCompile(`\.+$`).ReplaceAllString(strings.TrimSpace(b.Desc), "")
-		title.WriteString(fmt.Sprintf("%s %s", buildStateEmoji(b.State), desc))
+		title.WriteString(fmt.Sprintf("%s %s", buildState(b.State), desc))
 	}
 
-	if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[6].ID, title.String()); err != nil {
+	s := title.String()
+	if len(s) > maxBookmarkTitleLen {
+		s = s[:maxBookmarkTitleLen]
+	}
+
+	if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[6].ID, s); err != nil {
 		log.Error(ctx, "failed to update Slack channel's builds bookmark", "error", err)
+	}
+}
+
+func buildState(state string) string {
+	switch state {
+	case "INPROGRESS":
+		return "[?]"
+	case "SUCCESSFUL":
+		return "[V]"
+	default: // "FAILED", "STOPPED".
+		return "[X]"
 	}
 }
