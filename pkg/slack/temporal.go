@@ -52,6 +52,8 @@ func newConfig(cmd *cli.Command) *Config {
 var Signals = []string{
 	"slack.events.app_rate_limited",
 
+	"slack.events.channel_archive",
+	"slack.events.group_archive",
 	"slack.events.member_joined_channel",
 	"slack.events.member_left_channel",
 	"slack.events.message",
@@ -73,12 +75,14 @@ func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
 	c.initThrippyLinks(ctx, cmd.String("thrippy-links-template-id"))
 
 	w.RegisterWorkflowWithOptions(c.appRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})
-	w.RegisterWorkflowWithOptions(c.memberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[1]})
-	w.RegisterWorkflowWithOptions(c.memberLeftWorkflow, workflow.RegisterOptions{Name: Signals[2]})
-	w.RegisterWorkflowWithOptions(c.messageWorkflow, workflow.RegisterOptions{Name: Signals[3]})
-	w.RegisterWorkflowWithOptions(c.reactionAddedWorkflow, workflow.RegisterOptions{Name: Signals[4]})
-	w.RegisterWorkflowWithOptions(c.reactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[5]})
-	w.RegisterWorkflowWithOptions(c.slashCommandWorkflow, workflow.RegisterOptions{Name: Signals[6]})
+	w.RegisterWorkflowWithOptions(c.channelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[1]})
+	w.RegisterWorkflowWithOptions(c.channelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[2]})
+	w.RegisterWorkflowWithOptions(c.memberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[3]})
+	w.RegisterWorkflowWithOptions(c.memberLeftWorkflow, workflow.RegisterOptions{Name: Signals[4]})
+	w.RegisterWorkflowWithOptions(c.messageWorkflow, workflow.RegisterOptions{Name: Signals[5]})
+	w.RegisterWorkflowWithOptions(c.reactionAddedWorkflow, workflow.RegisterOptions{Name: Signals[6]})
+	w.RegisterWorkflowWithOptions(c.reactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[7]})
+	w.RegisterWorkflowWithOptions(c.slashCommandWorkflow, workflow.RegisterOptions{Name: Signals[8]})
 
 	w.RegisterWorkflowWithOptions(remindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
 }
@@ -88,12 +92,14 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 
 	addReceive[map[string]any](ctx, childCtx, sel, Signals[0])
-	addReceive[memberEventWrapper](ctx, childCtx, sel, Signals[1])
-	addReceive[memberEventWrapper](ctx, childCtx, sel, Signals[2])
-	addReceive[messageEventWrapper](ctx, childCtx, sel, Signals[3])
-	addReceive[reactionEventWrapper](ctx, childCtx, sel, Signals[4])
-	addReceive[reactionEventWrapper](ctx, childCtx, sel, Signals[5])
-	addReceive[SlashCommandEvent](ctx, childCtx, sel, Signals[6])
+	addReceive[archiveEventWrapper](ctx, childCtx, sel, Signals[1])
+	addReceive[archiveEventWrapper](ctx, childCtx, sel, Signals[2])
+	addReceive[memberEventWrapper](ctx, childCtx, sel, Signals[3])
+	addReceive[memberEventWrapper](ctx, childCtx, sel, Signals[4])
+	addReceive[messageEventWrapper](ctx, childCtx, sel, Signals[5])
+	addReceive[reactionEventWrapper](ctx, childCtx, sel, Signals[6])
+	addReceive[reactionEventWrapper](ctx, childCtx, sel, Signals[7])
+	addReceive[SlashCommandEvent](ctx, childCtx, sel, Signals[8])
 }
 
 func addReceive[T any](ctx, childCtx workflow.Context, sel workflow.Selector, signalName string) {
@@ -116,12 +122,14 @@ func DrainSignals(ctx workflow.Context, taskQueue string) bool {
 	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
 
 	totalEvents := receiveAsync[map[string]any](ctx, childCtx, Signals[0])
-	totalEvents += receiveAsync[memberEventWrapper](ctx, childCtx, Signals[1])
-	totalEvents += receiveAsync[memberEventWrapper](ctx, childCtx, Signals[2])
-	totalEvents += receiveAsync[messageEventWrapper](ctx, childCtx, Signals[3])
-	totalEvents += receiveAsync[reactionEventWrapper](ctx, childCtx, Signals[4])
-	totalEvents += receiveAsync[reactionEventWrapper](ctx, childCtx, Signals[5])
-	totalEvents += receiveAsync[SlashCommandEvent](ctx, childCtx, Signals[6])
+	totalEvents += receiveAsync[archiveEventWrapper](ctx, childCtx, Signals[1])
+	totalEvents += receiveAsync[archiveEventWrapper](ctx, childCtx, Signals[2])
+	totalEvents += receiveAsync[memberEventWrapper](ctx, childCtx, Signals[3])
+	totalEvents += receiveAsync[memberEventWrapper](ctx, childCtx, Signals[4])
+	totalEvents += receiveAsync[messageEventWrapper](ctx, childCtx, Signals[5])
+	totalEvents += receiveAsync[reactionEventWrapper](ctx, childCtx, Signals[6])
+	totalEvents += receiveAsync[reactionEventWrapper](ctx, childCtx, Signals[7])
+	totalEvents += receiveAsync[SlashCommandEvent](ctx, childCtx, Signals[8])
 
 	return totalEvents > 0
 }

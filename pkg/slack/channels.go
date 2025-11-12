@@ -15,6 +15,17 @@ const (
 	channelMetadataMaxLen = 250
 )
 
+// https://docs.slack.dev/reference/events/channel_archive/
+// https://docs.slack.dev/reference/events/group_archive/
+func (c *Config) channelArchivedWorkflow(ctx workflow.Context, event archiveEventWrapper) error {
+	if selfTriggeredEvent(ctx, event.Authorizations, event.InnerEvent.User) {
+		return nil
+	}
+
+	log.Warn(ctx, "Slack channel archived - event handler not implemented yet")
+	return nil
+}
+
 // NormalizeChannelName transforms arbitrary text into a valid Slack channel name.
 // Based on: https://docs.slack.dev/reference/methods/conversations.create#naming.
 func NormalizeChannelName(name string, maxLen int) string {

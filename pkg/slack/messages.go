@@ -15,49 +15,7 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
-type messageEventWrapper struct {
-	eventWrapper
-
-	InnerEvent MessageEvent `json:"event"`
-}
-
-// https://docs.slack.dev/reference/events/message
-type MessageEvent struct {
-	// Type string `json:"type"` // Always "message".
-
-	Subtype string `json:"subtype,omitempty"`
-
-	User     string `json:"user,omitempty"`
-	BotID    string `json:"bot_id,omitempty"`
-	Username string `json:"username,omitempty"` // Customized display name, when bot_id is present.
-
-	Team        string `json:"team,omitempty"`
-	Channel     string `json:"channel,omitempty"`
-	ChannelType string `json:"channel_type,omitempty"`
-
-	Text string `json:"text,omitempty"`
-	// Blocks []map[string]any `json:"blocks"` // Text is enough.
-
-	Edited          *edited       `json:"edited,omitempty"`           // Subtype = "message_changed".
-	Message         *MessageEvent `json:"message,omitempty"`          // Subtype = "message_changed".
-	PreviousMessage *MessageEvent `json:"previous_message,omitempty"` // Subtype = "message_changed" or "message_deleted".
-	Root            *MessageEvent `json:"root,omitempty"`             // Subtype = "thread_broadcast".
-
-	TS        string `json:"ts"`
-	EventTS   string `json:"event_ts,omitempty"`
-	DeletedTS string `json:"deleted_ts,omitempty"` // Subtype = "message_deleted".
-	ThreadTS  string `json:"thread_ts,omitempty"`  // Reply, or subtype = "thread_broadcast".
-
-	ParentUserID string `json:"parent_user_id,omitempty"` // Subtype = "thread_broadcast".
-	ClientMsgID  string `json:"client_msg_id,omitempty"`
-}
-
-type edited struct {
-	User string `json:"user"`
-	TS   string `json:"ts"`
-}
-
-// https://docs.slack.dev/reference/events/message
+// https://docs.slack.dev/reference/events/message/
 func (c *Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
 	userID := extractUserID(ctx, &event.InnerEvent)
 	if userID == "" {
@@ -66,7 +24,7 @@ func (c *Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper
 		return errors.New(msg)
 	}
 
-	if isSelfTriggeredEvent(ctx, event.Authorizations, userID) {
+	if selfTriggeredEvent(ctx, event.Authorizations, userID) {
 		return nil
 	}
 
@@ -146,7 +104,7 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 func (c *Config) addMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
-		return c.addMessageInBitbucket(ctx, event, userID)
+		return c.addMessageBitbucket(ctx, event, userID)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		return errors.New("neither Bitbucket nor GitHub are configured")
@@ -173,8 +131,8 @@ func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID 
 	}
 }
 
-// addMessageInBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
-func (c *Config) addMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
+// addMessageBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
+func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
 	if event.Subtype == "bot_message" {
 		log.Error(ctx, "unexpected bot message", "bot_id", event.BotID, "username", event.Username)
 	}
