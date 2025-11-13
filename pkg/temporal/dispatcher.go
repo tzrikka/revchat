@@ -5,7 +5,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
@@ -25,7 +24,7 @@ const (
 )
 
 type Config struct {
-	cmd *cli.Command
+	taskQueue string
 }
 
 // EventDispatcherWorkflow is an always-running singleton workflow that receives Temporal
@@ -41,11 +40,10 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	}
 
 	selector := workflow.NewSelector(ctx)
-	taskQueue := c.cmd.String("temporal-task-queue-revchat")
-	bitbucket.RegisterPullRequestSignals(ctx, selector, taskQueue)
-	bitbucket.RegisterRepositorySignals(ctx, selector, taskQueue)
-	github.RegisterSignals(ctx, selector, taskQueue)
-	slack.RegisterSignals(ctx, selector, taskQueue)
+	bitbucket.RegisterPullRequestSignals(ctx, selector, c.taskQueue)
+	bitbucket.RegisterRepositorySignals(ctx, selector, c.taskQueue)
+	github.RegisterSignals(ctx, selector, c.taskQueue)
+	slack.RegisterSignals(ctx, selector, c.taskQueue)
 
 	for {
 		selector.Select(ctx)
@@ -65,7 +63,7 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 				if err := workflow.Sleep(ctx, time.Second); err != nil {
 					log.Error(ctx, "failed to wait 1 second between drain cycles", "error", err)
 				}
-				if drainCycle(ctx, taskQueue) {
+				if c.drainCycle(ctx) {
 					cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
 				}
 			}
@@ -82,11 +80,11 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 }
 
 // drainCycle processes each event source and returns true if any signals were found.
-func drainCycle(ctx workflow.Context, taskQueue string) bool {
-	bitbucketPRSignalsFound := bitbucket.DrainPullRequestSignals(ctx, taskQueue)
-	bitbucketRepoSignalsFound := bitbucket.DrainRepositorySignals(ctx, taskQueue)
-	githubSignalsFound := github.DrainSignals(ctx, taskQueue)
-	slackSignalsFound := slack.DrainSignals(ctx, taskQueue)
+func (c Config) drainCycle(ctx workflow.Context) bool {
+	bitbucketPRSignalsFound := bitbucket.DrainPullRequestSignals(ctx, c.taskQueue)
+	bitbucketRepoSignalsFound := bitbucket.DrainRepositorySignals(ctx, c.taskQueue)
+	githubSignalsFound := github.DrainSignals(ctx, c.taskQueue)
+	slackSignalsFound := slack.DrainSignals(ctx, c.taskQueue)
 
 	return bitbucketPRSignalsFound || bitbucketRepoSignalsFound || githubSignalsFound || slackSignalsFound
 }

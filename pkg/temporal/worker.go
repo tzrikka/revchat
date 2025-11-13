@@ -37,7 +37,8 @@ func Run(ctx context.Context, l zerolog.Logger, cmd *cli.Command) error {
 	defer c.Close()
 
 	ctx = l.WithContext(ctx)
-	w := worker.New(c, cmd.String("temporal-task-queue-revchat"), worker.Options{})
+	tq := cmd.String("temporal-task-queue-revchat")
+	w := worker.New(c, tq, worker.Options{})
 	bitbucket.RegisterPullRequestWorkflows(w, cmd)
 	bitbucket.RegisterRepositoryWorkflows(w)
 	github.RegisterWorkflows(w, cmd)
@@ -45,12 +46,12 @@ func Run(ctx context.Context, l zerolog.Logger, cmd *cli.Command) error {
 
 	slack.CreateSchedule(ctx, c, cmd)
 
-	cfg := Config{cmd: cmd}
+	cfg := Config{taskQueue: tq}
 	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})
 
 	opts := client.StartWorkflowOptions{
 		ID:                       EventDispatcher,
-		TaskQueue:                cmd.String("temporal-task-queue-revchat"),
+		TaskQueue:                tq,
 		WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
 		WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
 	}
