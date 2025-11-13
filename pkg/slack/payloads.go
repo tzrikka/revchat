@@ -82,7 +82,10 @@ type MessageEvent struct {
 	BotID    string `json:"bot_id,omitempty"`
 	Username string `json:"username,omitempty"` // Customized display name, when bot_id is present.
 
-	Team        string `json:"team,omitempty"`
+	Team       string `json:"team,omitempty"`
+	SourceTeam string `json:"source_team,omitempty"`
+	UserTeam   string `json:"user_team,omitempty"`
+
 	Channel     string `json:"channel,omitempty"`
 	ChannelType string `json:"channel_type,omitempty"`
 
@@ -99,8 +102,18 @@ type MessageEvent struct {
 	DeletedTS string `json:"deleted_ts,omitempty"` // Subtype = "message_deleted".
 	ThreadTS  string `json:"thread_ts,omitempty"`  // Reply, or subtype = "thread_broadcast".
 
-	ParentUserID string `json:"parent_user_id,omitempty"` // Subtype = "thread_broadcast".
-	ClientMsgID  string `json:"client_msg_id,omitempty"`
+	ReplyCount      int      `json:"reply_count,omitempty"`
+	ReplyUsers      []string `json:"reply_users,omitempty"`
+	ReplyUsersCount int      `json:"reply_users_count,omitempty"`
+	LatestReply     string   `json:"latest_reply,omitempty"`
+	// ParentUserID string   `json:"parent_user_id,omitempty"` // Unnecessary.
+
+	Hidden     bool   `json:"hidden,omitempty"`
+	IsLocked   bool   `json:"is_locked,omitempty"`
+	Subscribed bool   `json:"subscribed,omitempty"`
+	LastRead   string `json:"last_read,omitempty"`
+
+	// ClientMsgID  string `json:"client_msg_id,omitempty"` // Unnecessary.
 }
 
 type Edited struct {

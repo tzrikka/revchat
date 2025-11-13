@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/rs/zerolog v1.34.0
-	github.com/tzrikka/thrippy-api v1.4.1
+	github.com/tzrikka/thrippy-api v1.4.2
 	github.com/tzrikka/timpani-api v1.0.0
 	github.com/tzrikka/xdg v1.3.3
 	github.com/urfave/cli-altsrc/v3 v3.1.0
@@ -31,13 +31,13 @@ require (
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	golang.org/x/net v0.46.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251110190251-83f479183930 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251110190251-83f479183930 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

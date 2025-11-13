@@ -126,7 +126,7 @@ func inviteSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 			continue
 		}
 
-		if user.ThrippyLink != "" {
+		if data.IsOptedIn(user) {
 			msg := fmt.Sprintf(":bell: <@%s> is already opted-in.", userID)
 			_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 			continue
@@ -188,7 +188,7 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 		return false
 	}
 
-	if user.ThrippyLink == "" {
+	if !data.IsOptedIn(user) {
 		msg := fmt.Sprintf(":no_bell: <@%s> is not opted-in to use RevChat.", userID)
 		_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 		return false
@@ -215,7 +215,7 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 		return err
 	}
 
-	if user.ThrippyLink != "" {
+	if data.IsOptedIn(user) {
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":bell: You're already opted in.")
 	}
 
@@ -285,7 +285,7 @@ func (c *Config) optOutSlashCommand(ctx workflow.Context, event SlashCommandEven
 		return err
 	}
 
-	if user.ThrippyLink == "" {
+	if !data.IsOptedIn(user) {
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 

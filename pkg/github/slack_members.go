@@ -101,7 +101,7 @@ func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, s
 		return ""
 	}
 
-	if user.ThrippyLink == "" {
+	if !data.IsOptedIn(user) {
 		return ""
 	}
 

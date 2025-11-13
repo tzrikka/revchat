@@ -149,6 +149,10 @@ func SelectUserBySlackID(slackID string) (User, error) {
 	return selectUserBy(indexBySlackID, slackID)
 }
 
+func IsOptedIn(u User) bool {
+	return u.ThrippyLink != ""
+}
+
 func selectUserBy(indexType int, id string) (User, error) {
 	if id == "" {
 		return User{}, nil

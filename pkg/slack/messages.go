@@ -17,6 +17,10 @@ import (
 
 // https://docs.slack.dev/reference/events/message/
 func (c *Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
+	if !prChannel(ctx, event.InnerEvent.Channel) {
+		return nil
+	}
+
 	userID := extractUserID(ctx, &event.InnerEvent)
 	if userID == "" {
 		msg := "could not determine who triggered a Slack message event"
@@ -72,6 +76,10 @@ func extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 		return user
 	}
 
+	if msg.User == "USLACKBOT" {
+		return ""
+	}
+
 	return msg.User
 }
 
@@ -114,7 +122,7 @@ func (c *Config) addMessage(ctx workflow.Context, event MessageEvent, userID str
 func (c *Config) changeMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
-		return editMessageInBitbucket(ctx, event, userID)
+		return c.editMessageBitbucket(ctx, event, userID)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		return errors.New("neither Bitbucket nor GitHub are configured")
@@ -124,139 +132,181 @@ func (c *Config) changeMessage(ctx workflow.Context, event MessageEvent, userID 
 func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
 	case c.bitbucketWorkspace != "":
-		return deleteMessageInBitbucket(ctx, event, userID)
+		return deleteMessageBitbucket(ctx, event, userID)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
 }
 
-// addMessageBitbucket mirrors in Bitbucket the creation of a Slack message/reply/broadcast.
+// addMessageBitbucket mirrors in Bitbucket the creation of a Slack message/reply.
+// Broadcast replies are treated as normal replies, not as new top-level messages.
 func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
 	if event.Subtype == "bot_message" {
-		log.Error(ctx, "unexpected bot message", "bot_id", event.BotID, "username", event.Username)
+		log.Error(ctx, "unexpected bot message in Slack", "bot_id", event.BotID, "username", event.Username)
 	}
 
-	id := event.Channel
+	ids := event.Channel
 	if event.ThreadTS != "" {
-		id = fmt.Sprintf("%s/%s", id, event.ThreadTS)
+		ids = fmt.Sprintf("%s/%s", event.Channel, event.ThreadTS)
 	}
 
-	url, err := data.SwitchURLAndID(id)
-	if err != nil {
-		msg := "failed to retrieve Slack message's PR comment URL"
-		log.Error(ctx, msg, "error", err, "message_subtype", event.Subtype, "channel_id", event.Channel, "message_ts", event.ThreadTS)
-		return err
-	}
-	if url == "" {
-		log.Debug(ctx, "Slack message's PR comment URL is empty", "msg_subtype", event.Subtype, "channel_id", event.Channel, "msg_ts", event.ThreadTS)
-		return nil // If we're not tracking this PR, there's no need/way to announce this event.
-	}
-
-	return c.createPRComment(ctx, url, event.Text, event.Channel, fmt.Sprintf("%s/%s", id, event.TS), userID)
-}
-
-var commentURLPattern = regexp.MustCompile(`[a-z]/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
-
-const ExpectedSubmatches = 6
-
-// editMessageInBitbucket mirrors in Bitbucket the editing of a Slack message/reply/broadcast.
-func editMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
-	log.Warn(ctx, "message edit event", "event", event, "user_id", userID)
-	return nil
-}
-
-// deleteMessageInBitbucket mirrors in Bitbucket the deletion of a Slack message/reply/broadcast.
-func deleteMessageInBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
-	id := fmt.Sprintf("%s/%s", event.Channel, event.DeletedTS)
-	if tts := event.PreviousMessage.ThreadTS; tts != "" {
-		id = fmt.Sprintf("%s/%s/%s", event.Channel, tts, event.DeletedTS)
-	}
-
-	url, err := data.SwitchURLAndID(id)
-	if err != nil {
-		msg := "failed to retrieve Slack message's PR comment URL"
-		log.Error(ctx, msg, "error", err, "message_subtype", event.Subtype, "id", id, "url", url)
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	url, err := urlElements(ctx, ids)
+	if err != nil || url == nil {
 		return err
 	}
 
-	sub := commentURLPattern.FindStringSubmatch(url)
-	if len(sub) != ExpectedSubmatches {
-		msg := "failed to parse Slack message's PR comment URL"
-		log.Error(ctx, msg, "message_subtype", event.Subtype, "id", id, "url", url)
-		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
-	}
-
-	if err := data.DeleteURLAndIDMapping(url); err != nil {
-		log.Error(ctx, "failed to delete URL/Slack mappings", "error", err, "comment_url", url)
-		// Don't abort - we still want to attempt to delete the PR comment.
-	}
-
-	user, err := data.SelectUserBySlackID(userID)
-	if err != nil {
-		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
+	// Need to impersonate in Bitbucket the user who sent the Slack message.
+	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
+	if err != nil || linkID == "" {
 		return err
 	}
 
-	if user.ThrippyLink == "" {
-		msg := "Cannot mirror deletion in Bitbucket, you need to run the slash command `/revchat opt-in`"
-		return PostEphemeralMessage(ctx, event.Channel, userID, msg)
-	}
-
-	err = bitbucket.PullRequestsDeleteCommentActivity(ctx, bitbucket.PullRequestsDeleteCommentRequest{
-		ThrippyLinkID: user.ThrippyLink,
-		Workspace:     sub[1],
-		RepoSlug:      sub[2],
-		PullRequestID: sub[3],
-		CommentID:     sub[5],
-	})
-	if err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR comment", "error", err, "id", id, "url", url)
-		return err
-	}
-
-	return nil
-}
-
-func (c *Config) createPRComment(ctx workflow.Context, url, msg, slackChannel, slackID, slackUser string) error {
-	sub := commentURLPattern.FindStringSubmatch(url)
-	if len(sub) != ExpectedSubmatches {
-		log.Error(ctx, "failed to parse Slack message's PR comment URL", "url", url)
-		return fmt.Errorf("invalid Bitbucket PR URL: %s", url)
-	}
-
-	user, err := data.SelectUserBySlackID(slackUser)
-	if err != nil {
-		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", slackUser)
-		return err
-	}
-
-	if user.ThrippyLink == "" {
-		msg := "Cannot mirror message in Bitbucket, you need to run the slash command `/revchat opt-in`"
-		return PostEphemeralMessage(ctx, slackChannel, slackUser, msg)
-	}
-
-	msg = markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, msg) + "\n\n[This comment was created by RevChat]: #"
+	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Text)
+	msg += "\n\n[This comment was created by RevChat]: #"
 
 	resp, err := bitbucket.PullRequestsCreateCommentActivity(ctx, bitbucket.PullRequestsCreateCommentRequest{
-		ThrippyLinkID: user.ThrippyLink,
-		Workspace:     sub[1],
-		RepoSlug:      sub[2],
-		PullRequestID: sub[3],
+		ThrippyLinkID: linkID,
+		Workspace:     url[1],
+		RepoSlug:      url[2],
+		PullRequestID: url[3],
 		Markdown:      msg,
-		ParentID:      sub[5], // Optional.
+		ParentID:      url[5], // Optional.
 	})
 	if err != nil {
-		log.Error(ctx, "failed to create Bitbucket PR comment", "error", err, "url", url, "slack_id", slackID)
+		log.Error(ctx, "failed to create Bitbucket PR comment", "error", err, "slack_ids", ids, "pr_url", url[0])
 		return fmt.Errorf("failed to create Bitbucket PR comment: %w", err)
 	}
 
-	url = resp.Links["html"].HRef
-	if err := data.MapURLAndID(url, slackID); err != nil {
-		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url, "slack_id", slackID)
+	url[0] = resp.Links["html"].HRef
+	ids = fmt.Sprintf("%s/%s", ids, event.TS)
+
+	if err := data.MapURLAndID(url[0], ids); err != nil {
+		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "slack_ids", ids, "comment_url", url[0])
 		// Don't return the error - the message is already created in Bitbucket, so
 		// we don't want to retry and post it again, even though this is problematic.
 	}
 
 	return nil
+}
+
+// editMessageBitbucket mirrors in Bitbucket the editing of a Slack message/reply.
+func (c *Config) editMessageBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
+	// Ignore "fake" edit events when a broadcast reply is created/deleted.
+	if event.Message.Text == event.PreviousMessage.Text {
+		return nil
+	}
+
+	ids := fmt.Sprintf("%s/%s", event.Channel, event.Message.TS)
+	if event.Message.ThreadTS != "" && event.Message.ThreadTS != event.Message.TS {
+		ids = fmt.Sprintf("%s/%s/%s", event.Channel, event.Message.ThreadTS, event.Message.TS)
+	}
+
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	url, err := urlElements(ctx, ids)
+	if err != nil || url == nil {
+		return err
+	}
+
+	// Need to impersonate in Bitbucket the user who sent the Slack message.
+	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
+	if err != nil || linkID == "" {
+		return err
+	}
+
+	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Message.Text)
+	err = bitbucket.PullRequestsUpdateCommentActivity(ctx, bitbucket.PullRequestsUpdateCommentRequest{
+		ThrippyLinkID: linkID,
+		Workspace:     url[1],
+		RepoSlug:      url[2],
+		PullRequestID: url[3],
+		CommentID:     url[5],
+		Markdown:      msg,
+	})
+	if err != nil {
+		log.Error(ctx, "failed to update Bitbucket PR comment", "error", err, "slack_ids", ids, "comment_url", url[0])
+		return err
+	}
+
+	return nil
+}
+
+// deleteMessageBitbucket mirrors in Bitbucket the deletion of a Slack message/reply.
+func deleteMessageBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
+	// Don't delete "tombstone" messages (roots of threads).
+	if event.PreviousMessage.Subtype == "tombstone" {
+		return nil
+	}
+
+	ids := fmt.Sprintf("%s/%s", event.Channel, event.DeletedTS)
+	if event.PreviousMessage.ThreadTS != "" && event.PreviousMessage.ThreadTS != event.DeletedTS {
+		ids = fmt.Sprintf("%s/%s/%s", event.Channel, event.PreviousMessage.ThreadTS, event.DeletedTS)
+	}
+
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	url, err := urlElements(ctx, ids)
+	if err != nil || url == nil {
+		return err
+	}
+
+	if err := data.DeleteURLAndIDMapping(url[0]); err != nil {
+		log.Error(ctx, "failed to delete URL/Slack mappings", "error", err, "comment_url", url[0])
+		// Don't abort - we still want to attempt to delete the PR comment.
+	}
+
+	// Need to impersonate in Bitbucket the user who sent the Slack message.
+	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
+	if err != nil || linkID == "" {
+		return err
+	}
+
+	err = bitbucket.PullRequestsDeleteCommentActivity(ctx, bitbucket.PullRequestsDeleteCommentRequest{
+		ThrippyLinkID: linkID,
+		Workspace:     url[1],
+		RepoSlug:      url[2],
+		PullRequestID: url[3],
+		CommentID:     url[5],
+	})
+	if err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR comment", "error", err, "slack_ids", ids, "comment_url", url[0])
+		return err
+	}
+
+	return nil
+}
+
+var commentURLPattern = regexp.MustCompile(`^https://[^/]+/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
+
+const ExpectedSubmatches = 6
+
+func urlElements(ctx workflow.Context, ids string) ([]string, error) {
+	url, err := commentURL(ctx, ids)
+	if err != nil || url == "" {
+		return nil, err
+	}
+
+	sub := commentURLPattern.FindStringSubmatch(url)
+	if len(sub) != ExpectedSubmatches {
+		msg := "failed to parse Slack message's PR comment URL"
+		log.Error(ctx, msg, "slack_ids", ids, "comment_url", url)
+		return nil, fmt.Errorf("invalid Bitbucket PR URL: %s", url)
+	}
+
+	return sub, nil
+}
+
+func thrippyLinkID(ctx workflow.Context, userID, channelID string) (string, error) {
+	user, err := data.SelectUserBySlackID(userID)
+	if err != nil {
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
+		return "", err
+	}
+
+	if !data.IsOptedIn(user) {
+		msg := ":warning: Cannot mirror this in Bitbucket, you need to run this slash command: `/revchat opt-in`"
+		return "", PostEphemeralMessage(ctx, channelID, userID, msg)
+	}
+
+	return user.ThrippyLink, nil
 }
