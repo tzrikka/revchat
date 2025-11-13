@@ -40,36 +40,42 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 		return fmt.Errorf("failed to set workflow search attribute: %w", err)
 	}
 
-	sel := workflow.NewSelector(ctx)
-	tq := c.cmd.String("temporal-task-queue-revchat")
-	bitbucket.RegisterPullRequestSignals(ctx, sel, tq)
-	bitbucket.RegisterRepositorySignals(ctx, sel, tq)
-	github.RegisterSignals(ctx, sel, tq)
-	slack.RegisterSignals(ctx, sel, tq)
+	selector := workflow.NewSelector(ctx)
+	taskQueue := c.cmd.String("temporal-task-queue-revchat")
+	bitbucket.RegisterPullRequestSignals(ctx, selector, taskQueue)
+	bitbucket.RegisterRepositorySignals(ctx, selector, taskQueue)
+	github.RegisterSignals(ctx, selector, taskQueue)
+	slack.RegisterSignals(ctx, selector, taskQueue)
 
 	for {
-		sel.Select(ctx)
+		selector.Select(ctx)
 
 		// https://docs.temporal.io/develop/go/continue-as-new
 		// https://docs.temporal.io/develop/go/message-passing#wait-for-message-handlers
 		if info := workflow.GetInfo(ctx); info.GetContinueAsNewSuggested() {
-			msg := "continue-as-new suggested by Temporal server"
-			log.Info(ctx, msg, "history_length", info.GetCurrentHistoryLength(), "history_size", info.GetCurrentHistorySize())
+			startTime := time.Now()
+			log.Info(ctx, "continue-as-new suggested by Temporal server",
+				"history_length", info.GetCurrentHistoryLength(),
+				"history_size", info.GetCurrentHistorySize())
 
 			// "Lame duck" mode: drain all signal channels before resetting workflow history.
 			// This minimizes - but doesn't entirely eliminate - the chance of losing signals.
 			// We run in this mode until the worker is relatively idle.
 			for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 5; cyclesSinceLastSignal++ {
 				if err := workflow.Sleep(ctx, time.Second); err != nil {
-					log.Error(ctx, "failed to wait 1 second between drain cycles", "error", err, "cycle", cyclesSinceLastSignal)
+					log.Error(ctx, "failed to wait 1 second between drain cycles", "error", err)
 				}
-				if drainCycle(ctx, tq) {
+				if drainCycle(ctx, taskQueue) {
 					cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
 				}
 			}
 
-			msg = "triggering workflow continue-as-new"
-			log.Warn(ctx, msg, "history_length", info.GetCurrentHistoryLength(), "history_size", info.GetCurrentHistorySize())
+			duration := time.Since(startTime)
+			log.Warn(ctx, "triggering continue-as-new for dispatcher workflow",
+				"history_length", info.GetCurrentHistoryLength(),
+				"history_size", info.GetCurrentHistorySize(),
+				"lead_time", duration.String())
+
 			return workflow.NewContinueAsNewError(ctx, EventDispatcher)
 		}
 	}
