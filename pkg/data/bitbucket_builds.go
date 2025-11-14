@@ -3,6 +3,7 @@ package data
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"maps"
 	"os"
@@ -16,6 +17,7 @@ type PRStatus struct {
 }
 
 type CommitStatus struct {
+	Name  string `json:"name"`
 	State string `json:"state"`
 	Desc  string `json:"desc"`
 	URL   string `json:"url"`
@@ -46,10 +48,10 @@ func SummarizeBitbucketBuilds(url string) string {
 		return ""
 	}
 
-	names := slices.Sorted(maps.Keys(pr.Builds))
+	keys := slices.Sorted(maps.Keys(pr.Builds))
 	var summary []string
-	for _, name := range names {
-		switch s := pr.Builds[name].State; s {
+	for _, k := range keys {
+		switch s := pr.Builds[k].State; s {
 		case "INPROGRESS":
 			// Don't show in-progress builds in summary.
 		case "SUCCESSFUL":
@@ -61,12 +63,12 @@ func SummarizeBitbucketBuilds(url string) string {
 
 	// Returns a sequence of space-separated emoji.
 	if len(summary) > 0 {
-		return ":" + strings.Join(summary, ": :") + ":"
+		return fmt.Sprintf(":%s:", strings.Join(summary, ": :"))
 	}
 	return ""
 }
 
-func UpdateBitbucketBuilds(prURL, commitHash, name string, cs CommitStatus) error {
+func UpdateBitbucketBuilds(prURL, commitHash, key string, cs CommitStatus) error {
 	mu := prStatusMutexes.Get(prURL)
 	mu.Lock()
 	defer mu.Unlock()
@@ -84,7 +86,7 @@ func UpdateBitbucketBuilds(prURL, commitHash, name string, cs CommitStatus) erro
 		pr.Builds = map[string]CommitStatus{}
 	}
 
-	pr.Builds[name] = cs
+	pr.Builds[key] = cs
 	return writeStatusFile(prURL, pr)
 }
 

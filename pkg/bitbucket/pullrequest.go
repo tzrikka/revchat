@@ -27,8 +27,8 @@ func (c Config) prCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 }
 
 func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	cs := commits(ctx, event)
-	event.PullRequest.CommitCount = len(cs)
+	cmts := commits(ctx, event)
+	event.PullRequest.CommitCount = len(cmts)
 
 	url := event.PullRequest.Links["html"].HRef
 	snapshot, err := switchSnapshot(ctx, url, event.PullRequest)
@@ -111,24 +111,25 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	}
 
 	// Commit(s) pushed to the PR branch.
-	if len(cs) > 0 && snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
-		slices.Reverse(cs) // Switch from reverse order to chronological order.
+	if event.PullRequest.CommitCount > 0 && snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
+		slices.Reverse(cmts) // Switch from reverse order to chronological order.
 
-		if snapshot.CommitCount >= len(cs) {
-			log.Error(ctx, "commit count in Bitbucket PR snapshot >= actual commit count",
-				"pr_url", url, "snapshot_count", snapshot.CommitCount, "actual_commits", len(cs))
-			// Workaround: announce just the latest commit.
-			snapshot.CommitCount = len(cs) - 1
+		commitCount := event.PullRequest.CommitCount
+		if snapshot.CommitCount >= commitCount {
+			// Handle the unlikely ">" case where RevChat missed a commit push,
+			// but more likely the "==" case where the user force-pushed a new head
+			// (i.e. same number of commits) - by announcing just the last commits.
+			commitCount--
 		}
-		cs = cs[snapshot.CommitCount:]
+		cmts = cmts[commitCount:]
 
-		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, len(cs))
-		if len(cs) != 1 {
+		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, len(cmts))
+		if len(cmts) != 1 {
 			msg += "s"
 		}
 
 		msg += "> to this PR:"
-		for _, c := range cs {
+		for _, c := range cmts {
 			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], c.Message)
 		}
 		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)

@@ -91,7 +91,7 @@ func countApprovals(pr PullRequest) int {
 }
 
 const (
-	maxBookmarkTitleLen = 250
+	maxBookmarkTitleLen = 200
 )
 
 // updateChannelBuildsBookmark updates the "Builds" bookmark in the PR's Slack channel based on the latest repo
@@ -117,13 +117,13 @@ func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 		title.WriteString("no results")
 	}
 
-	names := slices.Sorted(maps.Keys(results.Builds))
-	for i, n := range names {
+	keys := slices.Sorted(maps.Keys(results.Builds))
+	for i, k := range keys {
 		if i > 0 {
 			title.WriteString(" ")
 		}
 
-		b := results.Builds[n]
+		b := results.Builds[k]
 		desc := regexp.MustCompile(`\.+$`).ReplaceAllString(strings.TrimSpace(b.Desc), "")
 		title.WriteString(fmt.Sprintf("%s %s", buildState(b.State), desc))
 	}
