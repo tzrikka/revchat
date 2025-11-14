@@ -143,7 +143,7 @@ func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID 
 // Broadcast replies are treated as normal replies, not as new top-level messages.
 func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
 	if event.Subtype == "bot_message" {
-		log.Error(ctx, "unexpected bot message in Slack", "bot_id", event.BotID, "username", event.Username)
+		return nil // Slack bot, not a real user.
 	}
 
 	ids := event.Channel
@@ -297,6 +297,10 @@ func urlElements(ctx workflow.Context, ids string) ([]string, error) {
 }
 
 func thrippyLinkID(ctx workflow.Context, userID, channelID string) (string, error) {
+	if len(userID) > 0 && userID[0] == 'B' {
+		return "", nil // Slack bot, not a real user.
+	}
+
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
 		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)

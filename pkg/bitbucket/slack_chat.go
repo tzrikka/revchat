@@ -1,7 +1,6 @@
 package bitbucket
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -24,7 +23,7 @@ func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Accoun
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		log.Warn(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
-		return errors.New("missing/bad Slack IDs")
+		return nil
 	}
 
 	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName))
@@ -69,7 +68,7 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		log.Warn(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
-		return errors.New("missing/bad Slack IDs")
+		return nil
 	}
 
 	name, icon := impersonateUser(ctx, user)
@@ -112,15 +111,11 @@ func deleteMsg(ctx workflow.Context, url string) error {
 		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
 		return err
 	}
-	if ids == "" {
-		log.Debug(ctx, "no Slack IDs found for Bitbucket URL (already deleted)", "url", url)
-		return nil
-	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		log.Warn(ctx, "can't delete Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
-		return errors.New("missing/bad Slack IDs")
+		return nil
 	}
 
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
@@ -141,7 +136,7 @@ func editMsg(ctx workflow.Context, url, msg string) error {
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
 		log.Warn(ctx, "can't update Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
-		return errors.New("missing/bad Slack IDs")
+		return nil
 	}
 
 	return slack.UpdateMessage(ctx, id[0], id[len(id)-1], msg)
