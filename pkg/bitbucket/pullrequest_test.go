@@ -180,19 +180,19 @@ func TestInlineCommentPrefix(t *testing.T) {
 			name: "no_from",
 			url:  "http://example.com",
 			i:    &Inline{Path: "test.txt"},
-			want: "<http://example.com|File comment> in the file `test.txt`:\n",
+			want: "<http://example.com|File comment> in `test.txt`:\n",
 		},
 		{
 			name: "from_only",
 			url:  "http://example.com",
 			i:    &Inline{From: &from, Path: "test.txt"},
-			want: "<http://example.com|Line comment> in line 1 in the file `test.txt`:\n",
+			want: "<http://example.com|Line comment> in line 1 in `test.txt`:\n",
 		},
 		{
 			name: "from_and_to",
 			url:  "http://example.com",
 			i:    &Inline{From: &from, To: &to, Path: "test.txt"},
-			want: "<http://example.com|Line comment> in lines 1-2 in the file `test.txt`:\n",
+			want: "<http://example.com|Line comment> in lines 1-2 in `test.txt`:\n",
 		},
 	}
 

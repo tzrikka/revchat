@@ -62,7 +62,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 	// Title edited.
 	if snapshot.Title != event.PullRequest.Title {
-		_ = mentionUserInMsg(ctx, channelID, event.Actor, "%s edited the PR title.")
+		_ = mentionUserInMsg(ctx, channelID, event.Actor, ":pencil2: %s edited the PR title.")
 		slack.SetChannelDescription(ctx, channelID, event.PullRequest.Title, url)
 		if msg := c.linkifyIDs(ctx, event.PullRequest.Title); msg != "" {
 			_, _ = slack.PostMessage(ctx, channelID, msg)
@@ -73,9 +73,9 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 	// Description edited.
 	if snapshot.Description != event.PullRequest.Description {
-		msg := "%s deleted the PR description."
+		msg := ":pencil2: %s deleted the PR description."
 		if text := strings.TrimSpace(event.PullRequest.Description); text != "" {
-			msg = "%s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, url)
+			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, url)
 		}
 
 		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
@@ -233,7 +233,7 @@ func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
 
 // reviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.
 func reviewerMentions(ctx workflow.Context, added, removed []string) string {
-	msg := "%s "
+	msg := ":bust_in_silhouette: %s "
 	if len(added) > 0 {
 		msg += "added" + bitbucketAccountsToSlackMentions(ctx, added)
 	}
@@ -431,16 +431,16 @@ func htmlURL(links map[string]Link) string {
 
 func inlineCommentPrefix(url string, i *Inline) string {
 	subject := "File"
-	location := "the"
+	location := "in"
 
 	if i.From != nil {
 		subject = "Line"
-		location = fmt.Sprintf("line %d in the", *i.From)
+		location = fmt.Sprintf("in line %d in", *i.From)
 
 		if i.To != nil {
-			location = fmt.Sprintf("lines %d-%d in the", *i.From, *i.To)
+			location = fmt.Sprintf("in lines %d-%d in", *i.From, *i.To)
 		}
 	}
 
-	return fmt.Sprintf("<%s|%s comment> in %s file `%s`:\n", url, subject, location, i.Path)
+	return fmt.Sprintf("<%s|%s comment> %s `%s`:\n", url, subject, location, i.Path)
 }
