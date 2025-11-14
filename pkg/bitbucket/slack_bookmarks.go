@@ -91,7 +91,7 @@ func countApprovals(pr PullRequest) int {
 }
 
 const (
-	maxBookmarkTitleLen = 257
+	maxBookmarkTitleLen = 250
 )
 
 // updateChannelBuildsBookmark updates the "Builds" bookmark in the PR's Slack channel based on the latest repo
