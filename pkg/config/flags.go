@@ -20,7 +20,7 @@ const (
 	DefaultTimpaniTaskQueue = "timpani"
 
 	ScheduleToStartTimeout = time.Minute
-	StartToCloseTimeout    = 5 * time.Second
+	StartToCloseTimeout    = 10 * time.Second
 	MaxRetryAttempts       = 5
 
 	DefaultChannelNamePrefix    = "_pr"
