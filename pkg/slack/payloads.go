@@ -77,10 +77,13 @@ type MessageEvent struct {
 	// Type string `json:"type"` // Always "message".
 
 	Subtype string `json:"subtype,omitempty"`
+	// https://docs.slack.dev/reference/events/message/#hidden_subtypes
+	// Hidden bool `json:"hidden,omitempty"`
 
 	User     string `json:"user,omitempty"`
 	BotID    string `json:"bot_id,omitempty"`
 	Username string `json:"username,omitempty"` // Customized display name, when bot_id is present.
+	// ParentUserID string `json:"parent_user_id,omitempty"` // Unnecessary.
 
 	Team       string `json:"team,omitempty"`
 	SourceTeam string `json:"source_team,omitempty"`
@@ -89,8 +92,8 @@ type MessageEvent struct {
 	Channel     string `json:"channel,omitempty"`
 	ChannelType string `json:"channel_type,omitempty"`
 
-	Text string `json:"text,omitempty"`
-	// Blocks []map[string]any `json:"blocks"` // Text is enough.
+	Text   string           `json:"text,omitempty"`
+	Blocks []map[string]any `json:"blocks,omitempty"`
 
 	Edited          *Edited       `json:"edited,omitempty"`           // Subtype = "message_changed".
 	Message         *MessageEvent `json:"message,omitempty"`          // Subtype = "message_changed".
@@ -102,16 +105,22 @@ type MessageEvent struct {
 	DeletedTS string `json:"deleted_ts,omitempty"` // Subtype = "message_deleted".
 	ThreadTS  string `json:"thread_ts,omitempty"`  // Reply, or subtype = "thread_broadcast".
 
+	LatestReply     string   `json:"latest_reply,omitempty"`
 	ReplyCount      int      `json:"reply_count,omitempty"`
 	ReplyUsers      []string `json:"reply_users,omitempty"`
 	ReplyUsersCount int      `json:"reply_users_count,omitempty"`
-	LatestReply     string   `json:"latest_reply,omitempty"`
-	// ParentUserID string   `json:"parent_user_id,omitempty"` // Unnecessary.
 
-	Hidden     bool   `json:"hidden,omitempty"`
-	IsLocked   bool   `json:"is_locked,omitempty"`
-	Subscribed bool   `json:"subscribed,omitempty"`
-	LastRead   string `json:"last_read,omitempty"`
+	// LastRead           string `json:"last_read,omitempty"`
+	// UnreadCount        int    `json:"unread_count,omitempty"`
+	// UnreadCountDisplay int    `json:"unread_count_display,omitempty"`
+
+	// https://docs.slack.dev/reference/events/message/#stars
+	IsStarred bool       `json:"is_starred,omitempty"`
+	PinnedTo  []string   `json:"pinned_to,omitempty"`
+	Reactions []Reaction `json:"reactions,omitempty"`
+
+	// IsLocked   bool `json:"is_locked,omitempty"`
+	// Subscribed bool `json:"subscribed,omitempty"`
 
 	// ClientMsgID  string `json:"client_msg_id,omitempty"` // Unnecessary.
 }
@@ -119,6 +128,13 @@ type MessageEvent struct {
 type Edited struct {
 	User string `json:"user"`
 	TS   string `json:"ts"`
+}
+
+// https://docs.slack.dev/reference/events/message/#stars
+type Reaction struct {
+	Name  string   `json:"name,omitempty"`
+	Users []string `json:"users,omitempty"`
+	Count int      `json:"count,omitempty"`
 }
 
 type reactionEventWrapper struct {
