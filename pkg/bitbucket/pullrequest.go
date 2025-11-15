@@ -114,14 +114,14 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	if event.PullRequest.CommitCount > 0 && snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
 		slices.Reverse(cmts) // Switch from reverse order to chronological order.
 
-		commitCount := event.PullRequest.CommitCount
-		if snapshot.CommitCount >= commitCount {
+		prevCount := snapshot.CommitCount
+		if prevCount >= event.PullRequest.CommitCount {
 			// Handle the unlikely ">" case where RevChat missed a commit push,
 			// but more likely the "==" case where the user force-pushed a new head
-			// (i.e. same number of commits) - by announcing just the last commits.
-			commitCount--
+			// (i.e. same number of commits) - by announcing just the last commit.
+			prevCount = event.PullRequest.CommitCount - 1
 		}
-		cmts = cmts[commitCount:]
+		cmts = cmts[prevCount:]
 
 		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, len(cmts))
 		if len(cmts) != 1 {
