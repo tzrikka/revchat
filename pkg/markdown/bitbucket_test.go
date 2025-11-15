@@ -152,8 +152,8 @@ func TestBitbucketToSlack(t *testing.T) {
 		},
 		{
 			name: "unescaped_brackets",
-			text: `i\[0\] != \{1\}`,
-			want: "i[0] != {1}",
+			text: `i\[0\] \{1\} \(2\)`,
+			want: "i[0] {1} (2)",
 		},
 		{
 			name: "pr_ref_in_same_repo",
