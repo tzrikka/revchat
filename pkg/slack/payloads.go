@@ -114,6 +114,11 @@ type MessageEvent struct {
 	// UnreadCount        int    `json:"unread_count,omitempty"`
 	// UnreadCountDisplay int    `json:"unread_count_display,omitempty"`
 
+	// https://docs.slack.dev/reference/events/message/file_share
+	Files        []File `json:"files,omitempty"`
+	Upload       bool   `json:"upload,omitempty"`
+	DisplayAsBot bool   `json:"display_as_bot,omitempty"`
+
 	// https://docs.slack.dev/reference/events/message/#stars
 	IsStarred bool       `json:"is_starred,omitempty"`
 	PinnedTo  []string   `json:"pinned_to,omitempty"`
@@ -128,6 +133,66 @@ type MessageEvent struct {
 type Edited struct {
 	User string `json:"user"`
 	TS   string `json:"ts"`
+}
+
+// https://docs.slack.dev/reference/events/message/file_share
+// https://docs.slack.dev/reference/objects/file-object
+type File struct {
+	ID string `json:"id"`
+
+	// Created   int    `json:"created"`
+	// Updated   int    `json:"updated"`
+	// User      string `json:"user"`
+	// UserTeam  string `json:"user_team"`
+
+	Name       string `json:"name"`
+	Title      string `json:"title"`
+	MimeType   string `json:"mimetype"`
+	FileType   string `json:"filetype"` // https://docs.slack.dev/reference/objects/file-object#types
+	PrettyType string `json:"pretty_type"`
+
+	Size      int `json:"size"`
+	OriginalW int `json:"original_w"`
+	OriginalH int `json:"original_h"`
+
+	Mode             string `json:"mode"` // One of: "hosted", "external", "snippet", or "post".
+	Editable         bool   `json:"editable"`
+	IsExternal       bool   `json:"is_external"`
+	IsPublic         bool   `json:"is_public"`
+	PublicURLShared  bool   `json:"public_url_shared"`
+	ExternalType     string `json:"external_type"`
+	MediaDisplayType string `json:"media_display_type"`
+
+	Username     string `json:"username"`
+	DisplayAsBot bool   `json:"display_as_bot"`
+
+	URLPrivate         string `json:"url_private"`
+	URLPrivateDownload string `json:"url_private_download"`
+	Permalink          string `json:"permalink"`
+	PermalinkPublic    string `json:"permalink_public"`
+	EditLink           string `json:"edit_link,omitempty"`
+
+	Thumb64     string `json:"thumb_64,omitempty"`
+	Thumb80     string `json:"thumb_80,omitempty"`
+	Thumb160    string `json:"thumb_160,omitempty"`
+	Thumb360    string `json:"thumb_360,omitempty"`
+	Thumb360Gif string `json:"thumb_360_gif,omitempty"`
+	Thumb480    string `json:"thumb_480,omitempty"`
+	Thumb720    string `json:"thumb_720,omitempty"`
+	Thumb800    string `json:"thumb_800,omitempty"`
+	Thumb960    string `json:"thumb_960,omitempty"`
+	Thumb1024   string `json:"thumb_1024,omitempty"`
+	ThumbTiny   string `json:"thumb_tiny,omitempty"`
+
+	Preview            string `json:"preview,omitempty"`
+	PreviewHighlight   string `json:"preview_highlight,omitempty"`
+	PreviewIsTruncated bool   `json:"preview_is_truncated,omitempty"`
+	Lines              int    `json:"lines,omitempty"`
+	LinesMore          int    `json:"lines_more,omitempty"`
+
+	SkippedShares  bool   `json:"skipped_shares,omitempty"`
+	HasRichPreview bool   `json:"has_rich_preview,omitempty"`
+	FileAccess     string `json:"file_access,omitempty"`
 }
 
 // https://docs.slack.dev/reference/events/message/#stars

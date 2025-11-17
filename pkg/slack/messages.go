@@ -163,7 +163,7 @@ func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, u
 		return err
 	}
 
-	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Text)
+	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Text) + c.fileLinks(ctx, event.Files)
 	msg += "\n\n[This comment was created by RevChat]: #"
 
 	resp, err := bitbucket.PullRequestsCreateCommentActivity(ctx, bitbucket.PullRequestsCreateCommentRequest{
@@ -189,6 +189,66 @@ func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, u
 	}
 
 	return nil
+}
+
+func (c *Config) fileLinks(ctx workflow.Context, files []File) string {
+	if len(files) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n\nAttached files:\n")
+	for _, f := range files {
+		sb.WriteString(fmt.Sprintf("\n- :%s: [%s](%s)", c.fileTypeEmoji(ctx, f), f.Name, f.Permalink))
+	}
+	return sb.String()
+}
+
+func (c *Config) fileTypeEmoji(ctx workflow.Context, f File) string {
+	switch {
+	case c.bitbucketWorkspace != "":
+		return fileTypeEmojiBitbucket(f)
+	default:
+		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		return "paperclip"
+	}
+}
+
+// https://docs.slack.dev/reference/objects/file-object/#types
+func fileTypeEmojiBitbucket(f File) string {
+	switch strings.ToLower(f.FileType) {
+	// Multimedia.
+	case "aac", "m4a", "mp3", "ogg", "wav":
+		return "headphones"
+	case "avi", "flv", "mkv", "mov", "mp4", "mpg", "ogv", "webm", "wmv":
+		return "clapper"
+	case "bmp", "dgraw", "eps", "odg", "odi", "psd", "svg", "tiff":
+		return "frame_photo" // This is "frame_with_picture" in Slack.
+	case "gif", "jpg", "jpeg", "png", "webp":
+		return "camera"
+
+	// Documents.
+	case "text", "csv", "diff", "doc", "docx", "dotx", "gdoc", "json", "markdown", "odt", "rtf", "xml", "yaml":
+		return "pencil"
+	case "eml", "epub", "html", "latex", "mhtml", "pdf":
+		return "book"
+	case "gsheet", "ods", "xls", "xlsb", "xlsm", "xlsx", "xltx":
+		return "bar_chart"
+	case "gpres", "odp", "ppt", "pptx":
+		return "chart_with_upwards_trend"
+	case "gz", "gzip", "tar", "zip":
+		return "file_cabinet"
+
+	// Source code.
+	case "apk", "c", "csharp", "cpp", "css", "dockerfile", "go", "java", "javascript", "js", "kotlin", "lua":
+		return "robot" // This is "robot_face" in Slack.
+	case "powershell", "python", "rust", "sql", "shell":
+		return "robot" // This is "robot_face" in Slack.
+
+	// Everything else.
+	default:
+		return "paperclip"
+	}
 }
 
 // editMessageBitbucket mirrors in Bitbucket the editing of a Slack message/reply.
