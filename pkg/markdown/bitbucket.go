@@ -39,10 +39,12 @@ func BitbucketToSlack(ctx workflow.Context, text, prURL string) string {
 // bitbucketToSlackEmoji is the inverse of [slackToBitbucketEmoji].
 func bitbucketToSlackEmoji(text string) string {
 	text = strings.ReplaceAll(text, ":frame_photo:", ":frame_with_picture:")
+	text = strings.ReplaceAll(text, ":man_facepalming:", ":man-facepalming:")
 	text = strings.ReplaceAll(text, ":robot:", ":robot_face:")
 	text = strings.ReplaceAll(text, ":rofl:", ":rolling_on_the_floor_laughing:")
 	text = strings.ReplaceAll(text, ":slight_smile:", ":slightly_smiling_face:")
 	text = strings.ReplaceAll(text, ":upside_down:", ":upside_down_face:")
+	text = strings.ReplaceAll(text, ":woman_facepalming:", ":woman-facepalming:")
 	return text
 }
 
@@ -57,6 +59,7 @@ func bitbucketToSlackLinks(text, prURL string) string {
 	text = regexp.MustCompile(`!(<|&lt;)(.*?)>`).ReplaceAllString(text, ":camera: <${2}>")
 
 	// Unescape non-links.
+	text = strings.ReplaceAll(text, `\+`, "+")
 	text = strings.ReplaceAll(strings.ReplaceAll(text, `\[`, "["), `\]`, "]")
 	text = strings.ReplaceAll(strings.ReplaceAll(text, `\{`, "{"), `\}`, "}")
 	text = strings.ReplaceAll(strings.ReplaceAll(text, `\(`, "("), `\)`, ")")
@@ -148,10 +151,12 @@ func slackToBitbucketBlocks(text string) string {
 // slackToBitbucketEmoji is the inverse of [bitbucketToSlackEmoji].
 func slackToBitbucketEmoji(text string) string {
 	text = strings.ReplaceAll(text, ":frame_with_picture:", ":frame_photo:")
+	text = strings.ReplaceAll(text, ":man-facepalming:", ":man_facepalming:")
 	text = strings.ReplaceAll(text, ":robot_face:", ":robot:")
 	text = strings.ReplaceAll(text, ":rolling_on_the_floor_laughing:", ":rofl:")
 	text = strings.ReplaceAll(text, ":slightly_smiling_face:", ":slight_smile:")
 	text = strings.ReplaceAll(text, ":upside_down_face:", ":upside_down:")
+	text = strings.ReplaceAll(text, ":woman-facepalming:", ":woman_facepalming:")
 	return text
 }
 
