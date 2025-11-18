@@ -168,8 +168,6 @@ func TestHTMLURL(t *testing.T) {
 }
 
 func TestInlineCommentPrefix(t *testing.T) {
-	from, to := 1, 2
-
 	tests := []struct {
 		name string
 		url  string
@@ -177,30 +175,123 @@ func TestInlineCommentPrefix(t *testing.T) {
 		want string
 	}{
 		{
-			name: "no_from",
+			name: "file_comment",
 			url:  "http://example.com",
 			i:    &Inline{Path: "test.txt"},
 			want: "<http://example.com|File comment> in `test.txt`:\n",
 		},
 		{
-			name: "from_only",
+			name: "single_line",
 			url:  "http://example.com",
-			i:    &Inline{From: &from, Path: "test.txt"},
-			want: "<http://example.com|Line comment> in line 1 in `test.txt`:\n",
+			i:    &Inline{To: intPtr(1), Path: "test.txt"},
+			want: "<http://example.com|Inline comment> in line 1 in `test.txt`:\n",
 		},
 		{
-			name: "from_and_to",
+			name: "multiple_lines",
 			url:  "http://example.com",
-			i:    &Inline{From: &from, To: &to, Path: "test.txt"},
-			want: "<http://example.com|Line comment> in lines 1-2 in `test.txt`:\n",
+			i:    &Inline{StartTo: intPtr(2), To: intPtr(3), Path: "test.txt"},
+			want: "<http://example.com|Inline comment> in lines 2-3 in `test.txt`:\n",
+		},
+		{
+			name: "multiple_to_and_from_lines",
+			url:  "http://example.com",
+			i:    &Inline{StartFrom: intPtr(2), StartTo: intPtr(3), From: intPtr(4), To: intPtr(5), Path: "test.txt"},
+			want: "<http://example.com|Inline comment> in lines 2-5 in `test.txt`:\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := inlineCommentPrefix(tt.url, tt.i); got != tt.want {
-				t.Errorf("inlineCommentPrefix() = %v, want %v", got, tt.want)
+				t.Errorf("inlineCommentPrefix() = %q, want %q", got, tt.want)
 			}
 		})
 	}
+}
+
+func TestSpliceSuggestion(t *testing.T) {
+	tests := []struct {
+		name       string
+		in         *Inline
+		suggestion string
+		srcFile    string
+		want       string
+	}{
+		// Replace.
+		{
+			name:       "replace_first_line",
+			in:         &Inline{To: intPtr(1)},
+			suggestion: "New 1",
+			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
+			want:       "@@ -1,1 +1,1 @@\n-Line 1\n+New 1\n",
+		},
+		{
+			name:       "replace_middle_lines",
+			in:         &Inline{StartTo: intPtr(2), To: intPtr(3)},
+			suggestion: "New 2\nNew 3",
+			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
+			want:       "@@ -2,2 +2,2 @@\n-Line 2\n-Line 3\n+New 2\n+New 3\n",
+		},
+		{
+			name:       "replace_last_line",
+			in:         &Inline{To: intPtr(4)},
+			suggestion: "New 4",
+			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
+			want:       "@@ -4,1 +4,1 @@\n-Line 4\n+New 4\n",
+		},
+		// Add.
+		{
+			name:       "add_first_line",
+			in:         &Inline{To: intPtr(1)},
+			suggestion: "New\nLine 1",
+			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
+			want:       "@@ -1,1 +1,2 @@\n-Line 1\n+New\n+Line 1\n",
+		},
+		{
+			name:       "add_middle_lines",
+			in:         &Inline{StartTo: intPtr(2), To: intPtr(3)},
+			suggestion: "Line 2\nNew\nLine 3",
+			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
+			want:       "@@ -2,2 +2,3 @@\n-Line 2\n-Line 3\n+Line 2\n+New\n+Line 3\n",
+		},
+		{
+			name:       "add_last_line",
+			in:         &Inline{To: intPtr(4)},
+			suggestion: "Line 4\nNew",
+			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
+			want:       "@@ -4,1 +4,2 @@\n-Line 4\n+Line 4\n+New\n",
+		},
+		// Delete.
+		{
+			name:    "delete_first_line",
+			in:      &Inline{To: intPtr(1)},
+			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
+			want:    "@@ -1,1 @@\n-Line 1\n",
+		},
+		{
+			name:    "delete_middle_lines",
+			in:      &Inline{StartTo: intPtr(2), To: intPtr(3)},
+			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
+			want:    "@@ -2,2 @@\n-Line 2\n-Line 3\n",
+		},
+		{
+			name:    "delete_last_line",
+			in:      &Inline{To: intPtr(4)},
+			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
+			want:    "@@ -4,1 @@\n-Line 4\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := spliceSuggestion(tt.in, tt.suggestion, tt.srcFile)
+			if got != tt.want {
+				t.Errorf("spliceSuggestion() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func intPtr(i int) *int {
+	return &i
 }

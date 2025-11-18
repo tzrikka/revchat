@@ -338,10 +338,10 @@ func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 
 	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
-	url := pr.Links["html"].HRef
+	prURL := pr.Links["html"].HRef
 	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
-	if err := data.SwitchTurn(url, email); err != nil {
-		log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url)
+	if err := data.SwitchTurn(prURL, email); err != nil {
+		log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", prURL)
 		// Don't abort - we still want to post the comment.
 	}
 
@@ -351,13 +351,13 @@ func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 		return nil
 	}
 
-	commentURL := htmlURL(event.Comment.Links)
-	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, htmlURL(pr.Links))
-	if inline := event.Comment.Inline; inline != nil {
-		msg = inlineCommentPrefix(commentURL, inline) + msg
+	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, prURL)
+	if event.Comment.Inline != nil {
+		msg, _ = beautifyInlineComment(ctx, event, msg, event.Comment.Content.Raw)
 	}
 
 	var err error
+	commentURL := htmlURL(event.Comment.Links)
 	if event.Comment.Parent == nil {
 		err = impersonateUserInMsg(ctx, commentURL, channelID, event.Comment.User, msg)
 	} else {
@@ -378,8 +378,8 @@ func prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 
 	commentURL := htmlURL(event.Comment.Links)
 	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, htmlURL(event.PullRequest.Links))
-	if inline := event.Comment.Inline; inline != nil {
-		msg = inlineCommentPrefix(commentURL, inline) + msg
+	if event.Comment.Inline != nil {
+		msg, _ = beautifyInlineComment(ctx, event, msg, event.Comment.Content.Raw)
 	}
 
 	return editMsg(ctx, commentURL, msg)
@@ -429,18 +429,133 @@ func htmlURL(links map[string]Link) string {
 	return links["html"].HRef
 }
 
-func inlineCommentPrefix(url string, i *Inline) string {
-	subject := "File"
-	location := "in"
-
-	if i.From != nil {
-		subject = "Line"
-		location = fmt.Sprintf("in line %d in", *i.From)
-
-		if i.To != nil {
-			location = fmt.Sprintf("in lines %d-%d in", *i.From, *i.To)
-		}
+// extractSuggestion extracts the suggestion code block from a PR inline comment.
+func extractSuggestion(raw string) (string, bool) {
+	_, s, ok := strings.Cut(raw, "```suggestion\n")
+	if !ok {
+		return "", false
 	}
 
-	return fmt.Sprintf("<%s|%s comment> %s `%s`:\n", url, subject, location, i.Path)
+	i := strings.LastIndex(s, "```")
+	if i == -1 {
+		return "", false
+	}
+
+	return strings.TrimSuffix(s[:i], "\n"), true
+}
+
+// beautifyInlineComment adds an informative prefix to the comment's text.
+// If the comment contains a suggestion code block, it removes that block
+// and also generates a diff snippet to attach to the Slack message instead.
+func beautifyInlineComment(ctx workflow.Context, event PullRequestEvent, msg, raw string) (string, string) {
+	msg = inlineCommentPrefix(htmlURL(event.Comment.Links), event.Comment.Inline) + msg
+
+	suggestion, ok := extractSuggestion(raw)
+	if !ok {
+		return msg, ""
+	}
+
+	diff := generateDiff(ctx, event, suggestion, event.Comment.Links["code"].HRef)
+	if diff == "" {
+		return msg, ""
+	}
+
+	if suggestion != "" {
+		suggestion += "\n"
+	}
+	msg = strings.Replace(msg, fmt.Sprintf("```suggestion\n%s```", suggestion), "", 1)
+	msg = strings.TrimSpace(strings.ReplaceAll(msg, "\u200c", ""))
+
+	log.Warn(ctx, "attach diff to message - not implemented yet", "diff", diff)
+	return msg, diff
+}
+
+func inlineCommentPrefix(commentURL string, in *Inline) string {
+	var line1 int
+	if in.StartFrom != nil {
+		line1 = *in.StartFrom
+		if in.StartTo != nil && *in.StartTo < line1 {
+			line1 = *in.StartTo
+		}
+	} else if in.StartTo != nil {
+		line1 = *in.StartTo
+	}
+
+	var line2 int
+	if in.From != nil {
+		line2 = *in.From
+		if in.To != nil && *in.To > line2 {
+			line2 = *in.To
+		}
+	} else if in.To != nil {
+		line2 = *in.To
+	}
+
+	if line1 == 0 {
+		line1 = line2
+	}
+	if line2 == 0 {
+		line2 = line1
+	}
+
+	subject := "Inline"
+	location := "in"
+	switch line1 {
+	case 0: // No line info.
+		subject = "File"
+	case line2: // Single line.
+		location = fmt.Sprintf("in line %d in", line1)
+	default: // Multiple lines.
+		location = fmt.Sprintf("in lines %d-%d in", line1, line2)
+	}
+
+	return fmt.Sprintf("<%s|%s comment> %s `%s`:\n", commentURL, subject, location, in.Path)
+}
+
+func generateDiff(ctx workflow.Context, event PullRequestEvent, suggestion, diffURL string) string {
+	src := sourceFile(ctx, diffURL, event.Comment.Inline.SrcRev)
+	if src == "" {
+		return ""
+	}
+
+	return spliceSuggestion(event.Comment.Inline, suggestion, src)
+}
+
+// spliceSuggestion splices the suggestion into the source
+// file content, and returns the result as a diff snippet.
+func spliceSuggestion(in *Inline, suggestion, srcFile string) string {
+	var line1, line2 int
+	if in.To != nil {
+		line1, line2 = *in.To, *in.To
+	}
+	if in.StartTo != nil {
+		line1 = *in.StartTo
+	}
+
+	lenFrom := line2 - line1 + 1
+	lenTo := 0
+	if suggestion != "" {
+		lenTo = strings.Count(suggestion, "\n") + 1
+	}
+
+	var diff strings.Builder
+	diff.WriteString(fmt.Sprintf("@@ -%d,%d ", line1, lenFrom))
+	if lenTo > 0 {
+		diff.WriteString(fmt.Sprintf("+%d,%d ", line1, lenTo))
+	}
+	diff.WriteString("@@\n")
+
+	for _, line := range strings.Split(srcFile, "\n")[line1-1 : line2] {
+		diff.WriteString(fmt.Sprintf("-%s\n", line))
+	}
+
+	if suggestion == "" {
+		return diff.String()
+	}
+
+	for _, line := range strings.Split(suggestion, "\n") {
+		diff.WriteString(fmt.Sprintf("+%s\n", line))
+	}
+
+	return diff.String()
 }

@@ -80,13 +80,19 @@ type CommitStatus struct {
 }
 
 type Inline struct {
-	From         *int   `json:"from"`
-	To           *int   `json:"to"`
-	Path         string `json:"path"`
-	Outdated     bool   `json:"outdated"`
+	Path string `json:"path"`
+
+	StartFrom *int `json:"start_from"`
+	StartTo   *int `json:"start_to"`
+	From      *int `json:"from"`
+	To        *int `json:"to"`
+
 	ContextLines string `json:"context_lines"`
-	SrcRev       string `json:"src_rev"`
-	DestRev      string `json:"dest_rev"`
+	Outdated     bool   `json:"outdated"`
+
+	SrcRev  string `json:"src_rev"`
+	DestRev string `json:"dest_rev"`
+	// BaseRev *string `json:"base_rev"`
 }
 
 type Link struct {
