@@ -285,7 +285,7 @@ func TestSpliceSuggestion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := spliceSuggestion(tt.in, tt.suggestion, tt.srcFile)
-			if got != tt.want {
+			if string(got) != tt.want {
 				t.Errorf("spliceSuggestion() = %q, want %q", got, tt.want)
 			}
 		})

@@ -41,7 +41,11 @@ func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user A
 	return err
 }
 
-func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string) error {
+func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string, diff []byte) error {
+	if diff != nil {
+		msg = uploadDiff(ctx, diff, url, msg)
+	}
+
 	name, icon := impersonateUser(ctx, user)
 	resp, err := slack.PostMessageAsUser(ctx, channelID, name, icon, msg)
 	if err != nil {
@@ -58,7 +62,11 @@ func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Acco
 	return nil
 }
 
-func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string) error {
+func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string, diff []byte) error {
+	if diff != nil {
+		msg = uploadDiff(ctx, diff, url, msg)
+	}
+
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
 		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", parentURL)
@@ -85,6 +93,26 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 	}
 
 	return nil
+}
+
+func uploadDiff(ctx workflow.Context, diff []byte, url, msg string) string {
+	parts := strings.Split(url, "-")
+	filename := parts[len(parts)-1] + ".diff"
+	title := "Diff " + parts[len(parts)-1]
+
+	file, err := slack.Upload(ctx, diff, filename, title, "diff", "text/x-diff", "", "")
+	if err != nil || file == nil {
+		return msg // File upload failed, return the original message unmodified.
+	}
+
+	// Success: replace the code block in the message with a prettier rendering of the file.
+	parts = strings.Split(msg, "\n```")
+	msg = fmt.Sprintf("%s<%s| >", parts[0], file.Permalink)
+	if len(parts) > 2 {
+		msg += parts[2]
+	}
+
+	return msg
 }
 
 func impersonateUser(ctx workflow.Context, user Account) (name, icon string) {

@@ -20,6 +20,9 @@ Detailed instructions: <https://github.com/tzrikka/thrippy/blob/main/docs/slack/
   - [chat:write](https://docs.slack.dev/reference/scopes/chat.write)
   - [chat:write.customize](https://docs.slack.dev/reference/scopes/chat.write.customize)
 - [commands](https://docs.slack.dev/reference/scopes/commands)
+- Files
+  - [files:read](https://docs.slack.dev/reference/scopes/files.read)
+  - [files:write](https://docs.slack.dev/reference/scopes/files.write)
 - Groups (private channels)
   - [groups:history](https://docs.slack.dev/reference/scopes/groups.history)
   - [groups:read](https://docs.slack.dev/reference/scopes/groups.read)

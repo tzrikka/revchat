@@ -59,7 +59,7 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 }
 
 func UpdateMessage(ctx workflow.Context, channelID, timestamp, msg string) error {
-	req := slack.ChatUpdateRequest{Channel: channelID, TS: timestamp, MarkdownText: msg}
+	req := slack.ChatUpdateRequest{Channel: channelID, TS: timestamp, Text: msg}
 	if err := slack.ChatUpdateActivity(ctx, req); err != nil {
 		log.Error(ctx, "failed to update Slack message", "error", err, "channel_id", channelID, "timestamp", timestamp)
 		return err

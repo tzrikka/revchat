@@ -352,17 +352,18 @@ func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 	}
 
 	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, prURL)
+	var diff []byte
 	if event.Comment.Inline != nil {
-		msg, _ = beautifyInlineComment(ctx, event, msg, event.Comment.Content.Raw)
+		msg, diff = beautifyInlineComment(ctx, event, msg, event.Comment.Content.Raw)
 	}
 
 	var err error
 	commentURL := htmlURL(event.Comment.Links)
 	if event.Comment.Parent == nil {
-		err = impersonateUserInMsg(ctx, commentURL, channelID, event.Comment.User, msg)
+		err = impersonateUserInMsg(ctx, commentURL, channelID, event.Comment.User, msg, diff)
 	} else {
 		parentURL := htmlURL(event.Comment.Parent.Links)
-		err = impersonateUserInReply(ctx, commentURL, parentURL, event.Comment.User, msg)
+		err = impersonateUserInReply(ctx, commentURL, parentURL, event.Comment.User, msg, diff)
 	}
 	return err
 }
@@ -429,44 +430,28 @@ func htmlURL(links map[string]Link) string {
 	return links["html"].HRef
 }
 
-// extractSuggestion extracts the suggestion code block from a PR inline comment.
-func extractSuggestion(raw string) (string, bool) {
-	_, s, ok := strings.Cut(raw, "```suggestion\n")
-	if !ok {
-		return "", false
-	}
-
-	i := strings.LastIndex(s, "```")
-	if i == -1 {
-		return "", false
-	}
-
-	return strings.TrimSuffix(s[:i], "\n"), true
-}
-
 // beautifyInlineComment adds an informative prefix to the comment's text.
 // If the comment contains a suggestion code block, it removes that block
 // and also generates a diff snippet to attach to the Slack message instead.
-func beautifyInlineComment(ctx workflow.Context, event PullRequestEvent, msg, raw string) (string, string) {
+func beautifyInlineComment(ctx workflow.Context, event PullRequestEvent, msg, raw string) (string, []byte) {
 	msg = inlineCommentPrefix(htmlURL(event.Comment.Links), event.Comment.Inline) + msg
+	msg = strings.TrimSpace(strings.TrimSuffix(msg, "\u200c"))
 
 	suggestion, ok := extractSuggestion(raw)
 	if !ok {
-		return msg, ""
+		return msg, nil
 	}
 
 	diff := generateDiff(ctx, event, suggestion, event.Comment.Links["code"].HRef)
-	if diff == "" {
-		return msg, ""
+	if diff == nil {
+		return msg, nil
 	}
 
 	if suggestion != "" {
 		suggestion += "\n"
 	}
-	msg = strings.Replace(msg, fmt.Sprintf("```suggestion\n%s```", suggestion), "", 1)
-	msg = strings.TrimSpace(strings.ReplaceAll(msg, "\u200c", ""))
+	msg = strings.Replace(msg, fmt.Sprintf("```suggestion\n%s", suggestion), "```\n"+string(diff), 1)
 
-	log.Warn(ctx, "attach diff to message - not implemented yet", "diff", diff)
 	return msg, diff
 }
 
@@ -512,10 +497,25 @@ func inlineCommentPrefix(commentURL string, in *Inline) string {
 	return fmt.Sprintf("<%s|%s comment> %s `%s`:\n", commentURL, subject, location, in.Path)
 }
 
-func generateDiff(ctx workflow.Context, event PullRequestEvent, suggestion, diffURL string) string {
+// extractSuggestion extracts the suggestion code block from a PR inline comment.
+func extractSuggestion(raw string) (string, bool) {
+	_, s, ok := strings.Cut(raw, "```suggestion\n")
+	if !ok {
+		return "", false
+	}
+
+	i := strings.LastIndex(s, "```")
+	if i == -1 {
+		return "", false
+	}
+
+	return strings.TrimSuffix(s[:i], "\n"), true
+}
+
+func generateDiff(ctx workflow.Context, event PullRequestEvent, suggestion, diffURL string) []byte {
 	src := sourceFile(ctx, diffURL, event.Comment.Inline.SrcRev)
 	if src == "" {
-		return ""
+		return nil
 	}
 
 	return spliceSuggestion(event.Comment.Inline, suggestion, src)
@@ -523,7 +523,7 @@ func generateDiff(ctx workflow.Context, event PullRequestEvent, suggestion, diff
 
 // spliceSuggestion splices the suggestion into the source
 // file content, and returns the result as a diff snippet.
-func spliceSuggestion(in *Inline, suggestion, srcFile string) string {
+func spliceSuggestion(in *Inline, suggestion, srcFile string) []byte {
 	var line1, line2 int
 	if in.To != nil {
 		line1, line2 = *in.To, *in.To
@@ -538,7 +538,7 @@ func spliceSuggestion(in *Inline, suggestion, srcFile string) string {
 		lenTo = strings.Count(suggestion, "\n") + 1
 	}
 
-	var diff strings.Builder
+	var diff bytes.Buffer
 	diff.WriteString(fmt.Sprintf("@@ -%d,%d ", line1, lenFrom))
 	if lenTo > 0 {
 		diff.WriteString(fmt.Sprintf("+%d,%d ", line1, lenTo))
@@ -550,12 +550,12 @@ func spliceSuggestion(in *Inline, suggestion, srcFile string) string {
 	}
 
 	if suggestion == "" {
-		return diff.String()
+		return diff.Bytes()
 	}
 
-	for _, line := range strings.Split(suggestion, "\n") {
+	for line := range strings.SplitSeq(suggestion, "\n") {
 		diff.WriteString(fmt.Sprintf("+%s\n", line))
 	}
 
-	return diff.String()
+	return diff.Bytes()
 }
