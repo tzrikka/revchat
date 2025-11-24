@@ -56,7 +56,8 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 		// Continue anyway.
 	}
 
-	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, cs.Description)
+	desc, _, _ := strings.Cut(cs.Description, "\n")
+	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, desc)
 	_, err = slack.PostMessage(ctx, channelID, msg)
 	return err
 }
