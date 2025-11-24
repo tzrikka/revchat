@@ -130,7 +130,8 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 		msg += "> to this PR:"
 		for _, c := range cmts {
-			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], c.Message)
+			title, _, _ := strings.Cut(c.Message, "\n")
+			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title)
 		}
 		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
