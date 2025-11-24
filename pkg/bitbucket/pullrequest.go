@@ -85,7 +85,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	added, removed := reviewersDiff(*snapshot, event.PullRequest)
 	if len(added)+len(removed) > 0 {
 		msg := reviewerMentions(ctx, added, removed)
-		_ = mentionUserInMsg(ctx, channelID, event.Actor, msg+".")
+		_ = mentionUserInMsg(ctx, channelID, event.Actor, msg)
 		_ = slack.InviteUsersToChannel(ctx, channelID, bitbucketToSlackIDs(ctx, added))
 		_ = slack.KickUsersFromChannel(ctx, channelID, bitbucketToSlackIDs(ctx, removed))
 	}
@@ -233,34 +233,47 @@ func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
 
 // reviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.
 func reviewerMentions(ctx workflow.Context, added, removed []string) string {
-	msg := ":bust_in_silhouette: %s "
-	if len(added) > 0 {
-		msg += "added" + bitbucketAccountsToSlackMentions(ctx, added)
+	msg := strings.Builder{}
+	msg.WriteString(":bust_in_silhouette: %s ")
+
+	switch len(added) {
+	case 0:
+		// Do nothing.
+	case 1:
+		msg.WriteString("added this reviewer:")
+		msg.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
+	default:
+		msg.WriteString("added these reviewers:")
+		msg.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
 	}
+
 	if len(added) > 0 && len(removed) > 0 {
-		msg += ", and "
+		msg.WriteString(", and ")
 	}
-	if len(removed) > 0 {
-		msg += "removed" + bitbucketAccountsToSlackMentions(ctx, removed)
+
+	switch len(removed) {
+	case 0:
+		// Do nothing.
+	case 1:
+		msg.WriteString("removed this reviewer:")
+		msg.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
+	default:
+		msg.WriteString("removed these reviewers:")
+		msg.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
 	}
-	return msg
+
+	msg.WriteString(".")
+	return msg.String()
 }
 
 func bitbucketAccountsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
-	slackUsers := ""
+	slackUsers := strings.Builder{}
 	for _, a := range accountIDs {
 		if ref := users.BitbucketToSlackRef(ctx, a, ""); ref != "" {
-			slackUsers += " " + ref
+			slackUsers.WriteString(" " + ref)
 		}
 	}
-
-	if len(accountIDs) == 1 {
-		slackUsers += " as a reviewer"
-	} else {
-		slackUsers += " as reviewers"
-	}
-
-	return slackUsers
+	return slackUsers.String()
 }
 
 func bitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {
