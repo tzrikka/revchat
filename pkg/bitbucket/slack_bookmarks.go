@@ -27,11 +27,12 @@ func setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullReq
 // updateChannelBookmarks updates the PR's Slack channel bookmarks based on the latest PR event. This
 // is a deferred call that doesn't return an error, because handling the event itself is more important.
 func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channelID string, snapshot *PullRequest) {
+	url := event.PullRequest.Links["html"].HRef
+
 	// PR update events already load the previous snapshot, so reuse it in that case.
 	updateCommits := true
 	if snapshot == nil {
 		updateCommits = false
-		url := event.PullRequest.Links["html"].HRef
 		snapshot, _ = switchSnapshot(ctx, url, event.PullRequest)
 		if snapshot == nil {
 			return
@@ -74,8 +75,19 @@ func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channe
 
 	if len(bookmarks) > 4 && updateCommits {
 		title := fmt.Sprintf("Commits (%d)", event.PullRequest.CommitCount)
-		if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[4].ID, title); err != nil {
-			log.Error(ctx, "failed to update Slack channel's commits bookmark", "error", err)
+		if title != bookmarks[4].Title {
+			if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[4].ID, title); err != nil {
+				log.Error(ctx, "failed to update Slack channel's commits bookmark", "error", err)
+			}
+		}
+	}
+
+	if len(bookmarks) > 5 && updateCommits {
+		title := fmt.Sprintf("Files changed (%d)", data.ReadBitbucketDiffstatLength(url))
+		if title != bookmarks[5].Title {
+			if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[5].ID, title); err != nil {
+				log.Error(ctx, "failed to update Slack channel's files bookmark", "error", err)
+			}
 		}
 	}
 }

@@ -71,7 +71,7 @@ func cachedDataPath(filename, suffix string) (string, error) {
 		return path, nil
 	}
 
-	// Special handling for PR turn and status files.
+	// Special handling for PR diffstat/status/turn files.
 	if strings.HasPrefix(filename, "https://") {
 		path := urlBasedPath(filename, suffix)
 		pathCache[filename+suffix] = path

@@ -46,6 +46,7 @@
   - Kick removed reviewers from the Slack channel
 - If 1 or more commits are pushed to the PR branch
   - Mention the user and the commits in a Slack message
+  - Update RevChat's snapshot of the PR files
 - If the PR destination branch is retargeted
   - Mention and user with name and links of both branches
 - In any case, update the Slack channel's bookmarks
@@ -93,6 +94,10 @@
 - If the comment was posted by RevChat (i.e. mirrored from Slack) - abort (don't repost it)
 - Convert Bitbucket markdown to Slack markdown
 - Post as a Slack message/reply on behalf of the user
+- If the comment contains a code suggestion block
+  - Generate a diff between the latest version of the file and the suggestion
+  - Upload the diff as a text file to Slack
+  - Replace the code suggestion block with the Slack file's permalink
 - Update the Slack channel's bookmarks
 
 ### Comment Updated
@@ -139,7 +144,7 @@
 - Update RevChat's snapshot of PR build results
   - If RevChat's snaphot references a different commit hash, forget the current results (they are obsolete)
 - Post a message in the Slack channel
-- Update the Slack channel's bookmarks
+- Update the Slack channel's bookmarks, if needed
 
 ### Build Status Updated
 

@@ -81,3 +81,26 @@ func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 // 	_, text, _ = strings.Cut(text, "@@")
 // 	return strings.TrimSpace(strings.ReplaceAll(text, `\ No newline at end of file`, ""))
 // }
+
+func diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.DiffStat {
+	workspace, repo, found := strings.Cut(event.Repository.FullName, "/")
+	if !found {
+		log.Error(ctx, "failed to parse Bitbucket workspace and repository name", "full_name", event.Repository.FullName)
+		return nil
+	}
+
+	resp, err := bitbucket.PullRequestsDiffStatActivity(ctx, bitbucket.PullRequestsDiffStatRequest{
+		Workspace:     workspace,
+		RepoSlug:      repo,
+		PullRequestID: strconv.Itoa(event.PullRequest.ID),
+		AllPages:      true,
+	})
+	if err != nil {
+		url := event.PullRequest.Links["html"].HRef
+		log.Error(ctx, "failed to get Bitbucket PR diffstat", "error", err, "pr_url", url,
+			"workspace", workspace, "repo", repo, "pr_id", event.PullRequest.ID)
+		return nil
+	}
+
+	return resp.Values
+}

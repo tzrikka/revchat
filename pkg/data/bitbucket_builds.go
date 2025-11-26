@@ -68,12 +68,12 @@ func SummarizeBitbucketBuilds(url string) string {
 	return ""
 }
 
-func UpdateBitbucketBuilds(prURL, commitHash, key string, cs CommitStatus) error {
-	mu := prStatusMutexes.Get(prURL)
+func UpdateBitbucketBuilds(url, commitHash, key string, cs CommitStatus) error {
+	mu := prStatusMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
-	pr, err := readStatusFile(prURL)
+	pr, err := readStatusFile(url)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return err
@@ -87,7 +87,20 @@ func UpdateBitbucketBuilds(prURL, commitHash, key string, cs CommitStatus) error
 	}
 
 	pr.Builds[key] = cs
-	return writeStatusFile(prURL, pr)
+	path, err := cachedDataPath(url, "_status")
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	e := json.NewEncoder(f)
+	e.SetIndent("", "  ")
+	return e.Encode(pr)
 }
 
 // readStatusFile expects the caller to hold the appropriate mutex.
@@ -111,20 +124,15 @@ func readStatusFile(url string) (*PRStatus, error) {
 	return pr, nil
 }
 
-// writeStatusFile expects the caller to hold the appropriate mutex.
-func writeStatusFile(url string, pr *PRStatus) error {
+func DeleteBitbucketBuilds(url string) error {
+	mu := prStatusMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
+
 	path, err := cachedDataPath(url, "_status")
 	if err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- URL received from signature-verified 3rd-party
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	e := json.NewEncoder(f)
-	e.SetIndent("", "  ")
-	return e.Encode(pr)
+	return os.Remove(path) //gosec:disable G304 -- URL received from signature-verified 3rd-party
 }

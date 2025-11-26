@@ -31,8 +31,8 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
-	u := pr.Links["html"].HRef
-	cleanupPRData(ctx, u)
+	prURL := pr.Links["html"].HRef
+	cleanupPRData(ctx, prURL)
 
 	state := "closed this PR"
 	switch event.Type {
@@ -58,8 +58,8 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 		return err
 	}
 
-	if err := data.LogSlackChannelArchived(channelID, u); err != nil {
-		log.Error(ctx, "failed to log Slack channel archived", "error", err, "channel_id", channelID, "pr_url", u)
+	if err := data.LogSlackChannelArchived(channelID, prURL); err != nil {
+		log.Error(ctx, "failed to log Slack channel archived", "error", err, "channel_id", channelID, "pr_url", prURL)
 		// Don't fail the workflow for logging errors.
 	}
 	return nil
@@ -85,11 +85,19 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 // cleanupPRData deletes all data associated with a PR. If there are errors,
 // they are logged but ignored, as they do not affect the overall workflow.
 func cleanupPRData(ctx workflow.Context, u string) {
+	if err := data.DeleteBitbucketDiffstat(u); err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR diffstat", "error", err, "pr_url", u)
+	}
+
 	if err := data.DeleteBitbucketPR(u); err != nil {
 		log.Error(ctx, "failed to delete Bitbucket PR snapshot", "error", err, "pr_url", u)
 	}
 
-	if err := data.DeleteTurn(u); err != nil {
+	if err := data.DeleteBitbucketBuilds(u); err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR build status", "error", err, "pr_url", u)
+	}
+
+	if err := data.DeleteTurns(u); err != nil {
 		log.Error(ctx, "failed to delete Bitbucket PR turn-taking state", "error", err, "pr_url", u)
 	}
 
@@ -121,7 +129,7 @@ func initPRData(ctx workflow.Context, u string, pr PullRequest, authorAccountID,
 		}
 	}
 
-	if err := data.InitTurn(u, email, reviewers); err != nil {
+	if err := data.InitTurns(u, email, reviewers); err != nil {
 		log.Error(ctx, "failed to initialize Bitbucket PR turn-taking state", "error", err, "channel_id", channelID, "pr_url", u)
 		return err
 	}
@@ -136,25 +144,30 @@ func initPRData(ctx workflow.Context, u string, pr PullRequest, authorAccountID,
 
 func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error {
 	pr := event.PullRequest
-	u := pr.Links["html"].HRef
+	prURL := pr.Links["html"].HRef
 	pr.CommitCount = len(commits(ctx, event))
 
 	channelID, err := c.createChannel(ctx, pr)
 	if err != nil {
-		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, u)
+		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
 		return err
 	}
 
-	if err := initPRData(ctx, u, pr, event.Actor.AccountID, channelID); err != nil {
-		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, u)
-		cleanupPRData(ctx, u)
+	if err := initPRData(ctx, prURL, pr, event.Actor.AccountID, channelID); err != nil {
+		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
+		cleanupPRData(ctx, prURL)
 		return err
+	}
+
+	if err := data.UpdateBitbucketDiffstat(prURL, diffstat(ctx, event)); err != nil {
+		log.Error(ctx, "failed to update Bitbucket PR's diffstat", "error", err, "pr_url", prURL)
+		// Continue anyway.
 	}
 
 	// Channel cosmetics.
-	slack.SetChannelTopic(ctx, channelID, u)
-	slack.SetChannelDescription(ctx, channelID, pr.Title, u)
-	setChannelBookmarks(ctx, channelID, u, pr)
+	slack.SetChannelTopic(ctx, channelID, prURL)
+	slack.SetChannelDescription(ctx, channelID, pr.Title, prURL)
+	setChannelBookmarks(ctx, channelID, prURL, pr)
 	postIntroMsg(ctx, channelID, event.Type, pr, event.Actor)
 	if msg := c.linkifyIDs(ctx, pr.Title); msg != "" {
 		_, _ = slack.PostMessage(ctx, channelID, msg)
@@ -162,8 +175,8 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 
 	err = slack.InviteUsersToChannel(ctx, channelID, prParticipants(ctx, pr))
 	if err != nil {
-		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, u)
-		cleanupPRData(ctx, u)
+		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
+		cleanupPRData(ctx, prURL)
 		return err
 	}
 

@@ -23,8 +23,8 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Initialize state without reviewers.
-	if err := InitTurn(url, "author", []string{}); err != nil {
-		t.Fatalf("InitTurn() error = %v", err)
+	if err := InitTurns(url, "author", []string{}); err != nil {
+		t.Fatalf("InitTurns() error = %v", err)
 	}
 
 	got, err = GetCurrentTurn(url)
@@ -190,8 +190,8 @@ func TestNudge(t *testing.T) {
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Initialize state.
-	if err := InitTurn(url, "author", []string{"rev1", "rev2"}); err != nil {
-		t.Fatalf("InitTurn() error = %v", err)
+	if err := InitTurns(url, "author", []string{"rev1", "rev2"}); err != nil {
+		t.Fatalf("InitTurns() error = %v", err)
 	}
 
 	got, err := GetCurrentTurn(url)

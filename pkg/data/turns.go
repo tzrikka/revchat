@@ -61,11 +61,11 @@ type PRTurn struct {
 	Set       bool            `json:"set"`       // Whether the attention state has been set explicitly.
 }
 
-var turnMutexes RWMutexMap
+var prTurnMutexes RWMutexMap
 
-// InitTurn initializes the attention state of a new PR.
+// InitTurns initializes the attention state of a new PR.
 // Users are specified using their email addresses.
-func InitTurn(url, author string, reviewers []string) error {
+func InitTurns(url, author string, reviewers []string) error {
 	t := &PRTurn{
 		Author:    author,
 		Reviewers: make(map[string]bool, len(reviewers)),
@@ -78,14 +78,19 @@ func InitTurn(url, author string, reviewers []string) error {
 	return writeTurnFile(url, t) // Happens only once per PR, so no need for mutex here.
 }
 
-// DeleteTurn removes the attention state file of a specific PR.
+// DeleteTurns removes the attention state file of a specific PR.
 // This is used when the PR is closed or marked as a draft.
-func DeleteTurn(url string) error {
-	mu := turnMutexes.Get(url)
+func DeleteTurns(url string) error {
+	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
-	return os.Remove(urlBasedPath(url, "_turn")) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	path, err := cachedDataPath(url, "_turn")
+	if err != nil {
+		return err
+	}
+
+	return os.Remove(path) //gosec:disable G304 -- URL received from signature-verified 3rd-party
 }
 
 // AddReviewerToPR adds a new reviewer to the attention list of a specific PR.
@@ -96,7 +101,7 @@ func AddReviewerToPR(url, email string) error {
 		return nil
 	}
 
-	mu := turnMutexes.Get(url)
+	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -119,7 +124,7 @@ func AddReviewerToPR(url, email string) error {
 // reviewer has their turn flag set to false, we add the author to the list as well,
 // unless the attention list was set explicitly using [SetTurn].
 func GetCurrentTurn(url string) ([]string, error) {
-	mu := turnMutexes.Get(url)
+	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -158,7 +163,7 @@ func RemoveFromTurn(url, email string) error {
 		return nil
 	}
 
-	mu := turnMutexes.Get(url)
+	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -181,7 +186,7 @@ func RemoveFromTurn(url, email string) error {
 // input contains the PR author, they *are* added (temporarily, until [SwitchTurn]
 // is called for them). It also ignores empty or "bot" email addresses.
 func SetTurn(url string, emails []string) error {
-	mu := turnMutexes.Get(url)
+	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -214,7 +219,7 @@ func SwitchTurn(url, email string) error {
 		return nil
 	}
 
-	mu := turnMutexes.Get(url)
+	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -246,7 +251,7 @@ func Nudge(url, email string) (bool, error) {
 		return false, nil
 	}
 
-	mu := turnMutexes.Get(url)
+	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 

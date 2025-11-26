@@ -112,6 +112,11 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 	// Commit(s) pushed to the PR branch.
 	if event.PullRequest.CommitCount > 0 && snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
+		if err := data.UpdateBitbucketDiffstat(url, diffstat(ctx, event)); err != nil {
+			log.Error(ctx, "failed to update Bitbucket PR's diffstat", "error", err, "pr_url", url)
+			// Continue anyway.
+		}
+
 		slices.Reverse(cmts) // Switch from reverse order to chronological order.
 
 		prevCount := snapshot.CommitCount
