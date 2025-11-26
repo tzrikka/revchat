@@ -46,10 +46,11 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 	// Announce transitions between drafts and ready to review.
 	if !snapshot.Draft && event.PullRequest.Draft {
-		return mentionUserInMsg(ctx, channelID, event.Actor, ":construction: %s marked this PR as a draft.")
+		return mentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
 	}
 	if snapshot.Draft && !event.PullRequest.Draft {
-		return mentionUserInMsg(ctx, channelID, event.Actor, ":eyes: %s marked this PR as ready for review.")
+		_ = mentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
+		snapshot.Reviewers = nil // Force re-adding any reviewers that were added while the PR was a draft.
 	}
 
 	// Title edited.
@@ -76,9 +77,10 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	// Reviewers added/removed.
 	added, removed := reviewersDiff(*snapshot, event.PullRequest)
 	if len(added)+len(removed) > 0 {
-		msg := reviewerMentions(ctx, added, removed)
-		_ = mentionUserInMsg(ctx, channelID, event.Actor, msg)
-		_ = slack.InviteUsersToChannel(ctx, channelID, bitbucketToSlackIDs(ctx, added))
+		_ = mentionUserInMsg(ctx, channelID, event.Actor, reviewerMentions(ctx, added, removed))
+		if !event.PullRequest.Draft {
+			_ = slack.InviteUsersToChannel(ctx, channelID, bitbucketToSlackIDs(ctx, added))
+		}
 		_ = slack.KickUsersFromChannel(ctx, channelID, bitbucketToSlackIDs(ctx, removed))
 	}
 
@@ -304,7 +306,7 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 		if err := data.RemoveFromTurn(url, email); err != nil {
 			log.Error(ctx, "failed to remove user from Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
 		}
-		msg += "approved this PR :+1:"
+		msg += "approved this PR. :+1:"
 	case "unapproved":
 		if err := data.AddReviewerToPR(url, email); err != nil {
 			log.Error(ctx, "failed to add user back to Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
@@ -312,12 +314,12 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 		if err := data.SwitchTurn(url, email); err != nil {
 			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
 		}
-		msg += "unapproved this PR :-1:"
+		msg += "unapproved this PR. :-1:"
 	case "changes_request_created":
 		if err := data.SwitchTurn(url, email); err != nil {
 			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
 		}
-		msg += "requested changes in this PR :warning:"
+		msg += "requested changes in this PR. :warning:"
 
 	// Ignored event type.
 	case "changes_request_removed":
@@ -410,7 +412,7 @@ func prCommentResolvedWorkflow(ctx workflow.Context, event PullRequestEvent) err
 
 	url := htmlURL(event.Comment.Links)
 	_ = addReaction(ctx, url, "ok")
-	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s resolved this comment :ok:")
+	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s resolved this comment. :ok:")
 }
 
 func prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
@@ -424,7 +426,7 @@ func prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) err
 
 	url := htmlURL(event.Comment.Links)
 	_ = removeReaction(ctx, url, "ok")
-	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s reopened this comment :no_good:")
+	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s reopened this comment. :no_good:")
 }
 
 func htmlURL(links map[string]Link) string {

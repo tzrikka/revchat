@@ -23,6 +23,7 @@
 > Bitbucket events don't pinpoint changes like GitHub, details can be determined only by storing a snapshot of the PR's metadata and comparing it between update events (or with Bitbucket API calls, but we're avoiding doing that whenever possible).
 
 - If the PR is marked as a draft / ready to review - announce it
+  - If the PR is ready to review, add to the Slack channel reviewers who were added while the PR was a draft
 - Count the total number of commits in the PR (via API)
 - If the PR title is edited
   - Mention the editing user in a Slack message
@@ -38,7 +39,7 @@
 - If reviewers are added and/or removed
   - Enumerate added and removed separately
   - Mention the user and the changes in a Slack message
-  - Invite added reviewers to the Slack channel
+  - Invite added reviewers to the Slack channel (unless the PR is marked as a draft)
   - Kick removed reviewers from the Slack channel
 - If 1 or more commits are pushed to the PR branch
   - Mention the user and the commits in a Slack message
