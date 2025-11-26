@@ -15,12 +15,13 @@ import (
 )
 
 func setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
+	files := data.ReadBitbucketDiffstatLength(url)
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Reviewers (%d)", len(reviewers(pr, false))), url+"/overview", ":eyes:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview", ":speech_balloon:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview", ":white_check_mark:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview", ":+1:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.CommitCount), url+"/commits", ":pushpin:")
-	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", 0), url+"/diff", ":open_file_folder:")
+	_ = slack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff", ":open_file_folder:")
 	_ = slack.BookmarksAddActivity(ctx, channelID, "Builds: no results", url+"/overview", ":vertical_traffic_light:")
 }
 
