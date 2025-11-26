@@ -4,9 +4,8 @@
 
 ### PR Created
 
-- If the PR is a draft - abort (ignore this event)
 - Initialize a new Slack channel
-  - Create a normalized version of the PR title
+  - Construct a normalized version of the PR title
   - Create the Slack channel with the normalized name
     - If the channel already exists, retry with a numeric counter suffix
   - Set the channel's topic (to the Bitbucket URL)
@@ -23,10 +22,7 @@
 > [!NOTE]
 > Bitbucket events don't pinpoint changes like GitHub, details can be determined only by storing a snapshot of the PR's metadata and comparing it between update events (or with Bitbucket API calls, but we're avoiding doing that whenever possible).
 
-- If the PR is a draft - abort (ignore this event)
-- If converted into a draft - same as [PR Declined](#pr-declined)
-- If the PR is converted from a draft to marked-as-ready - same as [PR Created](#pr-created)
-- If the PR doesn't have a Slack channel - abort
+- If the PR is marked as a draft / ready to review - announce it
 - Count the total number of commits in the PR (via API)
 - If the PR title is edited
   - Mention the editing user in a Slack message
@@ -53,7 +49,7 @@
 
 ### PR Approved
 
-- If the PR is a draft - abort (ignore this event)
+- If the PR doesn't have a Slack channel - abort (ignore this event)
 - Mention the user and the action in a Slack message
 - Update the Slack channel's bookmarks
 
@@ -63,7 +59,7 @@
 
 ### PR Merged
 
-- If the PR is a draft - abort (ignore this event)
+- If the PR doesn't have a Slack channel - abort (ignore this event)
 - Wait 5 seconds (to handle other asynchronous events, e.g. a PR closure comment)
 - Clean up all of RevChat's data for this PR
 - Mention the user and the specific action in a Slack message
@@ -90,7 +86,7 @@
 
 ### Comment Created
 
-- If the PR is a draft - abort (ignore this event)
+- If the PR doesn't have a Slack channel - abort (ignore this event)
 - If the comment was posted by RevChat (i.e. mirrored from Slack) - abort (don't repost it)
 - Convert Bitbucket markdown to Slack markdown
 - Post as a Slack message/reply on behalf of the user
@@ -102,20 +98,20 @@
 
 ### Comment Updated
 
-- If the PR is a draft - abort (ignore this event)
+- If the PR doesn't have a Slack channel - abort (ignore this event)
 - Convert Bitbucket markdown to Slack markdown
 - Identify the corresponding Slack message/reply, and update it
 - Update the Slack channel's bookmarks
 
 ### Comment Deleted
 
-- If the PR is a draft - abort (ignore this event)
+- If the PR doesn't have a Slack channel - abort (ignore this event)
 - Identify the corresponding Slack message/reply, and delete it
 - Update the Slack channel's bookmarks
 
 ### Comment Resolved
 
-- If the PR is a draft - abort (ignore this event)
+- If the PR doesn't have a Slack channel - abort (ignore this event)
 - Identify the corresponding Slack message
   - Add an :ok: reaction to the message
   - Mention the user and the action in a reply
@@ -123,7 +119,7 @@
 
 ### Comment Reopened
 
-- If the PR is a draft - abort (ignore this event)
+- If the PR doesn't have a Slack channel - abort (ignore this event)
 - Identify the corresponding Slack message
   - Remove the :ok: reaction from the message
   - Mention the user and the action in a reply
@@ -148,4 +144,4 @@
 
 ### Build Status Updated
 
-- Same as [PR Approved](#build-status-created)
+- Same as [Build Status Created](#build-status-created)

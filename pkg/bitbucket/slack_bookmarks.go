@@ -146,6 +146,10 @@ func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 		s = s[:maxBookmarkTitleLen]
 	}
 
+	if s == bookmarks[6].Title {
+		return
+	}
+
 	if err := slack.BookmarksEditTitleActivity(ctx, channelID, bookmarks[6].ID, s); err != nil {
 		log.Error(ctx, "failed to update Slack channel's builds bookmark", "error", err)
 	}

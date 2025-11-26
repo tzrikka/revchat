@@ -16,14 +16,14 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-// A new PR was created (or marked as ready for review - see [Config.prUpdatedWorkflow]).
+// A new PR was created.
 func (c Config) prCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	// Ignore drafts until they're marked as ready for review.
-	if event.PullRequest.Draft {
-		return nil
-	}
-
 	return c.initChannel(ctx, event)
+}
+
+// A PR was closed, i.e. merged or declined/rejected.
+func prClosedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	return archiveChannel(ctx, event)
 }
 
 func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
@@ -36,29 +36,21 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		return err
 	}
 
-	// PR converted to a draft.
-	if snapshot != nil && event.PullRequest.Draft {
-		event.PullRequest.Draft = false
-		return prClosedWorkflow(ctx, event)
-	}
-
-	// Ignore drafts until they're marked as ready for review.
-	if snapshot == nil && event.PullRequest.Draft {
-		return nil
-	}
-
-	// PR converted from a draft to ready-for-review.
-	if snapshot == nil && !event.PullRequest.Draft {
-		return c.prCreatedWorkflow(ctx, event)
-	}
-
-	// If we're not tracking this PR, there's no need/way to announce this event.
+	// Support recovering lost channels and PR data.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
-	if !found {
-		return nil
+	if snapshot == nil || !found {
+		return c.initChannel(ctx, event)
 	}
 
 	defer updateChannelBookmarks(ctx, event, channelID, snapshot)
+
+	// Announce transitions between drafts and ready to review.
+	if !snapshot.Draft && event.PullRequest.Draft {
+		return mentionUserInMsg(ctx, channelID, event.Actor, ":construction: %s marked this PR as a draft.")
+	}
+	if snapshot.Draft && !event.PullRequest.Draft {
+		return mentionUserInMsg(ctx, channelID, event.Actor, ":eyes: %s marked this PR as ready for review.")
+	}
 
 	// Title edited.
 	if snapshot.Title != event.PullRequest.Title {
@@ -68,7 +60,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			_, _ = slack.PostMessage(ctx, channelID, msg)
 		}
 
-		err = c.renameChannel(ctx, event.PullRequest, channelID)
+		return c.renameChannel(ctx, event.PullRequest, channelID)
 	}
 
 	// Description edited.
@@ -78,7 +70,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, url)
 		}
 
-		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		return mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Reviewers added/removed.
@@ -335,16 +327,6 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	}
 
 	return mentionUserInMsg(ctx, channelID, event.Actor, msg)
-}
-
-// A PR was closed, i.e. merged or rejected (possibly a draft).
-func prClosedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	// Ignore drafts - they don't have an active Slack channel anyway.
-	if event.PullRequest.Draft {
-		return nil
-	}
-
-	return archiveChannel(ctx, event)
 }
 
 func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {

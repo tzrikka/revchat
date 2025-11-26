@@ -19,6 +19,18 @@ import (
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
+// lookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
+func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (string, bool) {
+	channelID, err := data.SwitchURLAndID(pr.Links["html"].HRef)
+	if err != nil {
+		log.Error(ctx, "failed to retrieve PR's Slack channel ID", "error", err,
+			"event_type", eventType, "pr_url", pr.Links["html"].HRef)
+		return "", false
+	}
+
+	return channelID, channelID != ""
+}
+
 func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
 	pr := event.PullRequest
@@ -31,95 +43,77 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
-	prURL := pr.Links["html"].HRef
-	cleanupPRData(ctx, prURL)
-
 	state := "closed this PR"
-	switch event.Type {
-	case "fulfilled":
+	if event.Type == "fulfilled" {
 		state = "merged this PR"
-	case "updated":
-		state = "converted this PR to a draft"
 	}
-
 	if reason := event.PullRequest.Reason; reason != "" {
 		state = fmt.Sprintf("%s with this reason: `%s`", state, reason)
 	} else {
 		state += "."
 	}
-
 	_ = mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
+	prURL := pr.Links["html"].HRef
+	if err := data.LogSlackChannelArchived(channelID, prURL); err != nil {
+		log.Error(ctx, "failed to log Slack channel archived", "error", err, "channel_id", channelID, "pr_url", prURL)
+	}
+
 	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
+		log.Error(ctx, "failed to archive Slack channel", "error", err, "channel_id", channelID, "pr_url", prURL)
+
 		state = strings.Replace(state, " this PR", "", 1)
-		msg := "Failed to archive this channel, even though its PR was " + state
-		_, _ = slack.PostMessage(ctx, channelID, msg)
+		_, _ = slack.PostMessage(ctx, channelID, "Failed to archive this channel, even though its PR was "+state)
 
 		return err
 	}
 
-	if err := data.LogSlackChannelArchived(channelID, prURL); err != nil {
-		log.Error(ctx, "failed to log Slack channel archived", "error", err, "channel_id", channelID, "pr_url", prURL)
-		// Don't fail the workflow for logging errors.
-	}
+	cleanupPRData(ctx, prURL)
 	return nil
-}
-
-// lookupChannel returns the ID of a channel associated
-// with a PR, if the PR is active and the channel is found.
-func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (string, bool) {
-	if pr.Draft {
-		return "", false
-	}
-
-	u := pr.Links["html"].HRef
-	channelID, err := data.SwitchURLAndID(u)
-	if err != nil {
-		log.Error(ctx, "failed to retrieve PR's Slack channel ID", "error", err, "event_type", eventType, "pr_url", u)
-		return "", false
-	}
-
-	return channelID, channelID != ""
 }
 
 // cleanupPRData deletes all data associated with a PR. If there are errors,
 // they are logged but ignored, as they do not affect the overall workflow.
-func cleanupPRData(ctx workflow.Context, u string) {
-	if err := data.DeleteBitbucketDiffstat(u); err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR diffstat", "error", err, "pr_url", u)
+func cleanupPRData(ctx workflow.Context, prURL string) {
+	if err := data.DeleteBitbucketDiffstat(prURL); err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR diffstat", "error", err, "pr_url", prURL)
 	}
 
-	if err := data.DeleteBitbucketPR(u); err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR snapshot", "error", err, "pr_url", u)
+	if err := data.DeleteBitbucketPR(prURL); err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR snapshot", "error", err, "pr_url", prURL)
 	}
 
-	if err := data.DeleteBitbucketBuilds(u); err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR build status", "error", err, "pr_url", u)
+	if err := data.DeleteBitbucketBuilds(prURL); err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR build status", "error", err, "pr_url", prURL)
 	}
 
-	if err := data.DeleteTurns(u); err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR turn-taking state", "error", err, "pr_url", u)
+	if err := data.DeleteTurns(prURL); err != nil {
+		log.Error(ctx, "failed to delete Bitbucket PR turn-taking state", "error", err, "pr_url", prURL)
 	}
 
-	if err := data.DeleteURLAndIDMapping(u); err != nil {
-		log.Error(ctx, "failed to delete PR URL / Slack channel mappings", "error", err, "pr_url", u)
+	if err := data.DeleteURLAndIDMapping(prURL); err != nil {
+		log.Error(ctx, "failed to delete PR URL / Slack channel mappings", "error", err, "pr_url", prURL)
 	}
 }
 
-// initPRData saves the initial state of a new PR: a snapshot of the
-// PR details, and mappings for 2-way syncs between Bitbucket and Slack.
-func initPRData(ctx workflow.Context, u string, pr PullRequest, authorAccountID, channelID string) error {
-	if err := data.StoreBitbucketPR(u, pr); err != nil {
-		log.Error(ctx, "failed to save Bitbucket PR snapshot", "error", err, "channel_id", channelID, "pr_url", u)
-		return err
+// initPRData saves the initial state of a new PR: a snapshot of the PR
+// details, and mappings for 2-way syncs between Bitbucket and Slack. If there
+// are errors, they are logged but ignored, as we can try to create the data later.
+func initPRData(ctx workflow.Context, event PullRequestEvent, channelID string) {
+	pr := event.PullRequest
+	prURL := pr.Links["html"].HRef
+
+	if err := data.StoreBitbucketPR(prURL, pr); err != nil {
+		log.Error(ctx, "failed to save Bitbucket PR snapshot", "error", err, "channel_id", channelID, "pr_url", prURL)
 	}
 
-	email, err := users.BitbucketToEmail(ctx, authorAccountID)
-	if err != nil {
-		return err
+	if err := data.UpdateBitbucketDiffstat(prURL, diffstat(ctx, event)); err != nil {
+		log.Error(ctx, "failed to update Bitbucket PR's diffstat", "error", err, "pr_url", prURL)
 	}
+
+	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
 	if email == "" {
-		log.Error(ctx, "initializing Bitbucket PR data without author's email", "pr_url", u)
+		log.Error(ctx, "initializing Bitbucket PR data without author's email", "pr_url", prURL)
 	}
 
 	reviewers := []string{}
@@ -129,17 +123,15 @@ func initPRData(ctx workflow.Context, u string, pr PullRequest, authorAccountID,
 		}
 	}
 
-	if err := data.InitTurns(u, email, reviewers); err != nil {
-		log.Error(ctx, "failed to initialize Bitbucket PR turn-taking state", "error", err, "channel_id", channelID, "pr_url", u)
-		return err
+	if err := data.InitTurns(prURL, email, reviewers); err != nil {
+		log.Error(ctx, "failed to initialize Bitbucket PR turn-taking state",
+			"error", err, "channel_id", channelID, "pr_url", prURL)
 	}
 
-	if err := data.MapURLAndID(u, channelID); err != nil {
-		log.Error(ctx, "failed to save PR URL / Slack channel mapping", "error", err, "channel_id", channelID, "pr_url", u)
-		return err
+	if err := data.MapURLAndID(prURL, channelID); err != nil {
+		log.Error(ctx, "failed to save PR URL / Slack channel mapping",
+			"error", err, "channel_id", channelID, "pr_url", prURL)
 	}
-
-	return nil
 }
 
 func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error {
@@ -147,21 +139,19 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	prURL := pr.Links["html"].HRef
 	pr.CommitCount = len(commits(ctx, event))
 
-	channelID, err := c.createChannel(ctx, pr)
-	if err != nil {
-		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
-		return err
+	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	if !found {
+		var err error
+		channelID, err = c.createChannel(ctx, pr)
+		if err != nil {
+			reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
+			return err
+		}
 	}
 
-	if err := initPRData(ctx, prURL, pr, event.Actor.AccountID, channelID); err != nil {
-		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
-		cleanupPRData(ctx, prURL)
-		return err
-	}
-
-	if err := data.UpdateBitbucketDiffstat(prURL, diffstat(ctx, event)); err != nil {
-		log.Error(ctx, "failed to update Bitbucket PR's diffstat", "error", err, "pr_url", prURL)
-		// Continue anyway.
+	initPRData(ctx, event, channelID)
+	if found {
+		return nil
 	}
 
 	// Channel cosmetics.
@@ -173,9 +163,10 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 		_, _ = slack.PostMessage(ctx, channelID, msg)
 	}
 
-	err = slack.InviteUsersToChannel(ctx, channelID, prParticipants(ctx, pr))
+	err := slack.InviteUsersToChannel(ctx, channelID, prParticipants(ctx, pr))
 	if err != nil {
 		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
+		_ = tslack.ConversationsArchiveActivity(ctx, channelID)
 		cleanupPRData(ctx, prURL)
 		return err
 	}
@@ -187,7 +178,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
 	u := pr.Links["html"].HRef
 
-	for i := 1; i < 50; i++ {
+	for i := 1; i < 10; i++ {
 		name := fmt.Sprintf("%s-%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.ID, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
@@ -204,7 +195,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 
 		if err := data.LogSlackChannelCreated(id, name, u); err != nil {
 			log.Error(ctx, "failed to log Slack channel creation", "error", err, "channel_id", id, "pr_url", u)
-			// Don't fail the workflow for logging errors.
+			// Don't fail the workflow because of logging errors.
 		}
 		return id, nil
 	}
@@ -217,7 +208,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 func (c Config) renameChannel(ctx workflow.Context, pr PullRequest, channelID string) error {
 	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
 
-	for i := 1; i < 50; i++ {
+	for i := 1; i < 10; i++ {
 		name := fmt.Sprintf("%s-%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.ID, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)

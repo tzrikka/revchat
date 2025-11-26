@@ -147,6 +147,9 @@ func prDetails(ctx workflow.Context, url string) string {
 	} else {
 		title = fmt.Sprintf("\n\n  •  *%v*", pr["title"])
 	}
+	if draft, ok := pr["draft"].(bool); ok && draft {
+		title = strings.Replace(title, "• ", "• :construction:", 1)
+	}
 	sb.WriteString(title)
 
 	// Slack channel link.
