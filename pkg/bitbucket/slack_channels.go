@@ -59,7 +59,7 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 		log.Error(ctx, "failed to log Slack channel archived", "error", err, "channel_id", channelID, "pr_url", prURL)
 	}
 
-	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
+	if err := tslack.ConversationsArchive(ctx, channelID); err != nil {
 		log.Error(ctx, "failed to archive Slack channel", "error", err, "channel_id", channelID, "pr_url", prURL)
 
 		state = strings.Replace(state, " this PR", "", 1)
@@ -166,7 +166,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	err := slack.InviteUsersToChannel(ctx, channelID, prParticipants(ctx, pr))
 	if err != nil {
 		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
-		_ = tslack.ConversationsArchiveActivity(ctx, channelID)
+		_ = tslack.ConversationsArchive(ctx, channelID)
 		cleanupPRData(ctx, prURL)
 		return err
 	}

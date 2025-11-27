@@ -21,7 +21,7 @@ func SlackToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackUserRef 
 		return fmt.Sprintf("@{%s}", accountID)
 	}
 
-	user, err := slack.UsersInfoActivity(ctx, userID)
+	user, err := slack.UsersInfo(ctx, userID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", userID)
 		return slackUserRef // Fallback: return the original Slack user reference.
@@ -43,7 +43,7 @@ func SlackIDToEmail(ctx workflow.Context, userID string) (string, error) {
 		return user.Email, nil
 	}
 
-	slackUser, err := slack.UsersInfoActivity(ctx, userID)
+	slackUser, err := slack.UsersInfo(ctx, userID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", userID)
 		return "", err
@@ -87,7 +87,7 @@ func EmailToSlackID(ctx workflow.Context, email string) string {
 		log.Debug(ctx, "user in DB without Slack ID", "email", email)
 	}
 
-	slackUser, err := slack.UsersLookupByEmailActivity(ctx, email)
+	slackUser, err := slack.UsersLookupByEmail(ctx, email)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "email", email)
 		return ""

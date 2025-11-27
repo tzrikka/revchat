@@ -61,7 +61,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			_, _ = slack.PostMessage(ctx, channelID, msg)
 		}
 
-		return c.renameChannel(ctx, event.PullRequest, channelID)
+		err = c.renameChannel(ctx, event.PullRequest, channelID)
 	}
 
 	// Description edited.
@@ -71,7 +71,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, url)
 		}
 
-		return mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Reviewers added/removed.

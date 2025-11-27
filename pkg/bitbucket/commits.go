@@ -14,15 +14,15 @@ import (
 func commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 	workspace, repo, found := strings.Cut(event.Repository.FullName, "/")
 	if !found {
-		log.Error(ctx, "failed to parse Bitbucket workspace and repository name", "full_name", event.Repository.FullName)
+		log.Error(ctx, "failed to parse Bitbucket workspace and repository name",
+			"full_name", event.Repository.FullName)
 		return nil
 	}
 
-	resp, err := bitbucket.PullRequestsListCommitsActivity(ctx, bitbucket.PullRequestsListCommitsRequest{
+	cs, err := bitbucket.PullRequestsListCommits(ctx, bitbucket.PullRequestsListCommitsRequest{
 		Workspace:     workspace,
 		RepoSlug:      repo,
 		PullRequestID: strconv.Itoa(event.PullRequest.ID),
-		AllPages:      true,
 	})
 	if err != nil {
 		url := event.PullRequest.Links["html"].HRef
@@ -31,7 +31,7 @@ func commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 		return nil
 	}
 
-	return resp.Values
+	return cs
 }
 
 var diffURLPattern = regexp.MustCompile(`/([^/]+)/([^/]+)/diff/([^?]+)(\?path=(.*))?$`)
@@ -43,7 +43,7 @@ func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 		return ""
 	}
 
-	text, err := bitbucket.SourceGetFileActivity(ctx, bitbucket.SourceGetRequest{
+	text, err := bitbucket.SourceGetFile(ctx, bitbucket.SourceGetRequest{
 		Workspace: matches[1],
 		RepoSlug:  matches[2],
 		Commit:    hash,
@@ -67,7 +67,7 @@ func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 // 		matches = append(matches, "", "")
 // 	}
 //
-// 	text, err := bitbucket.CommitsDiffActivity(ctx, bitbucket.CommitsDiffRequest{
+// 	text, err := bitbucket.CommitsDiff(ctx, bitbucket.CommitsDiffRequest{
 // 		Workspace: matches[1],
 // 		RepoSlug:  matches[2],
 // 		Spec:      matches[3],
@@ -82,18 +82,17 @@ func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 // 	return strings.TrimSpace(strings.ReplaceAll(text, `\ No newline at end of file`, ""))
 // }
 
-func diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.DiffStat {
+func diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.Diffstat {
 	workspace, repo, found := strings.Cut(event.Repository.FullName, "/")
 	if !found {
 		log.Error(ctx, "failed to parse Bitbucket workspace and repository name", "full_name", event.Repository.FullName)
 		return nil
 	}
 
-	resp, err := bitbucket.PullRequestsDiffStatActivity(ctx, bitbucket.PullRequestsDiffStatRequest{
+	ds, err := bitbucket.PullRequestsDiffstat(ctx, bitbucket.PullRequestsDiffstatRequest{
 		Workspace:     workspace,
 		RepoSlug:      repo,
 		PullRequestID: strconv.Itoa(event.PullRequest.ID),
-		AllPages:      true,
 	})
 	if err != nil {
 		url := event.PullRequest.Links["html"].HRef
@@ -102,5 +101,5 @@ func diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.DiffStat
 		return nil
 	}
 
-	return resp.Values
+	return ds
 }

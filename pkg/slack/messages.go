@@ -95,7 +95,7 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 		return userID
 	}
 
-	bot, err := slack.BotsInfoActivity(ctx, botID)
+	bot, err := slack.BotsInfo(ctx, botID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve bot info from Slack", "bot_id", botID, "error", err)
 		return ""
@@ -166,7 +166,7 @@ func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, u
 	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Text) + c.fileLinks(ctx, event.Files)
 	msg += "\n\n[This comment was created by RevChat]: #"
 
-	resp, err := bitbucket.PullRequestsCreateCommentActivity(ctx, bitbucket.PullRequestsCreateCommentRequest{
+	resp, err := bitbucket.PullRequestsCreateComment(ctx, bitbucket.PullRequestsCreateCommentRequest{
 		ThrippyLinkID: linkID,
 		Workspace:     url[1],
 		RepoSlug:      url[2],
@@ -276,7 +276,7 @@ func (c *Config) editMessageBitbucket(ctx workflow.Context, event MessageEvent, 
 	}
 
 	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Message.Text)
-	err = bitbucket.PullRequestsUpdateCommentActivity(ctx, bitbucket.PullRequestsUpdateCommentRequest{
+	err = bitbucket.PullRequestsUpdateComment(ctx, bitbucket.PullRequestsUpdateCommentRequest{
 		ThrippyLinkID: linkID,
 		Workspace:     url[1],
 		RepoSlug:      url[2],
@@ -321,7 +321,7 @@ func deleteMessageBitbucket(ctx workflow.Context, event MessageEvent, userID str
 		return err
 	}
 
-	err = bitbucket.PullRequestsDeleteCommentActivity(ctx, bitbucket.PullRequestsDeleteCommentRequest{
+	err = bitbucket.PullRequestsDeleteComment(ctx, bitbucket.PullRequestsDeleteCommentRequest{
 		ThrippyLinkID: linkID,
 		Workspace:     url[1],
 		RepoSlug:      url[2],

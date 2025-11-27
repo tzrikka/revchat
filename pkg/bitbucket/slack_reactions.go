@@ -23,7 +23,7 @@ func addReaction(ctx workflow.Context, url, emoji string) error {
 		return nil
 	}
 
-	return slack.ReactionsAddActivity(ctx, id[0], id[len(id)-1], emoji)
+	return slack.ReactionsAdd(ctx, id[0], id[len(id)-1], emoji)
 }
 
 func removeReaction(ctx workflow.Context, url, emoji string) error {
@@ -39,5 +39,5 @@ func removeReaction(ctx workflow.Context, url, emoji string) error {
 		return nil
 	}
 
-	return slack.ReactionsRemoveActivity(ctx, id[0], id[len(id)-1], emoji)
+	return slack.ReactionsRemove(ctx, id[0], id[len(id)-1], emoji)
 }

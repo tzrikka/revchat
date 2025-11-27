@@ -10,18 +10,18 @@ import (
 )
 
 func Upload(ctx workflow.Context, content []byte, filename, title, snippetType, mimeType, channelID, threadTS string) (*slack.File, error) {
-	uploadURL, fileID, err := slack.FilesGetUploadURLExternalActivity(ctx, len(content), filename, snippetType, "")
+	uploadURL, fileID, err := slack.FilesGetUploadURLExternal(ctx, len(content), filename, snippetType, "")
 	if err != nil {
 		log.Error(ctx, "failed to get Slack URL to upload file", "error", err, "filename", filename)
 		return nil, err
 	}
 
-	if err := slack.TimpaniUploadExternalActivity(ctx, uploadURL, mimeType, content); err != nil {
+	if err := slack.TimpaniUploadExternal(ctx, uploadURL, mimeType, content); err != nil {
 		log.Error(ctx, "failed to upload file to Slack", "error", err, "filename", filename)
 		return nil, err
 	}
 
-	files, err := slack.FilesCompleteUploadExternalActivity(ctx, slack.FilesCompleteUploadExternalRequest{
+	files, err := slack.FilesCompleteUploadExternal(ctx, slack.FilesCompleteUploadExternalRequest{
 		Files:     []slack.File{{ID: fileID, Title: title}},
 		ChannelID: channelID,
 		ThreadTS:  threadTS,

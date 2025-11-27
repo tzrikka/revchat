@@ -40,7 +40,7 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 
 	_ = c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+state)
 
-	if err := tslack.ConversationsArchiveActivity(ctx, channelID); err != nil {
+	if err := tslack.ConversationsArchive(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
 		msg := "Failed to archive this channel, even though its PR was " + state
 		_, _ = slack.PostMessage(ctx, channelID, msg)
@@ -148,11 +148,11 @@ func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, username, url 
 func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
 	checks := 0
 
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.Comments), url, ":speech_balloon:")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits", ":pushpin:")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks", "")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files", ":open_file_folder:")
-	_ = tslack.BookmarksAddActivity(ctx, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff", "")
+	_ = tslack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.Comments), url, ":speech_balloon:")
+	_ = tslack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.Commits), url+"/commits", ":pushpin:")
+	_ = tslack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Checks (%d)", checks), url+"/checks", "")
+	_ = tslack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Files changed (%d)", pr.ChangedFiles), url+"/files", ":open_file_folder:")
+	_ = tslack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Diffs (+%d -%d)", pr.Additions, pr.Deletions), url+".diff", "")
 }
 
 func (c Config) postIntroMsg(ctx workflow.Context, channelID, action string, pr PullRequest, sender User) {

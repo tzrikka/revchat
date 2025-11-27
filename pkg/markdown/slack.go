@@ -19,7 +19,7 @@ func slackBaseURL(ctx workflow.Context) string {
 		return cachedSlackBaseURL
 	}
 
-	resp, err := slack.AuthTestActivity(ctx)
+	resp, err := slack.AuthTest(ctx)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack auth info", "error", err)
 		return ""
@@ -34,7 +34,7 @@ func slackChannelIDToName(ctx workflow.Context, id string) string {
 		return name
 	}
 
-	channel, err := slack.ConversationsInfoActivity(ctx, id, false, false)
+	channel, err := slack.ConversationsInfo(ctx, id, false, false)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack channel info", "error", err, "channel_id", id)
 		return ""

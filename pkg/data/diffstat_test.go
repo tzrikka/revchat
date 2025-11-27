@@ -10,7 +10,7 @@ import (
 func TestDiffstatPaths(t *testing.T) {
 	tests := []struct {
 		name string
-		ds   []bitbucket.DiffStat
+		ds   []bitbucket.Diffstat
 		want []string
 	}{
 		{
@@ -18,25 +18,25 @@ func TestDiffstatPaths(t *testing.T) {
 		},
 		{
 			name: "empty",
-			ds:   []bitbucket.DiffStat{},
+			ds:   []bitbucket.Diffstat{},
 		},
 		{
 			name: "single_new_path",
-			ds: []bitbucket.DiffStat{
+			ds: []bitbucket.Diffstat{
 				{New: &bitbucket.CommitFile{Path: "path/new.txt"}},
 			},
 			want: []string{"path/new.txt"},
 		},
 		{
 			name: "single_old_path",
-			ds: []bitbucket.DiffStat{
+			ds: []bitbucket.Diffstat{
 				{Old: &bitbucket.CommitFile{Path: "path/old.txt"}},
 			},
 			want: []string{"path/old.txt"},
 		},
 		{
 			name: "single_old_and_new_path",
-			ds: []bitbucket.DiffStat{
+			ds: []bitbucket.Diffstat{
 				{New: &bitbucket.CommitFile{Path: "path/file"}},
 				{Old: &bitbucket.CommitFile{Path: "path/file"}},
 			},
@@ -44,7 +44,7 @@ func TestDiffstatPaths(t *testing.T) {
 		},
 		{
 			name: "multiple_paths",
-			ds: []bitbucket.DiffStat{
+			ds: []bitbucket.Diffstat{
 				{New: &bitbucket.CommitFile{Path: "1"}},
 				{Old: &bitbucket.CommitFile{Path: "1"}},
 				{New: &bitbucket.CommitFile{Path: "3"}},

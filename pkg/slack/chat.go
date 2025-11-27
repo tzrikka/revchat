@@ -11,7 +11,7 @@ import (
 )
 
 func DeleteMessage(ctx workflow.Context, channelID, timestamp string) error {
-	if err := slack.ChatDeleteActivity(ctx, channelID, timestamp); err != nil {
+	if err := slack.ChatDelete(ctx, channelID, timestamp); err != nil {
 		log.Error(ctx, "failed to delete Slack message", "error", err, "channel_id", channelID, "timestamp", timestamp)
 		return err
 	}
@@ -20,7 +20,7 @@ func DeleteMessage(ctx workflow.Context, channelID, timestamp string) error {
 
 func PostEphemeralMessage(ctx workflow.Context, channelID, userID, msg string) error {
 	req := slack.ChatPostEphemeralRequest{Channel: channelID, User: userID, Text: msg}
-	if err := slack.ChatPostEphemeralActivity(ctx, req); err != nil {
+	if err := slack.ChatPostEphemeral(ctx, req); err != nil {
 		if e := err.Error(); strings.Contains(e, "channel_not_found") || strings.Contains(e, "not_in_channel") {
 			_, err = PostMessage(ctx, userID, fmt.Sprintf("Couldn't send you this message in <#%s>:\n\n%s", channelID, msg))
 		} else {
@@ -44,7 +44,7 @@ func PostReply(ctx workflow.Context, channelID, timestamp, msg string) (*slack.C
 }
 
 func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg string) (*slack.ChatPostMessageResponse, error) {
-	resp, err := slack.ChatPostMessageActivity(ctx, slack.ChatPostMessageRequest{
+	resp, err := slack.ChatPostMessage(ctx, slack.ChatPostMessageRequest{
 		Channel:  channelID,
 		ThreadTS: timestamp,
 		Username: name,
@@ -60,7 +60,7 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 
 func UpdateMessage(ctx workflow.Context, channelID, timestamp, msg string) error {
 	req := slack.ChatUpdateRequest{Channel: channelID, TS: timestamp, Text: msg}
-	if err := slack.ChatUpdateActivity(ctx, req); err != nil {
+	if err := slack.ChatUpdate(ctx, req); err != nil {
 		log.Error(ctx, "failed to update Slack message", "error", err, "channel_id", channelID, "timestamp", timestamp)
 		return err
 	}

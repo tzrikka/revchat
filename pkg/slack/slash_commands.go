@@ -334,7 +334,7 @@ func remindersSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 }
 
 func setReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet bool) error {
-	user, err := slack.UsersInfoActivity(ctx, event.UserID)
+	user, err := slack.UsersInfo(ctx, event.UserID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", event.UserID)
 		postEphemeralError(ctx, event, "failed to retrieve Slack user info.")
@@ -567,7 +567,7 @@ func (c *Config) approveSlashCommand(ctx workflow.Context, event SlashCommandEve
 	switch {
 	case c.bitbucketWorkspace != "":
 		req := bitbucket.PullRequestsApproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
-		err = bitbucket.PullRequestsApproveActivity(ctx, req)
+		err = bitbucket.PullRequestsApprove(ctx, req)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		postEphemeralError(ctx, event, "internal configuration error.")
@@ -594,7 +594,7 @@ func (c *Config) unapproveSlashCommand(ctx workflow.Context, event SlashCommandE
 	switch {
 	case c.bitbucketWorkspace != "":
 		req := bitbucket.PullRequestsUnapproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
-		err = bitbucket.PullRequestsUnapproveActivity(ctx, req)
+		err = bitbucket.PullRequestsUnapprove(ctx, req)
 	default:
 		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
 		postEphemeralError(ctx, event, "internal configuration error.")

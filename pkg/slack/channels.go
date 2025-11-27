@@ -56,7 +56,7 @@ func NormalizeChannelName(name string, maxLen int) string {
 }
 
 func CreateChannel(ctx workflow.Context, name, url string, private bool) (string, bool, error) {
-	id, err := slack.ConversationsCreateActivity(ctx, name, private)
+	id, err := slack.ConversationsCreate(ctx, name, private)
 	if err != nil {
 		msg := "failed to create Slack channel"
 
@@ -74,7 +74,7 @@ func CreateChannel(ctx workflow.Context, name, url string, private bool) (string
 }
 
 func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
-	if err := slack.ConversationsRenameActivity(ctx, channelID, name); err != nil {
+	if err := slack.ConversationsRename(ctx, channelID, name); err != nil {
 		msg := "failed to rename Slack channel"
 
 		if strings.Contains(err.Error(), "name_taken") {
@@ -101,7 +101,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []stri
 		userIDs = userIDs[:1000]
 	}
 
-	if err := slack.ConversationsInviteActivity(ctx, channelID, userIDs, true); err != nil {
+	if err := slack.ConversationsInvite(ctx, channelID, userIDs, true); err != nil {
 		msg := "failed to add user(s) to Slack channel"
 
 		if strings.Contains(err.Error(), "already_in_channel") {
@@ -120,7 +120,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []stri
 func KickUsersFromChannel(ctx workflow.Context, channelID string, userIDs []string) error {
 	var err error
 	for _, userID := range userIDs {
-		err = slack.ConversationsKickActivity(ctx, channelID, userID)
+		err = slack.ConversationsKick(ctx, channelID, userID)
 		if err != nil {
 			msg := "failed to remove user from Slack channel"
 
@@ -143,7 +143,7 @@ func SetChannelDescription(ctx workflow.Context, channelID, title, url string) {
 		desc = desc[:channelMetadataMaxLen-4] + "`..."
 	}
 
-	if err := slack.ConversationsSetPurposeActivity(ctx, channelID, desc); err != nil {
+	if err := slack.ConversationsSetPurpose(ctx, channelID, desc); err != nil {
 		msg := "failed to set Slack channel description"
 		log.Error(ctx, msg, "error", err, "channel_id", channelID, "pr_url", url)
 	}
@@ -155,7 +155,7 @@ func SetChannelTopic(ctx workflow.Context, channelID, url string) {
 		topic = topic[:channelMetadataMaxLen-4] + " ..."
 	}
 
-	if err := slack.ConversationsSetTopicActivity(ctx, channelID, topic); err != nil {
+	if err := slack.ConversationsSetTopic(ctx, channelID, topic); err != nil {
 		log.Error(ctx, "failed to set Slack channel topic", "error", err, "channel_id", channelID, "pr_url", url)
 	}
 }

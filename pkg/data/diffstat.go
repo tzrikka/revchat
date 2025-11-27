@@ -18,7 +18,7 @@ func ReadBitbucketDiffstatPaths(url string) []string {
 	return diffstatPaths(readBitbucketDiffstat(url))
 }
 
-func readBitbucketDiffstat(url string) []bitbucket.DiffStat {
+func readBitbucketDiffstat(url string) []bitbucket.Diffstat {
 	mu := prDiffStatMutexes.Get(url)
 	mu.RLock()
 	defer mu.RUnlock()
@@ -34,7 +34,7 @@ func readBitbucketDiffstat(url string) []bitbucket.DiffStat {
 	}
 	defer f.Close()
 
-	ds := []bitbucket.DiffStat{}
+	ds := []bitbucket.Diffstat{}
 	if err := json.NewDecoder(f).Decode(&ds); err != nil {
 		return nil
 	}
@@ -42,7 +42,7 @@ func readBitbucketDiffstat(url string) []bitbucket.DiffStat {
 	return ds
 }
 
-func diffstatPaths(ds []bitbucket.DiffStat) []string {
+func diffstatPaths(ds []bitbucket.Diffstat) []string {
 	var paths []string
 	for _, d := range ds {
 		if d.New != nil {
@@ -57,7 +57,7 @@ func diffstatPaths(ds []bitbucket.DiffStat) []string {
 	return slices.Compact(paths)
 }
 
-func UpdateBitbucketDiffstat(url string, ds []bitbucket.DiffStat) error {
+func UpdateBitbucketDiffstat(url string, ds []bitbucket.Diffstat) error {
 	mu := prDiffStatMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()

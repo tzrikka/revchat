@@ -77,7 +77,7 @@ func (c Config) removeChannelMember(ctx workflow.Context, channelID string, revi
 		return nil
 	}
 
-	return tslack.ConversationsKickActivity(ctx, channelID, slackUserID)
+	return tslack.ConversationsKick(ctx, channelID, slackUserID)
 }
 
 func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, sender User, role, action string) string {

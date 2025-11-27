@@ -31,7 +31,7 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 		return user.Email, nil
 	}
 
-	jiraUser, err := jira.UsersGetActivity(ctx, accountID)
+	jiraUser, err := jira.UsersGet(ctx, accountID)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Jira user info", "error", err, "account_id", accountID)
 		return "", err
@@ -79,7 +79,7 @@ func BitbucketToSlackRef(ctx workflow.Context, accountID, displayName string) st
 		return "A bot"
 	}
 
-	user, err := bitbucket.UsersGetActivity(ctx, accountID, "")
+	user, err := bitbucket.UsersGet(ctx, accountID, "")
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Bitbucket user info", "error", err, "account_id", accountID)
 		return accountID // Fallback: return the original Bitbucket account ID.
