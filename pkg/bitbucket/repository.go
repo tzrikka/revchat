@@ -12,6 +12,7 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/xdg"
 )
@@ -59,6 +60,22 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	desc, _, _ := strings.Cut(cs.Description, "\n")
 	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, desc)
 	_, err = slack.PostMessage(ctx, channelID, msg)
+
+	// Other than announcing this specific event, also announce if the PR is ready to be merged
+	// (all builds are successful, the PR has at least 2 approvals, and from all code owners).
+	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(url) {
+		return err
+	}
+	workspace, repo, ok := strings.Cut(pr.Destination.Repository.FullName, "/")
+	if !ok {
+		return err
+	}
+	if !files.GotAllRequiredApprovals(ctx, workspace, repo, pr.Destination.Branch.Name) {
+		return err
+	}
+
+	log.Info(ctx, "Bitbucket PR is ready to be merged", "pr_url", url)
+	_, err = slack.PostMessage(ctx, channelID, "This PR is ready to be merged! :tada:")
 	return err
 }
 
@@ -141,4 +158,19 @@ func prURL(pr map[string]any) string {
 	}
 
 	return href
+}
+
+func allBuildsSuccessful(url string) bool {
+	prStatus := data.ReadBitbucketBuilds(url)
+	if prStatus == nil || len(prStatus.Builds) == 0 {
+		return false
+	}
+
+	for _, build := range prStatus.Builds {
+		if build.State != "SUCCESSFUL" {
+			return false
+		}
+	}
+
+	return true
 }

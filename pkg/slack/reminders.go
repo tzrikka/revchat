@@ -14,7 +14,9 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/users"
+	"github.com/tzrikka/timpani-api/pkg/slack"
 	"github.com/tzrikka/xdg"
 )
 
@@ -50,7 +52,7 @@ func remindersWorkflow(ctx workflow.Context) error {
 			var msg strings.Builder
 			msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
 			for _, url := range userPRs {
-				msg.WriteString(prDetails(ctx, url))
+				msg.WriteString(prDetails(ctx, url, userID))
 			}
 			_, _ = PostMessage(ctx, userID, msg.String())
 		}
@@ -136,7 +138,7 @@ func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder s
 	return
 }
 
-func prDetails(ctx workflow.Context, url string) string {
+func prDetails(ctx workflow.Context, url, userID string) string {
 	sb := strings.Builder{}
 
 	// Title.
@@ -144,11 +146,11 @@ func prDetails(ctx workflow.Context, url string) string {
 	pr, err := data.LoadBitbucketPR(url)
 	if err != nil {
 		log.Error(ctx, "failed to load Bitbucket PR snapshot for reminder", "error", err, "pr_url", url)
-	} else {
-		title = fmt.Sprintf("\n\n  •  *%v*", pr["title"])
+	} else if t, ok := pr["title"].(string); ok && len(t) > 0 {
+		title = fmt.Sprintf("\n\n  •  *%s*", t)
 	}
 	if draft, ok := pr["draft"].(bool); ok && draft {
-		title = strings.Replace(title, "• ", "• :construction:", 1)
+		title = strings.Replace(title, "•  ", "•  :construction: ", 1)
 	}
 	sb.WriteString(title)
 
@@ -182,8 +184,45 @@ func prDetails(ctx workflow.Context, url string) string {
 		sb.WriteString(fmt.Sprintf("\n          ◦   Approvals: %d (%s)", count, names))
 	}
 
+	// User-specific details.
 	// sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
-	// sb.WriteString("\n          ◦   TODO: Code owner / high risk files?")
+
+	paths := data.ReadBitbucketDiffstatPaths(url)
+	if len(paths) == 0 {
+		return sb.String()
+	}
+
+	user, err := slack.UsersProfileGet(ctx, userID)
+	if err != nil {
+		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", userID)
+		user = &slack.Profile{} // Fallback: empty user.
+	}
+
+	workspace, repo, branch := destinationDetails(pr)
+	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, user.RealName, paths)
+	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, paths)
+
+	if owner+highRisk > 0 {
+		sb.WriteString("\n          ◦   ")
+	}
+	if owner > 0 {
+		sb.WriteString(fmt.Sprintf("Code owner of `%d` file", owner))
+		if owner > 1 {
+			sb.WriteString("s")
+		}
+		if highRisk > 0 {
+			sb.WriteString(", h")
+		}
+	}
+	if highRisk > 0 {
+		if owner == 0 {
+			sb.WriteString("H")
+		}
+		sb.WriteString(fmt.Sprintf("igh risk: `%d` file", highRisk))
+		if highRisk > 1 {
+			sb.WriteString("s")
+		}
+	}
 
 	return sb.String()
 }
@@ -223,4 +262,38 @@ func approvals(ctx workflow.Context, pr map[string]any) (int, string) {
 	}
 
 	return count, names.String()
+}
+
+func destinationDetails(pr map[string]any) (workspace, repo, branch string) {
+	branch = "dev" // Default branch.
+
+	// Workspace and repo slug.
+	dest, ok := pr["destination"].(map[string]any)
+	if !ok {
+		return
+	}
+	m, ok := dest["repository"].(map[string]any)
+	if !ok {
+		return
+	}
+	fullName, ok := m["full_name"].(string)
+	if !ok {
+		return
+	}
+	workspace, repo, ok = strings.Cut(fullName, "/")
+	if !ok {
+		return
+	}
+
+	// Branch name.
+	m, ok = dest["branch"].(map[string]any)
+	if !ok {
+		return
+	}
+	branch, ok = m["name"].(string)
+	if !ok {
+		branch = "dev"
+	}
+
+	return
 }

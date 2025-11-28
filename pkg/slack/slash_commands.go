@@ -379,7 +379,7 @@ func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	msg.WriteString(":eyes: These PRs currently require your attention:")
 	slices.Sort(prs)
 	for _, url := range prs {
-		msg.WriteString(prDetails(ctx, url))
+		msg.WriteString(prDetails(ctx, url, event.UserID))
 	}
 
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())

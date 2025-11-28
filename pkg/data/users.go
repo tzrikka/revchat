@@ -28,6 +28,10 @@ type User struct {
 	BitbucketID string `json:"bitbucket_id,omitempty"`
 	GitHubID    string `json:"github_id,omitempty"`
 	SlackID     string `json:"slack_id,omitempty"`
+
+	RealName  string `json:"real_name,omitempty"`
+	SlackName string `json:"slack_name,omitempty"`
+
 	ThrippyLink string `json:"thrippy_link,omitempty"`
 }
 

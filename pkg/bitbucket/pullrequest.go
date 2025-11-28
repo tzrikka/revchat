@@ -11,6 +11,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -307,6 +308,7 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 			log.Error(ctx, "failed to remove user from Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
 		}
 		msg += "approved this PR. :+1:"
+
 	case "unapproved":
 		if err := data.AddReviewerToPR(url, email); err != nil {
 			log.Error(ctx, "failed to add user back to Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
@@ -315,20 +317,39 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
 		}
 		msg += "unapproved this PR. :-1:"
+
 	case "changes_request_created":
 		if err := data.SwitchTurn(url, email); err != nil {
 			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
 		}
 		msg += "requested changes in this PR. :warning:"
 
-	// Ignored event type.
 	case "changes_request_removed":
+		return nil // Ignored event type.
 
 	default:
 		log.Error(ctx, "unrecognized Bitbucket PR review event type", "event_type", event.Type)
+		return nil
 	}
 
-	return mentionUserInMsg(ctx, channelID, event.Actor, msg)
+	err := mentionUserInMsg(ctx, channelID, event.Actor, msg)
+
+	// Other than announcing this specific event, also announce if the PR is ready to be merged
+	// (all builds are successful, the PR has at least 2 approvals, and from all code owners).
+	if event.Type != "approved" || !allBuildsSuccessful(url) {
+		return err
+	}
+	workspace, repo, ok := strings.Cut(event.PullRequest.Destination.Repository.FullName, "/")
+	if !ok {
+		return err
+	}
+	if !files.GotAllRequiredApprovals(ctx, workspace, repo, event.PullRequest.Destination.Branch.Name) {
+		return err
+	}
+
+	log.Info(ctx, "Bitbucket PR is ready to be merged", "pr_url", url)
+	_, err = slack.PostMessage(ctx, channelID, "This PR is ready to be merged! :tada:")
+	return err
 }
 
 func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
