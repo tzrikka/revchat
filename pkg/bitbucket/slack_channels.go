@@ -41,7 +41,7 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 
 	// Wait for a few seconds to handle other asynchronous events
 	// (e.g. a PR closure comment) before archiving the channel.
-	_ = workflow.Sleep(ctx, 5*time.Second)
+	_ = workflow.Sleep(ctx, 3*time.Second)
 
 	state := "closed this PR"
 	if event.Type == "fulfilled" {
