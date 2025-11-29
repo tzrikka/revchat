@@ -151,6 +151,9 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	}
 	if draft, ok := pr["draft"].(bool); ok && draft {
 		title = strings.Replace(title, "•  ", "•  :construction: ", 1)
+		if !strings.Contains(strings.ToLower(title), "draft") {
+			title += " (draft)"
+		}
 	}
 	sb.WriteString(title)
 
@@ -179,14 +182,7 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 		sb.WriteString(b)
 	}
 
-	count, names := approvals(ctx, pr)
-	if count > 0 {
-		sb.WriteString(fmt.Sprintf("\n          ◦   Approvals: %d (%s)", count, names))
-	}
-
 	// User-specific details.
-	// sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
-
 	paths := data.ReadBitbucketDiffstatPaths(url)
 	if len(paths) == 0 {
 		return sb.String()
@@ -201,12 +197,13 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	workspace, repo, branch := destinationDetails(pr)
 	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, user.RealName, paths)
 	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, paths)
+	approvals, names := approvers(ctx, pr)
 
-	if owner+highRisk > 0 {
+	if owner+highRisk+approvals > 0 {
 		sb.WriteString("\n          ◦   ")
 	}
 	if owner > 0 {
-		sb.WriteString(fmt.Sprintf("Code owner of `%d` file", owner))
+		sb.WriteString(fmt.Sprintf("Code owner: *%d* file", owner))
 		if owner > 1 {
 			sb.WriteString("s")
 		}
@@ -218,16 +215,26 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 		if owner == 0 {
 			sb.WriteString("H")
 		}
-		sb.WriteString(fmt.Sprintf("igh risk: `%d` file", highRisk))
+		sb.WriteString(fmt.Sprintf("igh risk: *%d* file", highRisk))
 		if highRisk > 1 {
 			sb.WriteString("s")
 		}
 	}
+	if approvals > 0 {
+		if owner+highRisk > 0 {
+			sb.WriteString(", a")
+		} else {
+			sb.WriteString("A")
+		}
+		sb.WriteString(fmt.Sprintf("pprovals: *%d* (%s)", approvals, names))
+	}
+
+	// sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
 
 	return sb.String()
 }
 
-func approvals(ctx workflow.Context, pr map[string]any) (int, string) {
+func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
 	participants, ok := pr["participants"].([]any)
 	if !ok {
 		return 0, ""
@@ -255,7 +262,7 @@ func approvals(ctx workflow.Context, pr map[string]any) (int, string) {
 			continue
 		}
 		if count > 1 {
-			names.WriteString(" ")
+			names.WriteString(", ")
 		}
 
 		names.WriteString(users.BitbucketToSlackRef(ctx, accountID, ""))
