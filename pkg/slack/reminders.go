@@ -16,7 +16,6 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/users"
-	"github.com/tzrikka/timpani-api/pkg/slack"
 	"github.com/tzrikka/xdg"
 )
 
@@ -188,14 +187,8 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 		return sb.String()
 	}
 
-	user, err := slack.UsersProfileGet(ctx, userID)
-	if err != nil {
-		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", userID)
-		user = &slack.Profile{} // Fallback: empty user.
-	}
-
 	workspace, repo, branch := destinationDetails(pr)
-	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, user.RealName, paths)
+	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, users.SlackIDToRealName(ctx, userID), paths)
 	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, paths)
 	approvals, names := approvers(ctx, pr)
 

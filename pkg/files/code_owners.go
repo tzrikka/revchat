@@ -23,6 +23,10 @@ type CodeOwners struct {
 // CountOwnedFiles counts how many of the given file paths are owned by the specified
 // user, according to the "CODEOWNERS" file in the given branch (a PR's destination).
 func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, userName string, paths []string) int {
+	if userName == "" {
+		return 0
+	}
+
 	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, "CODEOWNERS"), true)
 	if c == nil {
 		return 0

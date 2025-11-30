@@ -51,7 +51,7 @@ var (
 	usersMutex sync.Mutex
 )
 
-func UpsertUser(email, bitbucketID, githubID, slackID, thrippyLink string) error {
+func UpsertUser(email, bitbucketID, githubID, slackID, realName, slackName, thrippyLink string) error {
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
 
@@ -94,6 +94,12 @@ func UpsertUser(email, bitbucketID, githubID, slackID, thrippyLink string) error
 	if slackID != "" {
 		usersDB.entries[i].SlackID = slackID
 		usersDB.slackIndex[slackID] = i
+	}
+	if realName != "" {
+		usersDB.entries[i].RealName = realName
+	}
+	if slackName != "" {
+		usersDB.entries[i].SlackName = slackName
 	}
 	if thrippyLink != "" {
 		if thrippyLink == "X" {

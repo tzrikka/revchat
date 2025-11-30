@@ -474,7 +474,7 @@ func beautifyInlineComment(ctx workflow.Context, event PullRequestEvent, msg, ra
 	if suggestion != "" {
 		suggestion += "\n"
 	}
-	msg = strings.Replace(msg, fmt.Sprintf("```suggestion\n%s", suggestion), "```\n"+string(diff), 1)
+	msg = strings.Replace(msg, "```suggestion\n"+suggestion, "```\n"+string(diff), 1)
 
 	return msg, diff
 }
