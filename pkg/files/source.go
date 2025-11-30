@@ -1,13 +1,22 @@
 package files
 
 import (
+	"fmt"
+
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
+var cache map[string]string
+
 func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, commit, path string) string {
+	key := fmt.Sprintf("%s/%s/%s/%s", workspace, repo, commit, path)
+	if file, ok := cache[key]; ok {
+		return file
+	}
+
 	file, err := bitbucket.SourceGetFile(ctx, bitbucket.SourceGetRequest{
 		Workspace: workspace,
 		RepoSlug:  repo,
@@ -20,5 +29,6 @@ func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, commit, path 
 		return ""
 	}
 
+	cache[key] = file
 	return file
 }
