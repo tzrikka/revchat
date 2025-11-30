@@ -24,7 +24,7 @@ const (
 var (
 	bitbucketURLPattern = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
 	remindersPattern    = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
-	userCommandsPattern = regexp.MustCompile(`^(invite|nudge|ping|poke|set turn to)`)
+	userCommandsPattern = regexp.MustCompile(`^(cc|uncc|invite|nudge|ping|poke|set turn to)`)
 	userIDsPattern      = regexp.MustCompile(`<@(\w+)(\|[^>]*)?>`)
 )
 
@@ -60,6 +60,10 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 	}
 	if cmd := userCommandsPattern.FindStringSubmatch(event.Text); cmd != nil {
 		switch cmd[1] {
+		case "cc":
+			return ccSlashCommand(ctx, event)
+		case "uncc":
+			return unccSlashCommand(ctx, event)
 		case "invite":
 			return inviteSlashCommand(ctx, event)
 		case "nudge", "ping", "poke":
@@ -107,6 +111,46 @@ func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent) ([]s
 	return ids, make(map[string]bool, len(ids))
 }
 
+func ccSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	// Ensure that the calling user is opted-in, i.e. authorized us & can join PR channels.
+	_, optedIn, err := userDetails(ctx, event, event.UserID)
+	if err != nil {
+		return nil // Not a *server* error as far as we're concerned.
+	}
+	if !optedIn {
+		postEphemeralError(ctx, event, "you need to opt-in first.")
+		return nil // Not a *server* error as far as we're concerned.
+	}
+
+	PostEphemeralMessage(ctx, event.ChannelID, event.UserID, event.Command)
+
+	users, _ := extractAtLeastOneUserID(ctx, event)
+	if len(users) == 0 {
+		return nil // Not a *server* error as far as we're concerned.
+	}
+
+	for _, userID := range users {
+		_, optedIn, err := userDetails(ctx, event, userID)
+		if err != nil {
+			continue
+		}
+		if !optedIn {
+			postEphemeralError(ctx, event, fmt.Sprintf("<@%s> isn't opted-in yet.", userID))
+			continue
+		}
+
+		PostEphemeralMessage(ctx, event.ChannelID, event.UserID, userID)
+	}
+
+	postEphemeralError(ctx, event, "this command is not implemented yet.")
+	return nil
+}
+
+func unccSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	postEphemeralError(ctx, event, "this command is not implemented yet.")
+	return nil
+}
+
 func inviteSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	users, sent := extractAtLeastOneUserID(ctx, event)
 	if len(users) == 0 {
@@ -119,16 +163,12 @@ func inviteSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 			continue
 		}
 
-		user, err := data.SelectUserBySlackID(userID)
-		if err != nil {
-			log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
-			postEphemeralError(ctx, event, fmt.Sprintf("failed to read internal data about <@%s>.", userID))
-			continue
-		}
-
-		if data.IsOptedIn(user) {
+		_, optedIn, err := userDetails(ctx, event, userID)
+		if optedIn {
 			msg := fmt.Sprintf(":bell: <@%s> is already opted-in.", userID)
 			_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+		}
+		if err != nil || optedIn {
 			continue
 		}
 
@@ -181,14 +221,11 @@ func nudgeSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 
 // checkUserBeforeNudging ensures that the user exists, is opted-in, and is a reviewer of the PR.
 func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, userID string) bool {
-	user, err := data.SelectUserBySlackID(userID)
+	user, optedIn, err := userDetails(ctx, event, userID)
 	if err != nil {
-		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
-		postEphemeralError(ctx, event, fmt.Sprintf("failed to read internal data about <@%s>.", userID))
 		return false
 	}
-
-	if !data.IsOptedIn(user) {
+	if !optedIn {
 		msg := fmt.Sprintf(":no_bell: <@%s> is not opted-in to use RevChat.", userID)
 		_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 		return false
@@ -208,14 +245,11 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 }
 
 func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	user, err := data.SelectUserBySlackID(event.UserID)
+	user, optedIn, err := userDetails(ctx, event, event.UserID)
 	if err != nil {
-		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", event.UserID)
-		postEphemeralError(ctx, event, "failed to read internal data about you.")
 		return err
 	}
-
-	if data.IsOptedIn(user) {
+	if optedIn {
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":bell: You're already opted in.")
 	}
 
@@ -280,14 +314,11 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 }
 
 func (c *Config) optOutSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	user, err := data.SelectUserBySlackID(event.UserID)
+	user, optedIn, err := userDetails(ctx, event, event.UserID)
 	if err != nil {
-		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", event.UserID)
-		postEphemeralError(ctx, event, "failed to read internal data about you.")
 		return err
 	}
-
-	if !data.IsOptedIn(user) {
+	if !optedIn {
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
@@ -623,6 +654,17 @@ func updateChannelSlashCommand(ctx workflow.Context, event SlashCommandEvent) er
 	log.Warn(ctx, "this slash command is not implemented yet")
 	postEphemeralError(ctx, event, "this command is not implemented yet.")
 	return nil
+}
+
+func userDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (data.User, bool, error) {
+	user, err := data.SelectUserBySlackID(userID)
+	if err != nil {
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
+		postEphemeralError(ctx, event, fmt.Sprintf("failed to read internal data about <@%s>.", userID))
+		return data.User{}, false, err
+	}
+
+	return user, data.IsOptedIn(user), nil
 }
 
 // prDetailsFromChannel extracts the PR details based on the Slack channel's ID.
