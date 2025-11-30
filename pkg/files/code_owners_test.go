@@ -110,6 +110,187 @@ func TestParseCodeOwnersFile(t *testing.T) {
 	}
 }
 
+func TestCodeOwnersAllApproved(t *testing.T) {
+	tests := []struct {
+		name      string
+		co        *CodeOwners
+		approvers []string
+		owners    []string
+		want      bool
+	}{
+		{
+			name:      "zero_owners_nonzero_approvers",
+			co:        &CodeOwners{},
+			approvers: []string{"user1", "user2"},
+			owners:    []string{},
+			want:      true,
+		},
+		{
+			name:      "single_owner_approved_individual",
+			co:        &CodeOwners{},
+			approvers: []string{"user1", "user2"},
+			owners:    []string{"user1"},
+			want:      true,
+		},
+		{
+			name: "single_owner_approved_partial_group",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+			}},
+			approvers: []string{"user1"},
+			owners:    []string{"@GroupA"},
+			want:      true,
+		},
+		{
+			name: "single_owner_approved_entire_group",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+			}},
+			approvers: []string{"user1", "user2"},
+			owners:    []string{"@GroupA"},
+			want:      true,
+		},
+		{
+			name:      "single_owner_not_approved_individual",
+			co:        &CodeOwners{},
+			approvers: []string{"user1", "user2"},
+			owners:    []string{"user3"},
+			want:      false,
+		},
+		{
+			name: "single_owner_not_approved_entire_group",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+			}},
+			approvers: []string{"user3", "user4"},
+			owners:    []string{"@GroupA"},
+			want:      false,
+		},
+		{
+			name:      "multiple_owners_all_approved_individuals",
+			co:        &CodeOwners{},
+			approvers: []string{"user1", "user2", "user3"},
+			owners:    []string{"user1", "user2"},
+			want:      true,
+		},
+		{
+			name: "multiple_owners_all_approved_partial_groups_1",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+				"@GroupB": {"user2", "user3"},
+			}},
+			approvers: []string{"user1", "user2"},
+			owners:    []string{"@GroupA", "@GroupB"},
+			want:      true,
+		},
+		{
+			name: "multiple_owners_all_approved_partial_groups_2",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+				"@GroupB": {"user3", "user4"},
+			}},
+			approvers: []string{"user1", "user2", "user3"},
+			owners:    []string{"@GroupA", "@GroupB"},
+			want:      true,
+		},
+		{
+			name: "multiple_owners_all_approved_entire_groups",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+				"@GroupB": {"user3", "user4"},
+			}},
+			approvers: []string{"user1", "user2", "user3", "user4"},
+			owners:    []string{"@GroupA", "@GroupB"},
+			want:      true,
+		},
+		{
+			name:      "multiple_owners_some_approved_individuals",
+			co:        &CodeOwners{},
+			approvers: []string{"user1", "user2"},
+			owners:    []string{"user2", "user3"},
+			want:      false,
+		},
+		{
+			name: "multiple_owners_some_approved_partial_groups_1",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+				"@GroupB": {"user3", "user4"},
+			}},
+			approvers: []string{"user1", "user3"},
+			owners:    []string{"@GroupA", "@GroupB"},
+			want:      true,
+		},
+		{
+			name: "multiple_owners_some_approved_partial_groups_2",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+				"@GroupB": {"user3", "user4"},
+			}},
+			approvers: []string{"user1", "user2", "user3"},
+			owners:    []string{"@GroupA", "@GroupB"},
+			want:      true,
+		},
+		{
+			name: "multiple_owners_some_approved_partial_groups_3",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+				"@GroupB": {"user3", "user4"},
+			}},
+			approvers: []string{"user1", "user2"},
+			owners:    []string{"@GroupA", "@GroupB"},
+			want:      false,
+		},
+		{
+			name:      "multiple_owners_none_approved_individuals",
+			co:        &CodeOwners{},
+			approvers: []string{"user1", "user2"},
+			owners:    []string{"user3", "user4"},
+			want:      false,
+		},
+		{
+			name: "multiple_owners_none_approved_groups",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA": {"user1", "user2"},
+				"@GroupB": {"user3", "user4"},
+			}},
+			approvers: []string{"user5", "user6"},
+			owners:    []string{"@GroupA", "@GroupB"},
+			want:      false,
+		},
+		{
+			name: "single_top_level_approval",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA":         {"user1", "user2"},
+				"@GroupB":         {"user3", "user4"},
+				"@FallbackOwners": {"user5", "user6"},
+			}},
+			approvers: []string{"user5"},
+			owners:    []string{"@GroupA", "@GroupB", "user7", "user8"},
+			want:      true,
+		},
+		{
+			name: "all_top_level_approval",
+			co: &CodeOwners{Groups: map[string][]string{
+				"@GroupA":         {"user1", "user2"},
+				"@GroupB":         {"user3", "user4"},
+				"@FallbackOwners": {"user5", "user6"},
+			}},
+			approvers: []string{"user5", "user6"},
+			owners:    []string{"@GroupA", "@GroupB", "user7", "user8"},
+			want:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.co.allApproved(nil, tt.approvers, tt.owners, true)
+			if got != tt.want {
+				t.Errorf("allApproved() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCodeOwnersGetOwners(t *testing.T) {
 	tests := []struct {
 		name    string

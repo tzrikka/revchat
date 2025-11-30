@@ -51,13 +51,30 @@ func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, userName str
 	return count
 }
 
-func GotAllRequiredApprovals(ctx workflow.Context, workspace, repo, branch string) bool {
+// GotAllRequiredApprovals checks whether all required approvals are present for the given
+// file paths, according to the "CODEOWNERS" file in the given branch (a PR's destination).
+func GotAllRequiredApprovals(ctx workflow.Context, workspace, repo, branch string, paths, approvers []string) bool {
+	if len(paths) == 0 {
+		return false
+	}
+
 	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, "CODEOWNERS"), true)
 	if c == nil {
 		return false
 	}
 
-	return false
+	for _, p := range paths {
+		owners, err := c.getOwners(p)
+		if err != nil {
+			log.Error(ctx, "failed to check CODEOWNERS path pattern", "file_path", p, "error", err)
+			return false
+		}
+		if !c.allApproved(ctx, approvers, owners, true) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func parseCodeOwnersFile(ctx workflow.Context, fileContent string, flatten bool) *CodeOwners {
@@ -191,6 +208,38 @@ func (c *CodeOwners) expandMember(ctx workflow.Context, name string) ([]string, 
 	c.Groups[name] = expanded // Memoization for nested groups.
 
 	return expanded, len(expanded)
+}
+
+func (c *CodeOwners) allApproved(ctx workflow.Context, approvers, owners []string, needAll bool) bool {
+	if specialOwners, found := c.Groups["@FallbackOwners"]; needAll && found {
+		if c.allApproved(ctx, approvers, specialOwners, false) {
+			return true
+		}
+	}
+
+	approvals := 0
+	for _, name := range owners {
+		// Approvals from individual owners.
+		if !strings.HasPrefix(name, "@") {
+			if slices.Contains(approvers, name) {
+				approvals++
+			}
+			continue
+		}
+
+		// Approvals from (at least one individual user in each) CODEOWNERS group.
+		members, found := c.Groups[name]
+		if !found {
+			log.Error(ctx, "group not found in CODEOWNERS", "group_name", name)
+			return false
+		}
+
+		if c.allApproved(ctx, approvers, members, false) {
+			approvals++
+		}
+	}
+
+	return (needAll && approvals == len(owners)) || (!needAll && approvals > 0)
 }
 
 func (c *CodeOwners) getOwners(filePath string) ([]string, error) {

@@ -298,7 +298,8 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 
 	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
-	url := event.PullRequest.Links["html"].HRef
+	pr := event.PullRequest
+	url := pr.Links["html"].HRef
 	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
 	msg := "%s "
 
@@ -339,17 +340,32 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	if event.Type != "approved" || !allBuildsSuccessful(url) {
 		return err
 	}
-	workspace, repo, ok := strings.Cut(event.PullRequest.Destination.Repository.FullName, "/")
+	workspace, repo, ok := strings.Cut(pr.Destination.Repository.FullName, "/")
 	if !ok {
 		return err
 	}
-	if !files.GotAllRequiredApprovals(ctx, workspace, repo, event.PullRequest.Destination.Branch.Name) {
+	paths := data.ReadBitbucketDiffstatPaths(url)
+	approvers := extractApprovers(ctx, pr.Participants)
+	if !files.GotAllRequiredApprovals(ctx, workspace, repo, pr.Destination.Branch.Name, paths, approvers) {
 		return err
 	}
 
 	log.Info(ctx, "Bitbucket PR is ready to be merged", "pr_url", url)
 	_, err = slack.PostMessage(ctx, channelID, "This PR is ready to be merged! :tada:")
 	return err
+}
+
+func extractApprovers(ctx workflow.Context, participants []Participant) []string {
+	var approvers []string
+	for _, p := range participants {
+		if p.Approved {
+			user := users.SlackIDToRealName(ctx, users.BitbucketToSlackID(ctx, p.User.AccountID, false))
+			if user != "" {
+				approvers = append(approvers, user)
+			}
+		}
+	}
+	return approvers
 }
 
 func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {

@@ -70,7 +70,9 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	if !ok {
 		return err
 	}
-	if !files.GotAllRequiredApprovals(ctx, workspace, repo, pr.Destination.Branch.Name) {
+	paths := data.ReadBitbucketDiffstatPaths(url)
+	approvers := extractApprovers(ctx, pr.Participants)
+	if !files.GotAllRequiredApprovals(ctx, workspace, repo, pr.Destination.Branch.Name, paths, approvers) {
 		return err
 	}
 
