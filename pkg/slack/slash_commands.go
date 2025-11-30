@@ -25,7 +25,8 @@ var (
 	bitbucketURLPattern = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
 	remindersPattern    = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
 	userCommandsPattern = regexp.MustCompile(`^(cc|uncc|invite|nudge|ping|poke|set turn to)`)
-	userIDsPattern      = regexp.MustCompile(`<@(\w+)(\|[^>]*)?>`)
+	userIDsPattern      = regexp.MustCompile(`<(@)(\w+)(\|[^>]*)?>`)
+	userOrTeamIDPattern = regexp.MustCompile(`<(@|!subteam^)(\w+)(\|[^>]*)?>`)
 )
 
 // https://docs.slack.dev/interactivity/implementing-slash-commands#app_command_handling
@@ -95,8 +96,8 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
-func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent) ([]string, map[string]bool) {
-	matches := userIDsPattern.FindAllStringSubmatch(event.Text, -1)
+func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent, pattern *regexp.Regexp) ([]string, map[string]bool) {
+	matches := pattern.FindAllStringSubmatch(event.Text, -1)
 	if len(matches) == 0 {
 		postEphemeralError(ctx, event, "you need to mention at least one `@user`.")
 		return nil, nil
@@ -104,7 +105,7 @@ func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent) ([]s
 
 	var ids []string
 	for _, match := range matches {
-		ids = append(ids, strings.ToUpper(match[1]))
+		ids = append(ids, strings.ToUpper(match[2]))
 	}
 
 	// The returned map is intentionally empty - the caller is responsible for populating it.
@@ -122,14 +123,8 @@ func ccSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a *server* error as far as we're concerned.
 	}
 
-	PostEphemeralMessage(ctx, event.ChannelID, event.UserID, event.Command)
-
-	users, _ := extractAtLeastOneUserID(ctx, event)
-	if len(users) == 0 {
-		return nil // Not a *server* error as far as we're concerned.
-	}
-
-	for _, userID := range users {
+	users, _ := extractAtLeastOneUserID(ctx, event, userOrTeamIDPattern)
+	for _, userID := range expandSubteams(ctx, users) {
 		_, optedIn, err := userDetails(ctx, event, userID)
 		if err != nil {
 			continue
@@ -138,11 +133,8 @@ func ccSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 			postEphemeralError(ctx, event, fmt.Sprintf("<@%s> isn't opted-in yet.", userID))
 			continue
 		}
-
-		PostEphemeralMessage(ctx, event.ChannelID, event.UserID, userID)
 	}
 
-	postEphemeralError(ctx, event, "this command is not implemented yet.")
 	return nil
 }
 
@@ -151,8 +143,24 @@ func unccSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	return nil
 }
 
+func expandSubteams(_ workflow.Context, ids []string) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	expanded := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if !strings.HasPrefix(id, "S") {
+			expanded = append(expanded, id)
+			continue
+		}
+	}
+
+	return expanded
+}
+
 func inviteSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	users, sent := extractAtLeastOneUserID(ctx, event)
+	users, sent := extractAtLeastOneUserID(ctx, event, userIDsPattern)
 	if len(users) == 0 {
 		return nil // Not a *server* error as far as we're concerned.
 	}
@@ -193,7 +201,7 @@ func nudgeSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a *server* error as far as we're concerned.
 	}
 
-	users, sent := extractAtLeastOneUserID(ctx, event)
+	users, sent := extractAtLeastOneUserID(ctx, event, userIDsPattern)
 	if len(users) == 0 {
 		return nil // Not a *server* error as far as we're concerned.
 	}
@@ -521,7 +529,7 @@ func setTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a *server* error as far as we're concerned.
 	}
 
-	users, _ := extractAtLeastOneUserID(ctx, event)
+	users, _ := extractAtLeastOneUserID(ctx, event, userIDsPattern)
 	if len(users) == 0 {
 		return nil // Not a *server* error as far as we're concerned.
 	}
