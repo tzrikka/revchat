@@ -249,12 +249,12 @@ func postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequ
 	}
 
 	url := pr.Links["html"].HRef
-	msg := fmt.Sprintf("%%s %s %s: `%s`", action, url, pr.Title)
+	msg := fmt.Sprintf("%s %s: `%s`", action, url, pr.Title)
 	if text := strings.TrimSpace(pr.Description); text != "" {
 		msg += "\n\n" + markdown.BitbucketToSlack(ctx, text, url)
 	}
 
-	_ = mentionUserInMsg(ctx, channelID, actor, msg)
+	_ = mentionUserInMsg(ctx, channelID, actor, "%s "+msg)
 }
 
 var linkifyPattern = regexp.MustCompile(`[A-Z]+-\d+`)

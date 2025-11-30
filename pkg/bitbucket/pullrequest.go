@@ -123,7 +123,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		}
 		cmts = cmts[prevCount:]
 
-		msg := fmt.Sprintf("%%s pushed <%s/commits|%d commit", url, len(cmts))
+		msg := fmt.Sprintf("pushed <%s/commits|%d commit", url, len(cmts))
 		if len(cmts) != 1 {
 			msg += "s"
 		}
@@ -133,7 +133,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			title, _, _ := strings.Cut(c.Message, "\n")
 			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title)
 		}
-		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
 	}
 
 	// Retargeted destination branch.
@@ -141,9 +141,9 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	newBranch := event.PullRequest.Destination.Branch.Name
 	if oldBranch != newBranch {
 		repoURL := event.Repository.Links["html"].HRef
-		msg := "%%s changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
+		msg := "changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
-		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		err = mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
 	}
 
 	return err

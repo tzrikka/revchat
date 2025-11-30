@@ -13,6 +13,14 @@ import (
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
+// No need for thread safety, this should only be set once per process, and even
+// if multiple workflows set it concurrently, the value will be the same anyway.
+var workspaceURL = ""
+
+func mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) error {
+	return mentionUserInReply(ctx, channelID, "", user, msg)
+}
+
 func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
 	ids, err := data.SwitchURLAndID(parentURL)
 	if err != nil {
@@ -26,18 +34,31 @@ func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Accoun
 		return nil
 	}
 
-	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName))
-	_, err = slack.PostReply(ctx, id[0], id[1], msg)
-	return err
-}
-
-func mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) error {
-	return mentionUserInReply(ctx, channelID, "", user, msg)
+	return mentionUserInReply(ctx, id[0], id[1], user, msg)
 }
 
 func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) error {
-	msg = fmt.Sprintf(msg, users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName))
-	_, err := slack.PostReply(ctx, channelID, threadTS, msg)
+	// We don't want to use a Slack mention here, because that would spam the user in
+	// Slack with a narration of their own actions. So we just write their name instead
+	// of "users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName)".
+	slackUserID := users.BitbucketToSlackID(ctx, user.AccountID, false)
+	displayName := users.SlackIDToDisplayName(ctx, slackUserID)
+	if displayName == "" {
+		displayName = user.DisplayName
+	}
+
+	if workspaceURL == "" {
+		if resp, err := tslack.AuthTest(ctx); err == nil {
+			workspaceURL = resp.URL
+		}
+	}
+
+	// And if possible convert it into a profile link that LOOKS like a mention.
+	if workspaceURL != "" && slackUserID != "" {
+		displayName = fmt.Sprintf("<%s/team/%s|%s>", workspaceURL, slackUserID, displayName)
+	}
+
+	_, err := slack.PostReply(ctx, channelID, threadTS, fmt.Sprintf(msg, displayName))
 	return err
 }
 

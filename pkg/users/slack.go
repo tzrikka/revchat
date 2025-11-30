@@ -96,6 +96,40 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 	return realName
 }
 
+// SlackIDToDisplayName retrieves a Slack user's display name based on their ID.
+// This function uses data caching, and API calls as a fallback.
+func SlackIDToDisplayName(ctx workflow.Context, userID string) string {
+	user, err := data.SelectUserBySlackID(userID)
+	if err != nil {
+		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
+		// Don't abort - try to use the Slack API as a fallback.
+	}
+	if user.SlackName != "" {
+		return "@" + user.SlackName
+	}
+
+	info, err := slack.UsersInfo(ctx, userID)
+	if err != nil {
+		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", userID)
+		return ""
+	}
+
+	email := info.Profile.Email
+	if info.IsBot {
+		email = "bot"
+	}
+
+	displayName := info.Profile.DisplayName
+	if err := data.UpsertUser(email, "", "", userID, info.RealName, displayName, ""); err != nil {
+		log.Error(ctx, "failed to save Slack user details", "error", err, "user_id", userID, "disp_name", displayName)
+	}
+
+	if displayName != "" {
+		displayName = "@" + displayName
+	}
+	return displayName
+}
+
 // EmailToSlackID retrieves a Slack user's ID based on their email address.
 // This function uses data caching, and API calls as a fallback.
 func EmailToSlackID(ctx workflow.Context, email string) string {
