@@ -313,7 +313,7 @@ func buildURL(ctx workflow.Context, base, id string) string {
 	return u
 }
 
-// prParticipants returns a list of opted-in Slack user IDs (author/participants/reviewers).
+// prParticipants returns a list of opted-in Slack user IDs (author/participants/reviewers/followers).
 // The output is guaranteed to be sorted, without teams/apps, and without repetitions.
 func prParticipants(ctx workflow.Context, pr PullRequest) []string {
 	accounts := append([]Account{pr.Author}, pr.Reviewers...)
@@ -321,20 +321,24 @@ func prParticipants(ctx workflow.Context, pr PullRequest) []string {
 		accounts = append(accounts, p.User)
 	}
 
-	accountIDs := []string{}
+	accountIDs := make([]string, 0, len(accounts))
 	for _, a := range accounts {
 		if a.Type == "user" {
 			accountIDs = append(accountIDs, a.AccountID)
 		}
 	}
 
-	slackIDs := []string{}
+	slackIDs := make([]string, 0, len(accountIDs))
 	for _, aid := range accountIDs {
 		// True = don't include opted-out users. They will still be mentioned
 		// in the channel, but as non-members they won't be notified about it.
 		if sid := users.BitbucketToSlackID(ctx, aid, true); sid != "" {
 			slackIDs = append(slackIDs, sid)
 		}
+	}
+
+	if user, err := data.SelectUserByBitbucketID(pr.Author.AccountID); err == nil {
+		slackIDs = append(slackIDs, user.Followers...)
 	}
 
 	slices.Sort(slackIDs)

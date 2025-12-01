@@ -33,6 +33,9 @@ type User struct {
 	SlackName string `json:"slack_name,omitempty"`
 
 	ThrippyLink string `json:"thrippy_link,omitempty"`
+
+	// Slack user IDs, controlled by the un/follow slash commands, used when creating channels.
+	Followers []string `json:"followers,omitempty"`
 }
 
 // Users is an indexed copy of a collection of [User] entries.
