@@ -24,9 +24,9 @@ const (
 var (
 	bitbucketURLPattern = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
 	remindersPattern    = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
-	userCommandsPattern = regexp.MustCompile(`^(cc|uncc|invite|nudge|ping|poke|set turn to)`)
+	userCommandsPattern = regexp.MustCompile(`^(follow|unfollow|invite|nudge|ping|poke|set turn to)`)
 	userIDsPattern      = regexp.MustCompile(`<(@)(\w+)(\|[^>]*)?>`)
-	userOrTeamIDPattern = regexp.MustCompile(`<(@|!subteam^)(\w+)(\|[^>]*)?>`)
+	userOrTeamIDPattern = regexp.MustCompile(`<(@|!subteam\^)(\w+)(\|[^>]*)?>`)
 )
 
 // https://docs.slack.dev/interactivity/implementing-slash-commands#app_command_handling
@@ -61,10 +61,10 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 	}
 	if cmd := userCommandsPattern.FindStringSubmatch(event.Text); cmd != nil {
 		switch cmd[1] {
-		case "cc":
-			return ccSlashCommand(ctx, event)
-		case "uncc":
-			return unccSlashCommand(ctx, event)
+		case "follow":
+			return followSlashCommand(ctx, event)
+		case "unfollow":
+			return unfollowSlashCommand(ctx, event)
 		case "invite":
 			return inviteSlashCommand(ctx, event)
 		case "nudge", "ping", "poke":
@@ -112,8 +112,8 @@ func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent, patt
 	return ids, make(map[string]bool, len(ids))
 }
 
-func ccSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	// Ensure that the calling user is opted-in, i.e. authorized us & can join PR channels.
+func followSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	// Ensure that the calling user is opted-in, i.e. authorized us & allowed to join PR channels.
 	_, optedIn, err := userDetails(ctx, event, event.UserID)
 	if err != nil {
 		return nil // Not a *server* error as far as we're concerned.
@@ -138,7 +138,7 @@ func ccSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	return nil
 }
 
-func unccSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+func unfollowSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	postEphemeralError(ctx, event, "this command is not implemented yet.")
 	return nil
 }
