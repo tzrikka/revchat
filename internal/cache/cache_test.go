@@ -125,7 +125,7 @@ func TestCacheItemsCopy(t *testing.T) {
 
 	items1 := c.Items()
 	if len(items1) != 1 || items1[k].Value != v {
-		t.Fatalf("Cache.Item() did not find key: %s", k)
+		t.Fatalf("Cache.Items() did not find key: %s", k)
 	}
 
 	items1[k] = cache.Item{
@@ -135,7 +135,7 @@ func TestCacheItemsCopy(t *testing.T) {
 
 	items2 := c.Items()
 	if len(items2) != 1 || items2[k].Value != v {
-		t.Fatalf("Cache.Item() did not find key: %s", k)
+		t.Fatalf("Cache.Items() did not find key: %s", k)
 	}
 
 	if items2[k].Value != v {
