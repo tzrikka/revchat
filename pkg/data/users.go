@@ -126,19 +126,19 @@ func (u *Users) findUserIndex(email, bitbucketID, githubID, slackID string) (int
 	}
 	if bitbucketFound {
 		if i >= 0 && i != bitbucketIndex {
-			return -1, errors.New("conflicting entries")
+			return -1, errors.New("conflicting user entries")
 		}
 		i = bitbucketIndex
 	}
 	if githubFound {
 		if i >= 0 && i != githubIndex {
-			return -1, errors.New("conflicting entries")
+			return -1, errors.New("conflicting user entries")
 		}
 		i = githubIndex
 	}
 	if slackFound {
 		if i >= 0 && i != slackIndex {
-			return -1, errors.New("conflicting entries")
+			return -1, errors.New("conflicting user entries")
 		}
 		i = slackIndex
 	}
