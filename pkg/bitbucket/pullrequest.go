@@ -28,6 +28,12 @@ func prClosedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 }
 
 func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
+	if !found {
+		return nil
+	}
+
 	cmts := commits(ctx, event)
 	event.PullRequest.CommitCount = len(cmts)
 
@@ -37,10 +43,10 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		return err
 	}
 
-	// Support recovering lost channels and PR data.
-	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
-	if snapshot == nil || !found {
-		return c.initChannel(ctx, event)
+	// Support PR data recovery.
+	if snapshot == nil {
+		initPRData(ctx, event, channelID)
+		return nil
 	}
 
 	defer updateChannelBookmarks(ctx, event, channelID, snapshot)

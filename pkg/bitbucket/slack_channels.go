@@ -139,20 +139,13 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	prURL := pr.Links["html"].HRef
 	pr.CommitCount = len(commits(ctx, event))
 
-	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
-	if !found {
-		var err error
-		channelID, err = c.createChannel(ctx, pr)
-		if err != nil {
-			reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
-			return err
-		}
+	channelID, err := c.createChannel(ctx, pr)
+	if err != nil {
+		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
+		return err
 	}
 
 	initPRData(ctx, event, channelID)
-	if found {
-		return nil
-	}
 
 	// Channel cosmetics.
 	slack.SetChannelTopic(ctx, channelID, prURL)
@@ -163,7 +156,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 		_, _ = slack.PostMessage(ctx, channelID, msg)
 	}
 
-	err := slack.InviteUsersToChannel(ctx, channelID, prParticipants(ctx, pr))
+	err = slack.InviteUsersToChannel(ctx, channelID, prParticipants(ctx, pr))
 	if err != nil {
 		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
 		_ = tslack.ConversationsArchive(ctx, channelID)
