@@ -503,7 +503,7 @@ func notMyTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 
 	// If this is a no-op, inform the user.
 	if !slices.Contains(currentTurn, user.Email) {
-		msg := ":joy: I didn't think it's your turn anyway!\n\n" + whoseTurnText(ctx, currentTurn, user, " already")
+		msg := ":joy: I didn't think it's your turn anyway!\n\n" + whoseTurnText(ctx, currentTurn, user, "")
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
 
