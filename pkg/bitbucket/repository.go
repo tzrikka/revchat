@@ -12,7 +12,6 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/xdg"
 )
@@ -63,16 +62,16 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 
 	// Other than announcing this specific event, also announce if the PR is ready to be merged
 	// (all builds are successful, the PR has at least 2 approvals, and from all code owners).
-	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(url) {
+	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(url) || pr.TaskCount > 0 {
 		return err
 	}
-	workspace, repo, ok := strings.Cut(pr.Destination.Repository.FullName, "/")
-	if !ok {
-		return err
+	approvers := 0
+	for _, p := range pr.Participants {
+		if p.Approved {
+			approvers++
+		}
 	}
-	paths := data.ReadBitbucketDiffstatPaths(url)
-	approvers := extractApprovers(ctx, pr.Participants)
-	if !files.GotAllRequiredApprovals(ctx, workspace, repo, pr.Destination.Branch.Name, paths, approvers) {
+	if approvers < 2 {
 		return err
 	}
 
@@ -164,7 +163,7 @@ func prURL(pr map[string]any) string {
 
 func allBuildsSuccessful(url string) bool {
 	prStatus := data.ReadBitbucketBuilds(url)
-	if prStatus == nil || len(prStatus.Builds) == 0 {
+	if prStatus == nil || len(prStatus.Builds) < 2 {
 		return false
 	}
 

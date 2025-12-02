@@ -11,7 +11,6 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -343,35 +342,22 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 
 	// Other than announcing this specific event, also announce if the PR is ready to be merged
 	// (all builds are successful, the PR has at least 2 approvals, and from all code owners).
-	if event.Type != "approved" || !allBuildsSuccessful(url) {
+	if event.Type != "approved" || !allBuildsSuccessful(url) || pr.TaskCount > 0 {
 		return err
 	}
-	workspace, repo, ok := strings.Cut(pr.Destination.Repository.FullName, "/")
-	if !ok {
-		return err
+	approvers := 0
+	for _, p := range pr.Participants {
+		if p.Approved {
+			approvers++
+		}
 	}
-	paths := data.ReadBitbucketDiffstatPaths(url)
-	approvers := extractApprovers(ctx, pr.Participants)
-	if !files.GotAllRequiredApprovals(ctx, workspace, repo, pr.Destination.Branch.Name, paths, approvers) {
+	if approvers < 2 {
 		return err
 	}
 
 	log.Info(ctx, "Bitbucket PR is ready to be merged", "pr_url", url)
 	_, err = slack.PostMessage(ctx, channelID, "This PR is ready to be merged! :tada:")
 	return err
-}
-
-func extractApprovers(ctx workflow.Context, participants []Participant) []string {
-	var approvers []string
-	for _, p := range participants {
-		if p.Approved {
-			user := users.SlackIDToRealName(ctx, users.BitbucketToSlackID(ctx, p.User.AccountID, false))
-			if user != "" {
-				approvers = append(approvers, user)
-			}
-		}
-	}
-	return approvers
 }
 
 func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
