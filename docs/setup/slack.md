@@ -19,6 +19,7 @@ Detailed instructions: <https://github.com/tzrikka/thrippy/blob/main/docs/slack/
 - Chat
   - [chat:write](https://docs.slack.dev/reference/scopes/chat.write)
   - [chat:write.customize](https://docs.slack.dev/reference/scopes/chat.write.customize)
+  - Optional: [chat:write.public](https://docs.slack.dev/reference/scopes/chat.write.public) (to allow RevChat to respond to Slack slash commands in any public channel, even if it wasn't explicitly added to it)
 - [commands](https://docs.slack.dev/reference/scopes/commands)
 - Files
   - [files:read](https://docs.slack.dev/reference/scopes/files.read)
