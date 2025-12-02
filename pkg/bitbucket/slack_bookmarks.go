@@ -124,33 +124,33 @@ func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 		return
 	}
 
-	title := strings.Builder{}
-	title.WriteString("Builds: ")
+	var sb strings.Builder
+	sb.WriteString("Builds: ")
 	if len(results.Builds) == 0 {
-		title.WriteString("no results")
+		sb.WriteString("no results")
 	}
 
 	keys := slices.Sorted(maps.Keys(results.Builds))
 	for i, k := range keys {
 		if i > 0 {
-			title.WriteString(" ")
+			sb.WriteString(" ")
 		}
 
 		b := results.Builds[k]
 		desc := regexp.MustCompile(`\.+$`).ReplaceAllString(strings.TrimSpace(b.Desc), "")
-		title.WriteString(fmt.Sprintf("%s %s", buildState(b.State), desc))
+		sb.WriteString(fmt.Sprintf("%s %s", buildState(b.State), desc))
 	}
 
-	s := title.String()
-	if len(s) > maxBookmarkTitleLen {
-		s = s[:maxBookmarkTitleLen]
+	title := sb.String()
+	if len(title) > maxBookmarkTitleLen {
+		title = title[:maxBookmarkTitleLen]
 	}
 
-	if s == bookmarks[6].Title {
+	if title == bookmarks[6].Title {
 		return
 	}
 
-	if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[6].ID, s); err != nil {
+	if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[6].ID, title); err != nil {
 		log.Error(ctx, "failed to update Slack channel's builds bookmark", "error", err)
 	}
 }

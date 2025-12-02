@@ -410,15 +410,16 @@ func setReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 }
 
 func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	var msg strings.Builder
 	prs := loadPRTurns(ctx)[event.UserID]
+	slices.Sort(prs)
 
 	if len(prs) == 0 {
-		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":joy: No PRs require your attention at this time!")
+		msg.WriteString(":joy: No PRs require your attention at this time!")
+	} else {
+		msg.WriteString(":eyes: These PRs currently require your attention:")
 	}
 
-	var msg strings.Builder
-	msg.WriteString(":eyes: These PRs currently require your attention:")
-	slices.Sort(prs)
 	for _, url := range prs {
 		msg.WriteString(prDetails(ctx, url, event.UserID))
 	}
@@ -554,7 +555,7 @@ func whoseTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 // whoseTurnText builds a "whose turn is it" summary message, reused by multiple slash commands.
 func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak string) string {
 	// If the user who ran the command is in the list, highlight that to them.
-	msg := strings.Builder{}
+	var msg strings.Builder
 	i := slices.Index(emails, user.Email)
 	if i > -1 {
 		msg.WriteString(":eyes: ")

@@ -240,47 +240,47 @@ func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
 
 // reviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.
 func reviewerMentions(ctx workflow.Context, added, removed []string) string {
-	msg := strings.Builder{}
-	msg.WriteString(":bust_in_silhouette: %s ")
+	var sb strings.Builder
+	sb.WriteString(":bust_in_silhouette: %s ")
 
 	switch len(added) {
 	case 0:
 		// Do nothing.
 	case 1:
-		msg.WriteString("added this reviewer:")
-		msg.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
+		sb.WriteString("added this reviewer:")
+		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
 	default:
-		msg.WriteString("added these reviewers:")
-		msg.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
+		sb.WriteString("added these reviewers:")
+		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
 	}
 
 	if len(added) > 0 && len(removed) > 0 {
-		msg.WriteString(", and ")
+		sb.WriteString(", and ")
 	}
 
 	switch len(removed) {
 	case 0:
 		// Do nothing.
 	case 1:
-		msg.WriteString("removed this reviewer:")
-		msg.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
+		sb.WriteString("removed this reviewer:")
+		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
 	default:
-		msg.WriteString("removed these reviewers:")
-		msg.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
+		sb.WriteString("removed these reviewers:")
+		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
 	}
 
-	msg.WriteString(".")
-	return msg.String()
+	sb.WriteString(".")
+	return sb.String()
 }
 
 func bitbucketAccountsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
-	slackUsers := strings.Builder{}
+	var sb strings.Builder
 	for _, a := range accountIDs {
 		if ref := users.BitbucketToSlackRef(ctx, a, ""); ref != "" {
-			slackUsers.WriteString(" " + ref)
+			sb.WriteString(" " + ref)
 		}
 	}
-	return slackUsers.String()
+	return sb.String()
 }
 
 func bitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {

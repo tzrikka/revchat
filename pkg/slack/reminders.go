@@ -138,7 +138,7 @@ func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder s
 }
 
 func prDetails(ctx workflow.Context, url, userID string) string {
-	sb := strings.Builder{}
+	var summary strings.Builder
 
 	// Title.
 	title := "\n\n  •  *(Unnamed PR)*"
@@ -154,37 +154,37 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 			title += " (draft)"
 		}
 	}
-	sb.WriteString(title)
+	summary.WriteString(title)
 
 	// Slack channel link.
 	channelID, err := data.SwitchURLAndID(url)
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Slack channel ID for reminder", "error", err, "pr_url", url)
 	} else {
-		sb.WriteString(fmt.Sprintf("\n          ◦   <#%s>", channelID))
+		summary.WriteString(fmt.Sprintf("\n          ◦   <#%s>", channelID))
 	}
 
 	// PR details.
-	sb.WriteString("\n          ◦   ")
-	sb.WriteString(url)
+	summary.WriteString("\n          ◦   ")
+	summary.WriteString(url)
 
 	now := time.Now().UTC()
 	created := timeSince(now, pr["created_on"])
-	sb.WriteString(fmt.Sprintf("\n          ◦   Created `%s` ago", created))
+	summary.WriteString(fmt.Sprintf("\n          ◦   Created `%s` ago", created))
 
 	if updated := timeSince(now, pr["updated_on"]); updated != "" {
-		sb.WriteString(fmt.Sprintf(", updated `%s` ago", updated))
+		summary.WriteString(fmt.Sprintf(", updated `%s` ago", updated))
 	}
 
 	if b := data.SummarizeBitbucketBuilds(url); b != "" {
-		sb.WriteString(", build states: ")
-		sb.WriteString(b)
+		summary.WriteString(", build states: ")
+		summary.WriteString(b)
 	}
 
 	// User-specific details.
 	paths := data.ReadBitbucketDiffstatPaths(url)
 	if len(paths) == 0 {
-		return sb.String()
+		return summary.String()
 	}
 
 	workspace, repo, branch := destinationDetails(pr)
@@ -193,38 +193,38 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	approvals, names := approvers(ctx, pr)
 
 	if owner+highRisk+approvals > 0 {
-		sb.WriteString("\n          ◦   ")
+		summary.WriteString("\n          ◦   ")
 	}
 	if owner > 0 {
-		sb.WriteString(fmt.Sprintf("Code owner: *%d* file", owner))
+		summary.WriteString(fmt.Sprintf("Code owner: *%d* file", owner))
 		if owner > 1 {
-			sb.WriteString("s")
+			summary.WriteString("s")
 		}
 		if highRisk > 0 {
-			sb.WriteString(", h")
+			summary.WriteString(", h")
 		}
 	}
 	if highRisk > 0 {
 		if owner == 0 {
-			sb.WriteString("H")
+			summary.WriteString("H")
 		}
-		sb.WriteString(fmt.Sprintf("igh risk: *%d* file", highRisk))
+		summary.WriteString(fmt.Sprintf("igh risk: *%d* file", highRisk))
 		if highRisk > 1 {
-			sb.WriteString("s")
+			summary.WriteString("s")
 		}
 	}
 	if approvals > 0 {
 		if owner+highRisk > 0 {
-			sb.WriteString(", a")
+			summary.WriteString(", a")
 		} else {
-			sb.WriteString("A")
+			summary.WriteString("A")
 		}
-		sb.WriteString(fmt.Sprintf("pprovals: *%d* (%s)", approvals, names))
+		summary.WriteString(fmt.Sprintf("pprovals: *%d* (%s)", approvals, names))
 	}
 
-	// sb.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
+	// list.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
 
-	return sb.String()
+	return summary.String()
 }
 
 func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
