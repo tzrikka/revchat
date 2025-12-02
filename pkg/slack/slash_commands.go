@@ -410,27 +410,19 @@ func setReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 }
 
 func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	var msg strings.Builder
 	prs := loadPRTurns(ctx)[event.UserID]
-	slices.Sort(prs)
-
 	if len(prs) == 0 {
-		msg.WriteString(":joy: No PRs require your attention at this time!")
-	} else {
-		msg.WriteString(":eyes: These PRs currently require your attention:")
+		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
+			":joy: No PRs require your attention at this time!")
 	}
 
+	var msg strings.Builder
+	msg.WriteString(":eyes: These PRs currently require your attention:")
+
+	slices.Sort(prs)
 	for _, url := range prs {
 		msg.WriteString(prDetails(ctx, url, event.UserID))
 	}
-
-	msg.WriteString("\n\n:information_source: Slash command tips:\n  •  `")
-	msg.WriteString(event.Command)
-	msg.WriteString(" status` - updated report at any time\n  •  `")
-	msg.WriteString(event.Command)
-	msg.WriteString(" reminder <time in 12h/24h format>` - change time or timezone\n  •  `")
-	msg.WriteString(event.Command)
-	msg.WriteString(" who` / `my turn` / `not my turn` - only in RevChat channels")
 
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
 }
