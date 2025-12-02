@@ -424,6 +424,14 @@ func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		msg.WriteString(prDetails(ctx, url, event.UserID))
 	}
 
+	msg.WriteString("\n\n:information_source: Slash command tips:\n  •  `")
+	msg.WriteString(event.Command)
+	msg.WriteString(" status` - updated report at any time\n  •  `")
+	msg.WriteString(event.Command)
+	msg.WriteString(" reminder <time in 12h/24h format>` - change time or timezone\n  •  `")
+	msg.WriteString(event.Command)
+	msg.WriteString(" who` / `my turn` / `not my turn` - only in RevChat channels")
+
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
 }
 

@@ -53,6 +53,12 @@ func remindersWorkflow(ctx workflow.Context) error {
 			for _, url := range userPRs {
 				msg.WriteString(prDetails(ctx, url, userID))
 			}
+
+			msg.WriteString("\n\n:information_source: Slash command tips:")
+			msg.WriteString("\n  •  `/revchat status` - updated report at any time")
+			msg.WriteString("\n  •  `/revchat reminder <time in 12h/24h format>` - change time or timezone")
+			msg.WriteString("\n  •  `/revchat who` / `my turn` / `not my turn` - only in RevChat channels")
+
 			_, _ = PostMessage(ctx, userID, msg.String())
 		}
 	}
