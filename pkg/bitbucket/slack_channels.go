@@ -68,32 +68,8 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 		return err
 	}
 
-	cleanupPRData(ctx, prURL)
+	data.FullPRCleanup(ctx, prURL)
 	return nil
-}
-
-// cleanupPRData deletes all data associated with a PR. If there are errors,
-// they are logged but ignored, as they do not affect the overall workflow.
-func cleanupPRData(ctx workflow.Context, prURL string) {
-	if err := data.DeleteBitbucketDiffstat(prURL); err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR diffstat", "error", err, "pr_url", prURL)
-	}
-
-	if err := data.DeleteBitbucketPR(prURL); err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR snapshot", "error", err, "pr_url", prURL)
-	}
-
-	if err := data.DeleteBitbucketBuilds(prURL); err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR build status", "error", err, "pr_url", prURL)
-	}
-
-	if err := data.DeleteTurns(prURL); err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR turn-taking state", "error", err, "pr_url", prURL)
-	}
-
-	if err := data.DeleteURLAndIDMapping(prURL); err != nil {
-		log.Error(ctx, "failed to delete PR URL / Slack channel mappings", "error", err, "pr_url", prURL)
-	}
 }
 
 // initPRData saves the initial state of a new PR: a snapshot of the PR
@@ -160,7 +136,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	if err != nil {
 		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
 		_ = tslack.ConversationsArchive(ctx, channelID)
-		cleanupPRData(ctx, prURL)
+		data.FullPRCleanup(ctx, prURL)
 		return err
 	}
 
@@ -190,6 +166,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 			log.Error(ctx, "failed to log Slack channel creation", "error", err, "channel_id", id, "pr_url", u)
 			// Don't fail the workflow because of logging errors.
 		}
+
 		return id, nil
 	}
 

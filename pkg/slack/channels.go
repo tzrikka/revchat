@@ -8,6 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -15,14 +16,27 @@ const (
 	channelMetadataMaxLen = 250
 )
 
-// https://docs.slack.dev/reference/events/channel_archive/
-// https://docs.slack.dev/reference/events/group_archive/
+// channelArchivedWorkflow handles PR data cleanup after unexpected Slack archiving events:
+//   - https://docs.slack.dev/reference/events/channel_archive/
+//   - https://docs.slack.dev/reference/events/group_archive/
 func (c *Config) channelArchivedWorkflow(ctx workflow.Context, event archiveEventWrapper) error {
 	if selfTriggeredEvent(ctx, event.Authorizations, event.InnerEvent.User) {
 		return nil
 	}
 
-	log.Warn(ctx, "Slack channel archived - event handler not implemented yet")
+	// Channel archived by someone other than RevChat. The most common reason is
+	// that the last member has left the channel, so Slackbot auto-archived it.
+	channelID := event.InnerEvent.Channel
+	log.Info(ctx, "Slack channel archived by someone else",
+		"channel_id", channelID, "user", event.InnerEvent.User)
+
+	url, err := data.SwitchURLAndID(channelID)
+	if err != nil {
+		log.Error(ctx, "failed to convert Slack channel to PR URL", "error", err, "channel_id", channelID)
+		return err
+	}
+
+	data.FullPRCleanup(ctx, url)
 	return nil
 }
 

@@ -76,10 +76,6 @@ func extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 		return user
 	}
 
-	if msg.User == "USLACKBOT" {
-		return ""
-	}
-
 	return msg.User
 }
 

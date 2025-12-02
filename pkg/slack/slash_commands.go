@@ -680,7 +680,7 @@ func userDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (
 func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) []string {
 	url, err := data.SwitchURLAndID(event.ChannelID)
 	if err != nil {
-		log.Error(ctx, "failed to convert Slack channel to PR URL", "error", err)
+		log.Error(ctx, "failed to convert Slack channel to PR URL", "error", err, "channel_id", event.ChannelID)
 		postEphemeralError(ctx, event, "failed to read internal data about the PR.")
 		return nil
 	}
