@@ -65,11 +65,22 @@ func BitbucketToSlackID(ctx workflow.Context, accountID string, checkOptIn bool)
 
 // BitbucketToSlackRef converts a Bitbucket account ID into a Slack user reference.
 // This depends on the user's email address being the same in both systems.
-// This function returns the Bitbucket display name if the user is not found in Slack.
+// This function returns some kind of display name if the user is not found.
 func BitbucketToSlackRef(ctx workflow.Context, accountID, displayName string) string {
-	id := BitbucketToSlackID(ctx, accountID, false)
-	if id != "" {
-		return fmt.Sprintf("<@%s>", id)
+	user, err := data.SelectUserByBitbucketID(accountID)
+	if err != nil {
+		log.Error(ctx, "failed to load user by Bitbucket ID", "error", err, "account_id", accountID)
+		// Don't abort - try to use the Slack API as a fallback.
+	}
+
+	if user.SlackID != "" {
+		return fmt.Sprintf("<@%s>", user.SlackID)
+	}
+	if user.SlackName != "" {
+		return "@" + user.SlackName
+	}
+	if user.RealName != "" {
+		return user.RealName
 	}
 
 	if displayName != "" {
@@ -79,13 +90,21 @@ func BitbucketToSlackRef(ctx workflow.Context, accountID, displayName string) st
 		return "A bot"
 	}
 
-	user, err := bitbucket.UsersGet(ctx, accountID, "")
+	apiUser, err := bitbucket.UsersGet(ctx, accountID, "")
 	if err != nil {
 		log.Error(ctx, "failed to retrieve Bitbucket user info", "error", err, "account_id", accountID)
-		return accountID // Fallback: return the original Bitbucket account ID.
+		return accountID // Last resort: return the original Bitbucket account ID.
 	}
 
-	return user.DisplayName
+	if apiUser.DisplayName != "" {
+		if err := data.UpsertUser("", accountID, "", "", apiUser.DisplayName, "", ""); err != nil {
+			log.Error(ctx, "failed to save Bitbucket user display name", "error", err,
+				"account_id", accountID, "display_name", apiUser.DisplayName)
+			// Don't abort - we have a display name, even if we failed to save it.
+		}
+	}
+
+	return apiUser.DisplayName
 }
 
 // EmailToBitbucketID retrieves a Bitbucket user's account ID based on their

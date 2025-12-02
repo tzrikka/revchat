@@ -30,6 +30,10 @@ func SlackToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackUserRef 
 // SlackIDToEmail retrieves a Slack user's email address based on their ID.
 // This function uses data caching, and API calls as a fallback.
 func SlackIDToEmail(ctx workflow.Context, userID string) string {
+	if userID == "" {
+		return ""
+	}
+
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
 		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
@@ -68,6 +72,10 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 // SlackIDToRealName retrieves a Slack user's full name based on their ID.
 // This function uses data caching, and API calls as a fallback.
 func SlackIDToRealName(ctx workflow.Context, userID string) string {
+	if userID == "" {
+		return ""
+	}
+
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
 		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
@@ -99,6 +107,10 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 // SlackIDToDisplayName retrieves a Slack user's display name based on their ID.
 // This function uses data caching, and API calls as a fallback.
 func SlackIDToDisplayName(ctx workflow.Context, userID string) string {
+	if userID == "" {
+		return ""
+	}
+
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
 		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
