@@ -55,7 +55,7 @@ func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user A
 
 	// And if possible convert it into a profile link that LOOKS like a mention.
 	if workspaceURL != "" && slackUserID != "" {
-		displayName = fmt.Sprintf("<%s/team/%s|%s>", workspaceURL, slackUserID, displayName)
+		displayName = fmt.Sprintf("<%steam/%s?preview=no|%s>", workspaceURL, slackUserID, displayName)
 	}
 
 	_, err := slack.PostReply(ctx, channelID, threadTS, fmt.Sprintf(msg, displayName))
