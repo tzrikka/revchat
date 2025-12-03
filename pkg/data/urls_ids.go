@@ -1,6 +1,7 @@
 package data
 
 import (
+	"strings"
 	"sync"
 )
 
@@ -42,6 +43,18 @@ func DeleteURLAndIDMapping(key string) error {
 
 	delete(m, m[key])
 	delete(m, key)
+
+	prefix := key + "/"
+	var moreKeysToDelete []string
+	for k := range m {
+		if strings.HasPrefix(k, prefix) {
+			moreKeysToDelete = append(moreKeysToDelete, k, m[k])
+		}
+	}
+	for _, k := range moreKeysToDelete {
+		delete(m, k)
+	}
+
 	return writeURLsIDsFile(m)
 }
 
