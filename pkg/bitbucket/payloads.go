@@ -133,16 +133,18 @@ type PullRequest struct {
 	State       string `json:"state"` // "OPEN", "MERGED", "DECLINED".
 	Draft       bool   `json:"draft"`
 
-	Summary     Rendered            `json:"summary"`
-	Rendered    map[string]Rendered `json:"rendered"`
-	Source      Reference           `json:"source"`
-	Destination Reference           `json:"destination"`
+	// Summary     Rendered            `json:"summary"`  // Unnecessary.
+	// Rendered    map[string]Rendered `json:"rendered"` // Unnecessary.
+	Source      Reference `json:"source"`
+	Destination Reference `json:"destination"`
 
 	CreatedOn    string `json:"created_on"`
 	UpdatedOn    string `json:"updated_on"`
 	CommentCount int    `json:"comment_count"`
 	TaskCount    int    `json:"task_count"`
-	CommitCount  int    `json:"commit_count"` // RevChat only.
+
+	CommitCount        int `json:"commit_count"`         // Populated and used only in RevChat.
+	ChangeRequestCount int `json:"change_request_count"` // Populated and used only in RevChat.
 
 	Author       Account       `json:"author"`
 	Participants []Participant `json:"participants"`

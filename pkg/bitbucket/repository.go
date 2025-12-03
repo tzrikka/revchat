@@ -61,8 +61,8 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	_, err = slack.PostMessage(ctx, channelID, msg)
 
 	// Other than announcing this specific event, also announce if the PR is ready to be merged
-	// (all builds are successful, the PR has at least 2 approvals, and from all code owners).
-	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(url) || pr.TaskCount > 0 {
+	// (all builds are successful, the PR has at least 2 approvals, and no pending action items).
+	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(url) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
 		return err
 	}
 	approvers := 0

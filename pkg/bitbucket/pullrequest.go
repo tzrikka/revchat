@@ -174,10 +174,13 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 		return nil, err
 	}
 
-	// the "CommitCount" field is fake and populated by RevChat, not Bitbucket.
-	// Persist it across snapshots (before the deferred call to [data.StoreBitbucketPR]).
+	// the "CommitCount" and "ChangeRequestCount" fields are populated and used by RevChat, not Bitbucket.
+	// Persist them across snapshots (before the deferred call to [data.StoreBitbucketPR]).
 	if snapshot.CommitCount == 0 {
 		snapshot.CommitCount = pr.CommitCount
+	}
+	if snapshot.ChangeRequestCount == 0 {
+		snapshot.ChangeRequestCount = pr.ChangeRequestCount
 	}
 
 	return pr, nil
@@ -325,13 +328,27 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 		msg += "unapproved this PR. :-1:"
 
 	case "changes_request_created":
+		pr.ChangeRequestCount++
+		if _, err := switchSnapshot(ctx, url, pr); err != nil {
+			log.Error(ctx, "failed to update change-request count in PR snapshot",
+				"error", err, "pr_url", url, "new_count", pr.ChangeRequestCount)
+		}
+
 		if err := data.SwitchTurn(url, email); err != nil {
 			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
 		}
 		msg += "requested changes in this PR. :warning:"
 
 	case "changes_request_removed":
-		return nil // Ignored event type.
+		pr.ChangeRequestCount--
+		if pr.ChangeRequestCount < 0 {
+			pr.ChangeRequestCount = 0 // Should not happen, but just in case.
+		}
+		if _, err := switchSnapshot(ctx, url, pr); err != nil {
+			log.Error(ctx, "failed to update change-request count in PR snapshot",
+				"error", err, "pr_url", url, "new_count", pr.ChangeRequestCount)
+		}
+		return nil
 
 	default:
 		log.Error(ctx, "unrecognized Bitbucket PR review event type", "event_type", event.Type)
@@ -341,8 +358,8 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	err := mentionUserInMsg(ctx, channelID, event.Actor, msg)
 
 	// Other than announcing this specific event, also announce if the PR is ready to be merged
-	// (all builds are successful, the PR has at least 2 approvals, and from all code owners).
-	if event.Type != "approved" || !allBuildsSuccessful(url) || pr.TaskCount > 0 {
+	// (all builds are successful, the PR has at least 2 approvals, and no pending action items).
+	if event.Type != "approved" || !allBuildsSuccessful(url) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
 		return err
 	}
 	approvers := 0
@@ -356,7 +373,7 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	}
 
 	log.Info(ctx, "Bitbucket PR is ready to be merged", "pr_url", url)
-	_, err = slack.PostMessage(ctx, channelID, "This PR is ready to be merged! :tada:")
+	_, err = slack.PostMessage(ctx, channelID, "@here this PR is ready to be merged! :tada:")
 	return err
 }
 
