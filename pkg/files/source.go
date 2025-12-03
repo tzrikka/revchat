@@ -15,10 +15,10 @@ import (
 // It substantially reduces API calls in workflows that call [CountOwnedFiles]
 // and [CountHighRiskFiles] and iterate over many users with many PRs,
 // but on the other hand we don't want this data to become stale.
-var fileCache = cache.New(15*time.Minute, cache.NoCleanup)
+var fileCache = cache.New(10*time.Minute, cache.NoCleanup)
 
-func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, commit, path string) string {
-	key := fmt.Sprintf("%s:%s:%s:%s", workspace, repo, commit, path)
+func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, branch, commit, path string) string {
+	key := fmt.Sprintf("%s:%s:%s:%s", workspace, repo, branch, path)
 	if file, ok := fileCache.Get(key); ok {
 		return file
 	}
@@ -31,7 +31,7 @@ func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, commit, path 
 	})
 	if err != nil {
 		log.Error(ctx, "failed to read Bitbucket source file", "error", err,
-			"workspace", workspace, "repo", repo, "commit", commit, "path", path)
+			"workspace", workspace, "repo", repo, "branch", branch, "commit", commit, "path", path)
 		return ""
 	}
 

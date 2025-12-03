@@ -22,12 +22,12 @@ type CodeOwners struct {
 
 // CountOwnedFiles counts how many of the given file paths are owned by the specified
 // user, according to the "CODEOWNERS" file in the given branch (a PR's destination).
-func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, userName string, paths []string) int {
+func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, commit, userName string, paths []string) int {
 	if userName == "" {
 		return 0
 	}
 
-	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, "CODEOWNERS"), true)
+	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, commit, "CODEOWNERS"), true)
 	if c == nil {
 		return 0
 	}
@@ -53,12 +53,12 @@ func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, userName str
 
 // GotAllRequiredApprovals checks whether all required approvals are present for the given
 // file paths, according to the "CODEOWNERS" file in the given branch (a PR's destination).
-func GotAllRequiredApprovals(ctx workflow.Context, workspace, repo, branch string, paths, approvers []string) bool {
+func GotAllRequiredApprovals(ctx workflow.Context, workspace, repo, branch, commit string, paths, approvers []string) bool {
 	if len(paths) == 0 {
 		return false
 	}
 
-	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, "CODEOWNERS"), true)
+	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, commit, "CODEOWNERS"), true)
 	if c == nil {
 		return false
 	}

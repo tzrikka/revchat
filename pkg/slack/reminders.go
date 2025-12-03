@@ -193,9 +193,9 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 		return summary.String()
 	}
 
-	workspace, repo, branch := destinationDetails(pr)
-	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, users.SlackIDToRealName(ctx, userID), paths)
-	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, paths)
+	workspace, repo, branch, commit := destinationDetails(pr)
+	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, commit, users.SlackIDToRealName(ctx, userID), paths)
+	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, commit, paths)
 	approvals, names := approvers(ctx, pr)
 
 	if owner+highRisk+approvals > 0 {
@@ -270,9 +270,7 @@ func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
 	return count, names.String()
 }
 
-func destinationDetails(pr map[string]any) (workspace, repo, branch string) {
-	branch = "dev" // Default branch.
-
+func destinationDetails(pr map[string]any) (workspace, repo, branch, commit string) {
 	// Workspace and repo slug.
 	dest, ok := pr["destination"].(map[string]any)
 	if !ok {
@@ -298,8 +296,15 @@ func destinationDetails(pr map[string]any) (workspace, repo, branch string) {
 	}
 	branch, ok = m["name"].(string)
 	if !ok {
-		branch = "dev"
+		return
 	}
+
+	// Commit hash.
+	m, ok = dest["commit"].(map[string]any)
+	if !ok {
+		return
+	}
+	commit, _ = m["hash"].(string)
 
 	return
 }

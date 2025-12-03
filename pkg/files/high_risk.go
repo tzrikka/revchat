@@ -8,8 +8,8 @@ import (
 
 // CountHighRiskFiles counts how many of the given file paths are considered high risk,
 // according to the "highrisk.txt" file in the given branch (a PR's destination).
-func CountHighRiskFiles(ctx workflow.Context, workspace, repo, branch string, paths []string) int {
-	hr := parseHighRiskFile(getBitbucketSourceFile(ctx, workspace, repo, branch, "highrisk.txt"))
+func CountHighRiskFiles(ctx workflow.Context, workspace, repo, branch, commit string, paths []string) int {
+	hr := parseHighRiskFile(getBitbucketSourceFile(ctx, workspace, repo, branch, commit, "highrisk.txt"))
 
 	count := 0
 	for _, p := range paths {
