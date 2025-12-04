@@ -76,7 +76,7 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	}
 
 	log.Info(ctx, "Bitbucket PR is ready to be merged", "pr_url", url)
-	_, err = slack.PostMessage(ctx, channelID, "This PR is ready to be merged! :tada:")
+	_, err = slack.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
 	return err
 }
 

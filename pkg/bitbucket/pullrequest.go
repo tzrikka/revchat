@@ -355,26 +355,7 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 		return nil
 	}
 
-	err := mentionUserInMsg(ctx, channelID, event.Actor, msg)
-
-	// Other than announcing this specific event, also announce if the PR is ready to be merged
-	// (all builds are successful, the PR has at least 2 approvals, and no pending action items).
-	if event.Type != "approved" || !allBuildsSuccessful(url) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
-		return err
-	}
-	approvers := 0
-	for _, p := range pr.Participants {
-		if p.Approved {
-			approvers++
-		}
-	}
-	if approvers < 2 {
-		return err
-	}
-
-	log.Info(ctx, "Bitbucket PR is ready to be merged", "pr_url", url)
-	_, err = slack.PostMessage(ctx, channelID, "@here this PR is ready to be merged! :tada:")
-	return err
+	return mentionUserInMsg(ctx, channelID, event.Actor, msg)
 }
 
 func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
