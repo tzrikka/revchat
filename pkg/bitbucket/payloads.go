@@ -39,6 +39,7 @@ type Branch struct {
 	SyncStrategies []string        `json:"sync_strategies,omitempty"`
 }
 
+// https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment
 type Comment struct {
 	// Type string `json:"type"` // Always "pullrequest_comment".
 
@@ -60,6 +61,7 @@ type Comment struct {
 
 type Commit = bitbucket.Commit
 
+// https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-created
 type CommitStatus struct {
 	// Type string `json:"type"` // Always "build".
 
@@ -79,6 +81,7 @@ type CommitStatus struct {
 	Links map[string]Link `json:"links"`
 }
 
+// https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment
 type Inline struct {
 	Path string `json:"path"`
 

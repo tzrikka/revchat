@@ -181,7 +181,13 @@ func TestInlineCommentPrefix(t *testing.T) {
 			want: "<http://example.com|File comment> in `test.txt`:\n",
 		},
 		{
-			name: "single_line",
+			name: "single_from_line",
+			url:  "http://example.com",
+			i:    &Inline{From: intPtr(1), Path: "test.txt"},
+			want: "<http://example.com|Inline comment> in line 1 in `test.txt`:\n",
+		},
+		{
+			name: "single_to_line",
 			url:  "http://example.com",
 			i:    &Inline{To: intPtr(1), Path: "test.txt"},
 			want: "<http://example.com|Inline comment> in line 1 in `test.txt`:\n",
@@ -264,19 +270,19 @@ func TestSpliceSuggestion(t *testing.T) {
 		// Delete.
 		{
 			name:    "delete_first_line",
-			in:      &Inline{To: intPtr(1)},
+			in:      &Inline{From: intPtr(1)},
 			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
 			want:    "@@ -1,1 @@\n-Line 1\n",
 		},
 		{
 			name:    "delete_middle_lines",
-			in:      &Inline{StartTo: intPtr(2), To: intPtr(3)},
+			in:      &Inline{StartFrom: intPtr(2), From: intPtr(3)},
 			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
 			want:    "@@ -2,2 @@\n-Line 2\n-Line 3\n",
 		},
 		{
 			name:    "delete_last_line",
-			in:      &Inline{To: intPtr(4)},
+			in:      &Inline{From: intPtr(4)},
 			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
 			want:    "@@ -4,1 @@\n-Line 4\n",
 		},
@@ -284,7 +290,7 @@ func TestSpliceSuggestion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := spliceSuggestion(tt.in, tt.suggestion, tt.srcFile)
+			got := spliceSuggestion(nil, tt.in, tt.suggestion, tt.srcFile)
 			if string(got) != tt.want {
 				t.Errorf("spliceSuggestion() = %q, want %q", got, tt.want)
 			}

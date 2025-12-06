@@ -548,34 +548,60 @@ func generateDiff(ctx workflow.Context, event PullRequestEvent, suggestion, diff
 		return nil
 	}
 
-	return spliceSuggestion(event.Comment.Inline, suggestion, src)
+	return spliceSuggestion(ctx, event.Comment.Inline, suggestion, src)
 }
 
 // spliceSuggestion splices the suggestion into the source
 // file content, and returns the result as a diff snippet.
-func spliceSuggestion(in *Inline, suggestion, srcFile string) []byte {
-	var line1, line2 int
-	if in.To != nil {
-		line1, line2 = *in.To, *in.To
+func spliceSuggestion(ctx workflow.Context, in *Inline, suggestion, srcFile string) []byte {
+	var fromLine1, fromLine2, toLine1, toLine2 int
+	if in.From != nil {
+		fromLine1, fromLine2 = *in.From, *in.From
 	}
-	if in.StartTo != nil {
-		line1 = *in.StartTo
+	if in.StartFrom != nil {
+		fromLine1 = *in.StartFrom
 	}
 
-	lenFrom := line2 - line1 + 1
-	lenTo := 0
+	if in.To != nil {
+		toLine1, toLine2 = *in.To, *in.To
+	}
+	if in.StartTo != nil {
+		toLine1 = *in.StartTo
+	}
+
+	switch {
+	case fromLine1 != 0 && toLine1 == 0:
+		toLine1 = fromLine1
+	case fromLine1 == 0 && toLine1 != 0:
+		fromLine1 = toLine1
+	}
+	if fromLine2 == 0 && toLine2 != 0 {
+		fromLine2 = toLine2
+	}
+
+	fromLen := fromLine2 - fromLine1 + 1
+	toLen := 0
 	if suggestion != "" {
-		lenTo = strings.Count(suggestion, "\n") + 1
+		toLen = strings.Count(suggestion, "\n") + 1
+	}
+
+	// If the calculations above don't match the source or
+	// the suggestion, fall back to a minimalistic code block.
+	srcLines := strings.Split(srcFile, "\n")
+	numLines := len(srcLines)
+	if fromLine1 == 0 || toLine1 == 0 || fromLine1 > numLines || fromLine2 > numLines || fromLen <= 0 || toLen < 0 {
+		log.Warn(ctx, "mistake in generating pretty diff")
+		return nil
 	}
 
 	var diff bytes.Buffer
-	diff.WriteString(fmt.Sprintf("@@ -%d,%d ", line1, lenFrom))
-	if lenTo > 0 {
-		diff.WriteString(fmt.Sprintf("+%d,%d ", line1, lenTo))
+	diff.WriteString(fmt.Sprintf("@@ -%d,%d ", fromLine1, fromLen))
+	if toLen > 0 {
+		diff.WriteString(fmt.Sprintf("+%d,%d ", toLine1, toLen))
 	}
 	diff.WriteString("@@\n")
 
-	for _, line := range strings.Split(srcFile, "\n")[line1-1 : line2] {
+	for _, line := range srcLines[fromLine1-1 : fromLine2] {
 		diff.WriteString(fmt.Sprintf("-%s\n", line))
 	}
 
