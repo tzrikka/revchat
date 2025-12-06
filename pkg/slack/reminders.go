@@ -147,12 +147,12 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	var summary strings.Builder
 
 	// Title.
-	title := "\n\n  •  *(Unnamed PR)*"
+	title := fmt.Sprintf("\n\n  •  *<%s>*", url)
 	pr, err := data.LoadBitbucketPR(url)
 	if err != nil {
 		log.Error(ctx, "failed to load Bitbucket PR snapshot for reminder", "error", err, "pr_url", url)
 	} else if t, ok := pr["title"].(string); ok && len(t) > 0 {
-		title = fmt.Sprintf("\n\n  •  *%s*", t)
+		title = fmt.Sprintf("\n\n  •  <%s|*%s*>", url, t)
 	}
 	if draft, ok := pr["draft"].(bool); ok && draft {
 		title = strings.Replace(title, "•  ", "•  :construction: ", 1)
@@ -171,9 +171,6 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	}
 
 	// PR details.
-	summary.WriteString("\n          ◦   ")
-	summary.WriteString(url)
-
 	now := time.Now().UTC()
 	created := timeSince(now, pr["created_on"])
 	summary.WriteString(fmt.Sprintf("\n          ◦   Created `%s` ago", created))
