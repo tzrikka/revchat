@@ -64,7 +64,7 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	} else {
 		state += "."
 	}
-	_ = mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
+	mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
 	prURL := pr.Links["html"].HRef
 	if err := data.LogSlackChannelArchived(channelID, prURL); err != nil {
@@ -236,7 +236,7 @@ func postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequ
 		msg += "\n\n" + markdown.BitbucketToSlack(ctx, text, url)
 	}
 
-	_ = mentionUserInMsg(ctx, channelID, actor, "%s "+msg)
+	mentionUserInMsg(ctx, channelID, actor, "%s "+msg)
 }
 
 var linkifyPattern = regexp.MustCompile(`[A-Z]+-\d+`)

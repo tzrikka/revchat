@@ -52,16 +52,17 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 	// Announce transitions between drafts and ready to review.
 	if !snapshot.Draft && event.PullRequest.Draft {
-		return mentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
+		mentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
+		return nil
 	}
 	if snapshot.Draft && !event.PullRequest.Draft {
-		_ = mentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
+		mentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
 		snapshot.Reviewers = nil // Force re-adding any reviewers that were added while the PR was a draft.
 	}
 
 	// Title edited.
 	if snapshot.Title != event.PullRequest.Title {
-		_ = mentionUserInMsg(ctx, channelID, event.Actor, ":pencil2: %s edited the PR title.")
+		mentionUserInMsg(ctx, channelID, event.Actor, ":pencil2: %s edited the PR title.")
 		slack.SetChannelDescription(ctx, channelID, event.PullRequest.Title, url)
 		if msg := c.linkifyIDs(ctx, event.PullRequest.Title); msg != "" {
 			_, _ = slack.PostMessage(ctx, channelID, msg)
@@ -77,13 +78,13 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, url)
 		}
 
-		err = mentionUserInMsg(ctx, channelID, event.Actor, msg)
+		mentionUserInMsg(ctx, channelID, event.Actor, msg)
 	}
 
 	// Reviewers added/removed.
 	added, removed := reviewersDiff(*snapshot, event.PullRequest)
 	if len(added)+len(removed) > 0 {
-		_ = mentionUserInMsg(ctx, channelID, event.Actor, reviewerMentions(ctx, added, removed))
+		mentionUserInMsg(ctx, channelID, event.Actor, reviewerMentions(ctx, added, removed))
 		if !event.PullRequest.Draft {
 			_ = slack.InviteUsersToChannel(ctx, channelID, bitbucketToSlackIDs(ctx, added))
 		}
@@ -138,7 +139,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			title, _, _ := strings.Cut(c.Message, "\n")
 			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title)
 		}
-		err = mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
+		mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
 	}
 
 	// Retargeted destination branch.
@@ -148,7 +149,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		repoURL := event.Repository.Links["html"].HRef
 		msg := "changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
-		err = mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
+		mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
 	}
 
 	return err
@@ -212,7 +213,8 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 		return nil
 	}
 
-	return mentionUserInMsg(ctx, channelID, event.Actor, msg)
+	mentionUserInMsg(ctx, channelID, event.Actor, msg)
+	return nil
 }
 
 func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) error {

@@ -18,9 +18,9 @@ import (
 // if multiple workflows set it concurrently, the value will be the same anyway.
 var workspaceURL = ""
 
-func mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) error {
-	_, err := mentionUserInReply(ctx, channelID, "", user, msg)
-	return err
+func mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) {
+	// Failures here are already logged, and never a reason to abort the calling workflows.
+	_, _ = mentionUserInReply(ctx, channelID, "", user, msg)
 }
 
 func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
