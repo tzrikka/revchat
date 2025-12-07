@@ -8,7 +8,7 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
-var prDiffStatMutexes RWMutexMap
+var prDiffstatMutexes RWMutexMap
 
 func ReadBitbucketDiffstatLength(url string) int {
 	return len(diffstatPaths(readBitbucketDiffstat(url)))
@@ -19,7 +19,7 @@ func ReadBitbucketDiffstatPaths(url string) []string {
 }
 
 func readBitbucketDiffstat(url string) []bitbucket.Diffstat {
-	mu := prDiffStatMutexes.Get(url)
+	mu := prDiffstatMutexes.Get(url)
 	mu.RLock()
 	defer mu.RUnlock()
 
@@ -58,7 +58,7 @@ func diffstatPaths(ds []bitbucket.Diffstat) []string {
 }
 
 func UpdateBitbucketDiffstat(url string, ds []bitbucket.Diffstat) error {
-	mu := prDiffStatMutexes.Get(url)
+	mu := prDiffstatMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -79,7 +79,7 @@ func UpdateBitbucketDiffstat(url string, ds []bitbucket.Diffstat) error {
 }
 
 func DeleteBitbucketDiffstat(url string) error {
-	mu := prDiffStatMutexes.Get(url)
+	mu := prDiffstatMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 

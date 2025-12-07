@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -18,26 +19,21 @@ import (
 var workspaceURL = ""
 
 func mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) error {
-	return mentionUserInReply(ctx, channelID, "", user, msg)
+	_, err := mentionUserInReply(ctx, channelID, "", user, msg)
+	return err
 }
 
 func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
-	ids, err := data.SwitchURLAndID(parentURL)
-	if err != nil {
-		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", parentURL)
+	ids, err := msgIDsForCommentURL(ctx, parentURL, "post")
+	if err != nil || ids == nil {
 		return err
 	}
 
-	id := strings.Split(ids, "/")
-	if len(id) < 2 {
-		log.Warn(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
-		return nil
-	}
-
-	return mentionUserInReply(ctx, id[0], id[1], user, msg)
+	_, err = mentionUserInReply(ctx, ids[0], ids[1], user, msg)
+	return err
 }
 
-func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) error {
+func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) (*tslack.ChatPostMessageResponse, error) {
 	// We don't want to use a Slack mention here, because that would spam the user in
 	// Slack with a narration of their own actions. So we just write their name instead
 	// of "users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName)".
@@ -58,17 +54,16 @@ func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user A
 		displayName = fmt.Sprintf("<%steam/%s?preview=no|%s>", workspaceURL, slackUserID, displayName)
 	}
 
-	_, err := slack.PostReply(ctx, channelID, threadTS, fmt.Sprintf(msg, displayName))
-	return err
+	return slack.PostReply(ctx, channelID, threadTS, fmt.Sprintf(msg, displayName))
 }
 
 func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string, diff []byte) error {
+	fileID := ""
 	if diff != nil {
-		msg = uploadDiff(ctx, diff, url, msg)
+		msg, fileID = uploadDiff(ctx, diff, url, msg)
 	}
 
-	name, icon := impersonateUser(ctx, user)
-	resp, err := slack.PostMessageAsUser(ctx, channelID, name, icon, msg)
+	resp, err := postAsUser(ctx, msg, channelID, "", fileID, user)
 	if err != nil {
 		return err
 	}
@@ -80,50 +75,64 @@ func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Acco
 		// don't want to retry and post it again, even though this is problematic.
 	}
 
+	// Also remember to delete diff files later, if we update or delete the message.
+	if fileID != "" {
+		if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", id, fileID)); err != nil {
+			log.Error(ctx, "failed to save Slack file mapping", "error", err, "url", url, "slack_id", id, "file_id", fileID)
+			// Don't return the error - the message is already posted in Slack, so we
+			// don't want to retry and post it again, even though this is problematic.
+		}
+	}
+
 	return nil
 }
 
 func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string, diff []byte) error {
+	ids, err := msgIDsForCommentURL(ctx, parentURL, "post")
+	if err != nil || ids == nil {
+		return err
+	}
+
+	fileID := ""
 	if diff != nil {
-		msg = uploadDiff(ctx, diff, url, msg)
+		msg, fileID = uploadDiff(ctx, diff, url, msg)
 	}
 
-	ids, err := data.SwitchURLAndID(parentURL)
-	if err != nil {
-		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", parentURL)
-		return err
-	}
-
-	id := strings.Split(ids, "/")
-	if len(id) < 2 {
-		log.Warn(ctx, "can't post Slack reply message - missing/bad IDs", "bitbucket_url", parentURL, "slack_ids", ids)
-		return nil
-	}
-
-	name, icon := impersonateUser(ctx, user)
-	resp, err := slack.PostReplyAsUser(ctx, id[0], id[1], name, icon, msg)
+	resp, err := postAsUser(ctx, msg, ids[0], ids[1], fileID, user)
 	if err != nil {
 		return err
 	}
 
-	sid := fmt.Sprintf("%s/%s/%s", id[0], id[1], resp.TS)
+	sid := fmt.Sprintf("%s/%s/%s", ids[0], ids[1], resp.TS)
 	if err := data.MapURLAndID(url, sid); err != nil {
 		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url, "slack_id", sid)
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}
 
+	// Also remember to delete diff files later, if we update or delete the message.
+	if fileID != "" {
+		if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", sid, fileID)); err != nil {
+			log.Error(ctx, "failed to save Slack file mapping", "error", err, "url", url, "slack_id", sid, "file_id", fileID)
+			// Don't return the error - the message is already posted in Slack, so we
+			// don't want to retry and post it again, even though this is problematic.
+		}
+	}
+
 	return nil
 }
 
-func uploadDiff(ctx workflow.Context, diff []byte, url, msg string) string {
+// uploadDiff uploads the given diff content to Slack and modifies the message
+// to reference this uploaded file instead of Bitbucket's minimalistic code block.
+// It returns the modified message and the uploaded file ID (or an empty string).
+func uploadDiff(ctx workflow.Context, diff []byte, url, msg string) (string, string) {
 	parts := strings.Split(url, "-")
 	filename := parts[len(parts)-1] + ".diff"
 	title := "Diff " + parts[len(parts)-1]
 
 	file, err := slack.Upload(ctx, diff, filename, title, "diff", "text/x-diff", "", "")
 	if err != nil || file == nil {
-		return msg // File upload failed, return the original message unmodified.
+		return msg, "" // File upload failed, return the original message unmodified.
 	}
 
 	// Success: replace the code block in the message with a prettier rendering of the file.
@@ -133,38 +142,70 @@ func uploadDiff(ctx workflow.Context, diff []byte, url, msg string) string {
 		msg += parts[2]
 	}
 
-	return msg
+	return msg, file.ID
 }
 
-func impersonateUser(ctx workflow.Context, user Account) (name, icon string) {
+// postAsUser posts a Slack message or a reply, either impersonating the given user
+// (if fileID is empty) or mentioning them (if fileID is non-empty).
+//
+// This distinction is necessary due to a limitation in the Slack API: messages posted as
+// another user ("impersonated") cannot be updated or deleted if they include file attachments.
+func postAsUser(ctx workflow.Context, msg, channelID, threadTS, fileID string, user Account) (*tslack.ChatPostMessageResponse, error) {
+	if fileID != "" {
+		return mentionUserInReply(ctx, channelID, threadTS, user, impersonationToMention(msg))
+	}
+
+	displayName, icon := impersonateUser(ctx, user)
+	return slack.PostReplyAsUser(ctx, channelID, threadTS, displayName, icon, msg)
+}
+
+var prefixPattern = regexp.MustCompile(`^<([^|]+)\|(File|Inline) comment>`)
+
+// impersonationToMention converts a message that was meant to be used in
+// [impersonateUserInMsg] or [impersonateUserInReply] into a message that can
+// be used in [mentionUserInMsg] or [mentionUserInReply], by adjusting the prefix.
+//
+// This is potentially relevant only for file and inline comments: if the message
+// includes a file (i.e. contains a Slack file permalink), we can't impersonate the
+// user, because the Slack API won't allow us to update or delete the message later.
+func impersonationToMention(msg string) string {
+	match := prefixPattern.FindStringSubmatch(msg)
+	if len(match) < 3 {
+		return msg
+	}
+
+	lower := strings.ToLower(match[2])
+	article := "a"
+	if lower == "inline" {
+		article = "an"
+	}
+
+	newPrefix := fmt.Sprintf("posted %s <%s|%s comment>", article, match[1], lower)
+	return strings.Replace(msg, match[0], "%s "+newPrefix, 1)
+}
+
+func impersonateUser(ctx workflow.Context, user Account) (displayName, icon string) {
 	id := users.BitbucketToSlackID(ctx, user.AccountID, false)
 	if id == "" {
-		name = user.DisplayName
+		displayName = user.DisplayName
 		return
 	}
 
 	profile, err := tslack.UsersProfileGet(ctx, id)
 	if err != nil {
-		name = user.DisplayName
+		displayName = user.DisplayName
 		return
 	}
 
-	name = profile.DisplayName
+	displayName = profile.DisplayName
 	icon = profile.Image48
 	return
 }
 
 func deleteMsg(ctx workflow.Context, url string) error {
-	ids, err := data.SwitchURLAndID(url)
-	if err != nil {
-		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
+	ids, err := msgIDsForCommentURL(ctx, url, "delete")
+	if err != nil || ids == nil {
 		return err
-	}
-
-	id := strings.Split(ids, "/")
-	if len(id) < 2 {
-		log.Warn(ctx, "can't delete Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
-		return nil
 	}
 
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
@@ -172,21 +213,31 @@ func deleteMsg(ctx workflow.Context, url string) error {
 		// Don't abort - we still want to attempt to delete the Slack message.
 	}
 
-	return slack.DeleteMessage(ctx, id[0], id[len(id)-1])
+	return slack.DeleteMessage(ctx, ids[0], ids[len(ids)-1])
 }
 
 func editMsg(ctx workflow.Context, url, msg string) error {
-	ids, err := data.SwitchURLAndID(url)
-	if err != nil {
-		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "url", url)
+	ids, err := msgIDsForCommentURL(ctx, url, "update")
+	if err != nil || ids == nil {
 		return err
 	}
 
-	id := strings.Split(ids, "/")
-	if len(id) < 2 {
-		log.Warn(ctx, "can't update Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
-		return nil
+	return slack.UpdateMessage(ctx, ids[0], ids[len(ids)-1], msg)
+}
+
+func msgIDsForCommentURL(ctx workflow.Context, url, action string) ([]string, error) {
+	ids, err := data.SwitchURLAndID(url)
+	if err != nil {
+		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", url)
+		return nil, err
 	}
 
-	return slack.UpdateMessage(ctx, id[0], id[len(id)-1], msg)
+	parts := strings.Split(ids, "/")
+	if len(parts) < 2 {
+		msg := fmt.Sprintf("can't %s Slack message - missing/bad IDs", action)
+		log.Warn(ctx, msg, "bitbucket_url", url, "slack_ids", ids)
+		return nil, nil
+	}
+
+	return parts, nil
 }

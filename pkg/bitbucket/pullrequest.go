@@ -425,6 +425,10 @@ func prCommentDeletedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 
 	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
+	if fileID, found := lookupSlackFileID(ctx, event.Comment); found {
+		slack.DeleteFile(ctx, fileID)
+	}
+
 	return deleteMsg(ctx, htmlURL(event.Comment.Links))
 }
 

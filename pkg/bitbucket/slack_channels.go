@@ -31,6 +31,18 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 	return channelID, channelID != ""
 }
 
+// lookupSlackFileID returns all the Slack IDs associated with the given PR comment, if they exist.
+func lookupSlackFileID(ctx workflow.Context, comment *Comment) (string, bool) {
+	fileID, err := data.SwitchURLAndID(comment.Links["html"].HRef + "/slack_file_id")
+	if err != nil {
+		log.Error(ctx, "failed to retrieve PR comment's Slack file ID",
+			"error", err, "pr_url", comment.Links["html"].HRef)
+		return "", false
+	}
+
+	return fileID, fileID != ""
+}
+
 func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
 	pr := event.PullRequest

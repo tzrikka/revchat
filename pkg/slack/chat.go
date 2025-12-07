@@ -35,10 +35,6 @@ func PostMessage(ctx workflow.Context, channelID, msg string) (*slack.ChatPostMe
 	return PostReplyAsUser(ctx, channelID, "", "", "", msg)
 }
 
-func PostMessageAsUser(ctx workflow.Context, channelID, name, icon, msg string) (*slack.ChatPostMessageResponse, error) {
-	return PostReplyAsUser(ctx, channelID, "", name, icon, msg)
-}
-
 func PostReply(ctx workflow.Context, channelID, timestamp, msg string) (*slack.ChatPostMessageResponse, error) {
 	return PostReplyAsUser(ctx, channelID, timestamp, "", "", msg)
 }

@@ -167,7 +167,13 @@ type Reference struct {
 	Repository Repository `json:"repository"`
 }
 
-type Rendered = bitbucket.Rendered
+type Rendered struct {
+	// Type string `json:"type"` // Always "rendered".
+
+	Raw    string `json:"raw"`
+	Markup string `json:"markup"`
+	HTML   string `json:"html"`
+}
 
 type Repository struct {
 	// Type string `json:"type"` // Always "repository".
