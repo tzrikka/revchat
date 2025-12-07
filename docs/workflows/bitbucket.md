@@ -99,6 +99,11 @@
 
 ### Comment Updated
 
+> [!CAUTION]
+> According to [Atlassian's documentation](https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated),
+> Bitbucket sends this webhook event only if 10 minutes or more have passed since the comment was created or last updated.
+> Workaround: temporary polling after comments are created or updated, until the duration passes or the comment is deleted.
+
 - If the PR doesn't have a Slack channel - abort (ignore this event)
 - Convert Bitbucket markdown to Slack markdown
 - Identify the corresponding Slack message/reply, and update it
