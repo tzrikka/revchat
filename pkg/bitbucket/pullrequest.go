@@ -154,149 +154,6 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	return err
 }
 
-// switchSnapshot stores the given new PR snapshot, and returns the previous one (if any).
-func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*PullRequest, error) {
-	defer func() { _ = data.StoreBitbucketPR(url, snapshot) }()
-
-	prev, err := data.LoadBitbucketPR(url)
-	if err != nil {
-		log.Error(ctx, "failed to load Bitbucket PR snapshot", "error", err, "pr_url", url)
-		return nil, err
-	}
-
-	if prev == nil {
-		return nil, nil
-	}
-
-	pr := new(PullRequest)
-	if err := mapToStruct(prev, pr); err != nil {
-		log.Error(ctx, "previous snapshot of Bitbucket PR is invalid", "error", err, "pr_url", url)
-		return nil, err
-	}
-
-	// the "CommitCount" and "ChangeRequestCount" fields are populated and used by RevChat, not Bitbucket.
-	// Persist them across snapshots (before the deferred call to [data.StoreBitbucketPR]).
-	if snapshot.CommitCount == 0 {
-		snapshot.CommitCount = pr.CommitCount
-	}
-	if snapshot.ChangeRequestCount == 0 {
-		snapshot.ChangeRequestCount = pr.ChangeRequestCount
-	}
-
-	return pr, nil
-}
-
-// mapToStruct converts a map-based representation of JSON data into a [PullRequest] struct.
-func mapToStruct(m any, pr *PullRequest) error {
-	buf := bytes.NewBuffer([]byte{})
-	if err := json.NewEncoder(buf).Encode(m); err != nil {
-		return err
-	}
-
-	if err := json.NewDecoder(buf).Decode(pr); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// reviewers returns the list of reviewer account IDs, and possibly participants too.
-// The output is guaranteed to be sorted, without teams/apps, and without repetitions.
-func reviewers(pr PullRequest, includeParticipants bool) []string {
-	var accountIDs []string
-	for _, r := range pr.Reviewers {
-		accountIDs = append(accountIDs, r.AccountID)
-	}
-
-	if includeParticipants {
-		for _, p := range pr.Participants {
-			accountIDs = append(accountIDs, p.User.AccountID)
-		}
-	}
-
-	slices.Sort(accountIDs)
-	return slices.Compact(accountIDs)
-}
-
-// reviewerDiff returns the lists of added and removed reviewers
-// (not participants), compared to the previous snapshot of the PR.
-// The output is guaranteed to be sorted, without teams/apps, and without repetitions.
-func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
-	prevIDs := reviewers(prev, false)
-	currIDs := reviewers(curr, false)
-
-	for _, id := range currIDs {
-		if !slices.Contains(prevIDs, id) {
-			added = append(added, id)
-		}
-	}
-
-	for _, id := range prevIDs {
-		if !slices.Contains(currIDs, id) {
-			removed = append(removed, id)
-		}
-	}
-
-	return
-}
-
-// reviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.
-func reviewerMentions(ctx workflow.Context, added, removed []string) string {
-	var sb strings.Builder
-	sb.WriteString(":bust_in_silhouette: %s ")
-
-	switch len(added) {
-	case 0:
-		// Do nothing.
-	case 1:
-		sb.WriteString("added this reviewer:")
-		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
-	default:
-		sb.WriteString("added these reviewers:")
-		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
-	}
-
-	if len(added) > 0 && len(removed) > 0 {
-		sb.WriteString(", and ")
-	}
-
-	switch len(removed) {
-	case 0:
-		// Do nothing.
-	case 1:
-		sb.WriteString("removed this reviewer:")
-		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
-	default:
-		sb.WriteString("removed these reviewers:")
-		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
-	}
-
-	sb.WriteString(".")
-	return sb.String()
-}
-
-func bitbucketAccountsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
-	var sb strings.Builder
-	for _, a := range accountIDs {
-		if ref := users.BitbucketToSlackRef(ctx, a, ""); ref != "" {
-			sb.WriteString(" " + ref)
-		}
-	}
-	return sb.String()
-}
-
-func bitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {
-	slackIDs := []string{}
-	for _, aid := range accountIDs {
-		// True = don't include opted-out users. They will still be mentioned
-		// in the channel, but as non-members they won't be notified about it.
-		if sid := users.BitbucketToSlackID(ctx, aid, true); sid != "" {
-			slackIDs = append(slackIDs, sid)
-		}
-	}
-	return slackIDs
-}
-
 func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.Type, event.PullRequest)
@@ -460,152 +317,52 @@ func prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) err
 	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s reopened this comment. :no_good:")
 }
 
+// switchSnapshot stores the given new PR snapshot, and returns the previous one (if any).
+func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*PullRequest, error) {
+	defer func() { _ = data.StoreBitbucketPR(url, snapshot) }()
+
+	prev, err := data.LoadBitbucketPR(url)
+	if err != nil {
+		log.Error(ctx, "failed to load Bitbucket PR snapshot", "error", err, "pr_url", url)
+		return nil, err
+	}
+
+	if prev == nil {
+		return nil, nil
+	}
+
+	pr := new(PullRequest)
+	if err := mapToStruct(prev, pr); err != nil {
+		log.Error(ctx, "previous snapshot of Bitbucket PR is invalid", "error", err, "pr_url", url)
+		return nil, err
+	}
+
+	// the "CommitCount" and "ChangeRequestCount" fields are populated and used by RevChat, not Bitbucket.
+	// Persist them across snapshots (before the deferred call to [data.StoreBitbucketPR]).
+	if snapshot.CommitCount == 0 {
+		snapshot.CommitCount = pr.CommitCount
+	}
+	if snapshot.ChangeRequestCount == 0 {
+		snapshot.ChangeRequestCount = pr.ChangeRequestCount
+	}
+
+	return pr, nil
+}
+
+// mapToStruct converts a map-based representation of JSON data into a [PullRequest] struct.
+func mapToStruct(m any, pr *PullRequest) error {
+	buf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(buf).Encode(m); err != nil {
+		return err
+	}
+
+	if err := json.NewDecoder(buf).Decode(pr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func htmlURL(links map[string]Link) string {
 	return links["html"].HRef
-}
-
-// beautifyInlineComment adds an informative prefix to the comment's text.
-// If the comment contains a suggestion code block, it removes that block
-// and also generates a diff snippet to attach to the Slack message instead.
-func beautifyInlineComment(ctx workflow.Context, event PullRequestEvent, msg, raw string) (string, []byte) {
-	msg = inlineCommentPrefix(htmlURL(event.Comment.Links), event.Comment.Inline) + msg
-	msg = strings.TrimSpace(strings.TrimSuffix(msg, "\u200c"))
-
-	suggestion, ok := extractSuggestion(raw)
-	if !ok {
-		return msg, nil
-	}
-
-	diff := generateDiff(ctx, event, suggestion, event.Comment.Links["code"].HRef)
-	if diff == nil {
-		return msg, nil
-	}
-
-	if suggestion != "" {
-		suggestion += "\n"
-	}
-	msg = strings.Replace(msg, "```suggestion\n"+suggestion, "```\n"+string(diff), 1)
-
-	return msg, diff
-}
-
-func inlineCommentPrefix(commentURL string, in *Inline) string {
-	var line1 int
-	if in.StartFrom != nil {
-		line1 = *in.StartFrom
-		if in.StartTo != nil && *in.StartTo < line1 {
-			line1 = *in.StartTo
-		}
-	} else if in.StartTo != nil {
-		line1 = *in.StartTo
-	}
-
-	var line2 int
-	if in.From != nil {
-		line2 = *in.From
-		if in.To != nil && *in.To > line2 {
-			line2 = *in.To
-		}
-	} else if in.To != nil {
-		line2 = *in.To
-	}
-
-	if line1 == 0 {
-		line1 = line2
-	}
-	if line2 == 0 {
-		line2 = line1
-	}
-
-	subject := "Inline"
-	location := "in"
-	switch line1 {
-	case 0: // No line info.
-		subject = "File"
-	case line2: // Single line.
-		location = fmt.Sprintf("in line %d in", line1)
-	default: // Multiple lines.
-		location = fmt.Sprintf("in lines %d-%d in", line1, line2)
-	}
-
-	return fmt.Sprintf("<%s|%s comment> %s `%s`:\n", commentURL, subject, location, in.Path)
-}
-
-// extractSuggestion extracts the suggestion code block from a PR inline comment.
-func extractSuggestion(raw string) (string, bool) {
-	_, s, ok := strings.Cut(raw, "```suggestion\n")
-	if !ok {
-		return "", false
-	}
-
-	i := strings.LastIndex(s, "```")
-	if i == -1 {
-		return "", false
-	}
-
-	return strings.TrimSuffix(s[:i], "\n"), true
-}
-
-func generateDiff(ctx workflow.Context, event PullRequestEvent, suggestion, diffURL string) []byte {
-	src := sourceFile(ctx, diffURL, event.Comment.Inline.SrcRev)
-	if src == "" {
-		return nil
-	}
-
-	return spliceSuggestion(ctx, event.Comment.Inline, suggestion, src)
-}
-
-// spliceSuggestion splices the suggestion into the source
-// file content, and returns the result as a diff snippet.
-func spliceSuggestion(ctx workflow.Context, in *Inline, suggestion, srcFile string) []byte {
-	var firstLine, lastLine int
-	if in.From != nil {
-		firstLine, lastLine = *in.From, *in.From
-	}
-	if in.StartFrom != nil {
-		firstLine = *in.StartFrom
-	}
-
-	if in.To != nil {
-		firstLine, lastLine = *in.To, *in.To
-	}
-	if in.StartTo != nil {
-		firstLine = *in.StartTo
-	}
-
-	lenFrom := lastLine - firstLine + 1
-	lenTo := 0
-	if suggestion != "" {
-		lenTo = strings.Count(suggestion, "\n") + 1
-	}
-
-	// If the calculations above don't match the source or
-	// the suggestion, fall back to a minimalistic code block.
-	srcLines := strings.Split(srcFile, "\n")
-	numLines := len(srcLines)
-	if firstLine < 1 || lastLine < 1 || firstLine > numLines || lastLine > numLines || lenFrom <= 0 || lenTo < 0 {
-		log.Warn(ctx, "mistake in generating pretty diff")
-		return nil
-	}
-
-	var diff bytes.Buffer
-	diff.WriteString(fmt.Sprintf("@@ -%d,%d ", firstLine, lenFrom))
-	if lenTo > 0 {
-		diff.WriteString(fmt.Sprintf("+%d,%d ", firstLine, lenTo))
-	}
-	diff.WriteString("@@\n")
-
-	for _, line := range srcLines[firstLine-1 : lastLine] {
-		diff.WriteString(fmt.Sprintf("-%s\n", line))
-	}
-
-	if suggestion == "" {
-		return diff.Bytes()
-	}
-
-	for line := range strings.SplitSeq(suggestion, "\n") {
-		diff.WriteString(fmt.Sprintf("+%s\n", line))
-	}
-
-	return diff.Bytes()
 }
