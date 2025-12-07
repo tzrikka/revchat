@@ -442,7 +442,7 @@ func prCommentResolvedWorkflow(ctx workflow.Context, event PullRequestEvent) err
 	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
 	url := htmlURL(event.Comment.Links)
-	_ = addReaction(ctx, url, "ok")
+	addOKReaction(ctx, url)
 	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s resolved this comment. :ok:")
 }
 
@@ -456,7 +456,7 @@ func prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) err
 	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
 	url := htmlURL(event.Comment.Links)
-	_ = removeReaction(ctx, url, "ok")
+	removeOKReaction(ctx, url)
 	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s reopened this comment. :no_good:")
 }
 
