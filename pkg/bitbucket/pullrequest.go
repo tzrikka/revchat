@@ -1,8 +1,6 @@
 package bitbucket
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -36,7 +34,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	cmts := commits(ctx, event)
 	event.PullRequest.CommitCount = len(cmts)
 
-	url := event.PullRequest.Links["html"].HRef
+	url := htmlURL(event.PullRequest.Links)
 	snapshot, err := switchSnapshot(ctx, url, event.PullRequest)
 	if err != nil {
 		return err
@@ -146,7 +144,7 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 	oldBranch := snapshot.Destination.Branch.Name
 	newBranch := event.PullRequest.Destination.Branch.Name
 	if oldBranch != newBranch {
-		repoURL := event.Repository.Links["html"].HRef
+		repoURL := htmlURL(event.Repository.Links)
 		msg := "changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
 		mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
@@ -165,7 +163,7 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
 	pr := event.PullRequest
-	url := pr.Links["html"].HRef
+	url := htmlURL(pr.Links)
 	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
 	msg := "%s "
 
@@ -227,7 +225,7 @@ func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 
 	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
-	prURL := pr.Links["html"].HRef
+	prURL := htmlURL(pr.Links)
 	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
 	if err := data.SwitchTurn(prURL, email); err != nil {
 		log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", prURL)
@@ -266,13 +264,38 @@ func prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 
 	defer updateChannelBookmarks(ctx, event, channelID, nil)
 
-	commentURL := htmlURL(event.Comment.Links)
-	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, htmlURL(event.PullRequest.Links))
-	if event.Comment.Inline != nil {
-		msg, _ = beautifyInlineComment(ctx, event, msg, event.Comment.Content.Raw)
+	// If the comment previously had an attached diff file, delete it - it's obsolete now.
+	if fileID, found := lookupSlackFileID(ctx, event.Comment); found {
+		slack.DeleteFile(ctx, fileID)
 	}
 
-	return editMsg(ctx, commentURL, msg)
+	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, htmlURL(event.PullRequest.Links))
+	var diff []byte
+	if event.Comment.Inline != nil {
+		msg, diff = beautifyInlineComment(ctx, event, msg, event.Comment.Content.Raw)
+	}
+
+	// We can't upload a file to an existing impersonated message - that would disable future updates/deletion
+	// of that message. We also can't replace an existing file attachment with a new upload in a seamless way.
+	// So we simply replace the suggestion block with a slightly better diff block.
+	if diff != nil {
+		parts := strings.Split(msg, "\n```")
+
+		var buf strings.Builder
+		buf.WriteString(parts[0])
+		buf.WriteString("\n```")
+		buf.Write(diff)
+		buf.WriteString("```")
+		if len(parts) > 2 {
+			if suffix := strings.TrimSpace(parts[2]); suffix != "" {
+				buf.WriteString("\n")
+				buf.WriteString(suffix)
+			}
+		}
+		msg = fmt.Sprintf(impersonationToMention(buf.String()), slackDisplayName(ctx, event.Actor))
+	}
+
+	return editMsg(ctx, htmlURL(event.Comment.Links), msg)
 }
 
 func prCommentDeletedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
@@ -317,54 +340,4 @@ func prCommentReopenedWorkflow(ctx workflow.Context, event PullRequestEvent) err
 	url := htmlURL(event.Comment.Links)
 	removeOKReaction(ctx, url)
 	return mentionUserInReplyByURL(ctx, url, event.Actor, "%s reopened this comment. :no_good:")
-}
-
-// switchSnapshot stores the given new PR snapshot, and returns the previous one (if any).
-func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*PullRequest, error) {
-	defer func() { _ = data.StoreBitbucketPR(url, snapshot) }()
-
-	prev, err := data.LoadBitbucketPR(url)
-	if err != nil {
-		log.Error(ctx, "failed to load Bitbucket PR snapshot", "error", err, "pr_url", url)
-		return nil, err
-	}
-
-	if prev == nil {
-		return nil, nil
-	}
-
-	pr := new(PullRequest)
-	if err := mapToStruct(prev, pr); err != nil {
-		log.Error(ctx, "previous snapshot of Bitbucket PR is invalid", "error", err, "pr_url", url)
-		return nil, err
-	}
-
-	// the "CommitCount" and "ChangeRequestCount" fields are populated and used by RevChat, not Bitbucket.
-	// Persist them across snapshots (before the deferred call to [data.StoreBitbucketPR]).
-	if snapshot.CommitCount == 0 {
-		snapshot.CommitCount = pr.CommitCount
-	}
-	if snapshot.ChangeRequestCount == 0 {
-		snapshot.ChangeRequestCount = pr.ChangeRequestCount
-	}
-
-	return pr, nil
-}
-
-// mapToStruct converts a map-based representation of JSON data into a [PullRequest] struct.
-func mapToStruct(m any, pr *PullRequest) error {
-	buf := bytes.NewBuffer([]byte{})
-	if err := json.NewEncoder(buf).Encode(m); err != nil {
-		return err
-	}
-
-	if err := json.NewDecoder(buf).Decode(pr); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func htmlURL(links map[string]Link) string {
-	return links["html"].HRef
 }

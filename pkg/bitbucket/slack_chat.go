@@ -20,7 +20,7 @@ var workspaceURL = ""
 
 func mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) {
 	// Failures here are already logged, and never a reason to abort the calling workflows.
-	_, _ = mentionUserInReply(ctx, channelID, "", user, msg)
+	_, _ = slack.PostReply(ctx, channelID, "", fmt.Sprintf(msg, slackDisplayName(ctx, user)))
 }
 
 func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
@@ -29,13 +29,13 @@ func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Accoun
 		return err
 	}
 
-	_, err = mentionUserInReply(ctx, ids[0], ids[1], user, msg)
+	_, err = slack.PostReply(ctx, ids[0], ids[1], fmt.Sprintf(msg, slackDisplayName(ctx, user)))
 	return err
 }
 
-func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user Account, msg string) (*tslack.ChatPostMessageResponse, error) {
-	// We don't want to use a Slack mention here, because that would spam the user in
-	// Slack with a narration of their own actions. So we just write their name instead
+func slackDisplayName(ctx workflow.Context, user Account) string {
+	// We don't want to use a Slack mention, because that would spam the user in
+	// Slack with echoes of their own actions. So we just write their name instead
 	// of "users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName)".
 	slackUserID := users.BitbucketToSlackID(ctx, user.AccountID, false)
 	displayName := users.SlackIDToDisplayName(ctx, slackUserID)
@@ -54,7 +54,7 @@ func mentionUserInReply(ctx workflow.Context, channelID, threadTS string, user A
 		displayName = fmt.Sprintf("<%steam/%s?preview=no|%s>", workspaceURL, slackUserID, displayName)
 	}
 
-	return slack.PostReply(ctx, channelID, threadTS, fmt.Sprintf(msg, displayName))
+	return displayName
 }
 
 func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string, diff []byte) error {
@@ -70,7 +70,8 @@ func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Acco
 
 	id := fmt.Sprintf("%s/%s", channelID, resp.TS)
 	if err := data.MapURLAndID(url, id); err != nil {
-		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url, "slack_id", id)
+		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping",
+			"error", err, "bitbucket_url", url, "slack_id", id)
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}
@@ -78,7 +79,8 @@ func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Acco
 	// Also remember to delete diff files later, if we update or delete the message.
 	if fileID != "" {
 		if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", id, fileID)); err != nil {
-			log.Error(ctx, "failed to save Slack file mapping", "error", err, "url", url, "slack_id", id, "file_id", fileID)
+			log.Error(ctx, "failed to save Slack file mapping", "error", err,
+				"bitbucket_url", url, "slack_id", id, "file_id", fileID)
 			// Don't return the error - the message is already posted in Slack, so we
 			// don't want to retry and post it again, even though this is problematic.
 		}
@@ -105,7 +107,8 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 
 	sid := fmt.Sprintf("%s/%s/%s", ids[0], ids[1], resp.TS)
 	if err := data.MapURLAndID(url, sid); err != nil {
-		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "url", url, "slack_id", sid)
+		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping",
+			"error", err, "bitbucket_url", url, "slack_id", sid)
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}
@@ -113,7 +116,8 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 	// Also remember to delete diff files later, if we update or delete the message.
 	if fileID != "" {
 		if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", sid, fileID)); err != nil {
-			log.Error(ctx, "failed to save Slack file mapping", "error", err, "url", url, "slack_id", sid, "file_id", fileID)
+			log.Error(ctx, "failed to save Slack file mapping", "error", err,
+				"bitbucket_url", url, "slack_id", sid, "file_id", fileID)
 			// Don't return the error - the message is already posted in Slack, so we
 			// don't want to retry and post it again, even though this is problematic.
 		}
@@ -152,7 +156,8 @@ func uploadDiff(ctx workflow.Context, diff []byte, url, msg string) (string, str
 // another user ("impersonated") cannot be updated or deleted if they include file attachments.
 func postAsUser(ctx workflow.Context, msg, channelID, threadTS, fileID string, user Account) (*tslack.ChatPostMessageResponse, error) {
 	if fileID != "" {
-		return mentionUserInReply(ctx, channelID, threadTS, user, impersonationToMention(msg))
+		msg = impersonationToMention(msg)
+		return slack.PostReply(ctx, channelID, threadTS, fmt.Sprintf(msg, slackDisplayName(ctx, user)))
 	}
 
 	displayName, icon := impersonateUser(ctx, user)

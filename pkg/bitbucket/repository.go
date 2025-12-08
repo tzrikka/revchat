@@ -47,7 +47,7 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 		return nil
 	}
 
-	url := pr.Links["html"].HRef
+	url := htmlURL(pr.Links)
 	defer updateChannelBuildsBookmark(ctx, channelID, url)
 
 	status := data.CommitStatus{Name: cs.Name, State: cs.State, Desc: cs.Description, URL: cs.URL}

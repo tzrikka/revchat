@@ -21,10 +21,10 @@ import (
 
 // lookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
 func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (string, bool) {
-	channelID, err := data.SwitchURLAndID(pr.Links["html"].HRef)
+	channelID, err := data.SwitchURLAndID(htmlURL(pr.Links))
 	if err != nil {
 		log.Error(ctx, "failed to retrieve PR's Slack channel ID", "error", err,
-			"event_type", eventType, "pr_url", pr.Links["html"].HRef)
+			"event_type", eventType, "pr_url", htmlURL(pr.Links))
 		return "", false
 	}
 
@@ -33,10 +33,10 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 
 // lookupSlackFileID returns all the Slack IDs associated with the given PR comment, if they exist.
 func lookupSlackFileID(ctx workflow.Context, comment *Comment) (string, bool) {
-	fileID, err := data.SwitchURLAndID(comment.Links["html"].HRef + "/slack_file_id")
+	fileID, err := data.SwitchURLAndID(htmlURL(comment.Links) + "/slack_file_id")
 	if err != nil {
 		log.Error(ctx, "failed to retrieve PR comment's Slack file ID",
-			"error", err, "pr_url", comment.Links["html"].HRef)
+			"error", err, "pr_url", htmlURL(comment.Links))
 		return "", false
 	}
 
@@ -66,7 +66,7 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	}
 	mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
-	prURL := pr.Links["html"].HRef
+	prURL := htmlURL(pr.Links)
 	if err := data.LogSlackChannelArchived(channelID, prURL); err != nil {
 		log.Error(ctx, "failed to log Slack channel archived", "error", err, "channel_id", channelID, "pr_url", prURL)
 	}
@@ -89,7 +89,7 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 // are errors, they are logged but ignored, as we can try to create the data later.
 func initPRData(ctx workflow.Context, event PullRequestEvent, channelID string) {
 	pr := event.PullRequest
-	prURL := pr.Links["html"].HRef
+	prURL := htmlURL(pr.Links)
 
 	if err := data.StoreBitbucketPR(prURL, pr); err != nil {
 		log.Error(ctx, "failed to save Bitbucket PR snapshot", "error", err, "channel_id", channelID, "pr_url", prURL)
@@ -124,7 +124,7 @@ func initPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 
 func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error {
 	pr := event.PullRequest
-	prURL := pr.Links["html"].HRef
+	prURL := htmlURL(pr.Links)
 	pr.CommitCount = len(commits(ctx, event))
 
 	channelID, err := c.createChannel(ctx, pr)
@@ -157,7 +157,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 
 func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
 	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
-	u := pr.Links["html"].HRef
+	prURL := htmlURL(pr.Links)
 
 	for i := 1; i < 10; i++ {
 		name := fmt.Sprintf("%s-%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.ID, title)
@@ -165,7 +165,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		id, retry, err := slack.CreateChannel(ctx, name, u, c.Cmd.Bool("slack-private-channels"))
+		id, retry, err := slack.CreateChannel(ctx, name, prURL, c.Cmd.Bool("slack-private-channels"))
 		if err != nil {
 			if retry {
 				continue
@@ -174,8 +174,8 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 			}
 		}
 
-		if err := data.LogSlackChannelCreated(id, name, u); err != nil {
-			log.Error(ctx, "failed to log Slack channel creation", "error", err, "channel_id", id, "pr_url", u)
+		if err := data.LogSlackChannelCreated(id, name, prURL); err != nil {
+			log.Error(ctx, "failed to log Slack channel creation", "error", err, "channel_id", id, "pr_url", prURL)
 			// Don't fail the workflow because of logging errors.
 		}
 
@@ -183,7 +183,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 	}
 
 	msg := "too many failed attempts to create Slack channel"
-	log.Error(ctx, msg, "pr_url", u)
+	log.Error(ctx, msg, "pr_url", prURL)
 	return "", errors.New(msg)
 }
 
@@ -210,7 +210,7 @@ func (c Config) renameChannel(ctx workflow.Context, pr PullRequest, channelID st
 	}
 
 	msg := "too many failed attempts to rename Slack channel"
-	log.Error(ctx, msg, "pr_url", pr.Links["html"].HRef, "channel_id", channelID)
+	log.Error(ctx, msg, "pr_url", htmlURL(pr.Links), "channel_id", channelID)
 	return errors.New(msg)
 }
 
@@ -230,10 +230,10 @@ func postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequ
 		action = "marked as ready for review"
 	}
 
-	url := pr.Links["html"].HRef
-	msg := fmt.Sprintf("%s %s: `%s`", action, url, pr.Title)
+	prURL := htmlURL(pr.Links)
+	msg := fmt.Sprintf("%s %s: `%s`", action, prURL, pr.Title)
 	if text := strings.TrimSpace(pr.Description); text != "" {
-		msg += "\n\n" + markdown.BitbucketToSlack(ctx, text, url)
+		msg += "\n\n" + markdown.BitbucketToSlack(ctx, text, prURL)
 	}
 
 	mentionUserInMsg(ctx, channelID, actor, "%s "+msg)

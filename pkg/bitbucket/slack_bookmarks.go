@@ -28,7 +28,7 @@ func setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullReq
 // updateChannelBookmarks updates the PR's Slack channel bookmarks based on the latest PR event. This
 // is a deferred call that doesn't return an error, because handling the event itself is more important.
 func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channelID string, snapshot *PullRequest) {
-	url := event.PullRequest.Links["html"].HRef
+	url := htmlURL(event.PullRequest.Links)
 
 	// PR update events already load the previous snapshot, so reuse it in that case.
 	updateCommits := true

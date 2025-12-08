@@ -25,8 +25,7 @@ func commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 		PullRequestID: strconv.Itoa(event.PullRequest.ID),
 	})
 	if err != nil {
-		url := event.PullRequest.Links["html"].HRef
-		log.Error(ctx, "failed to list Bitbucket PR commits", "error", err, "pr_url", url,
+		log.Error(ctx, "failed to list Bitbucket PR commits", "error", err, "pr_url", htmlURL(event.PullRequest.Links),
 			"workspace", workspace, "repo", repo, "pr_id", event.PullRequest.ID)
 		return nil
 	}
@@ -95,8 +94,7 @@ func diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.Diffstat
 		PullRequestID: strconv.Itoa(event.PullRequest.ID),
 	})
 	if err != nil {
-		url := event.PullRequest.Links["html"].HRef
-		log.Error(ctx, "failed to get Bitbucket PR diffstat", "error", err, "pr_url", url,
+		log.Error(ctx, "failed to get Bitbucket PR diffstat", "error", err, "pr_url", htmlURL(event.PullRequest.Links),
 			"workspace", workspace, "repo", repo, "pr_id", event.PullRequest.ID)
 		return nil
 	}
