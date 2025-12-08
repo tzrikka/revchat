@@ -22,7 +22,7 @@ func TestUsers(t *testing.T) {
 	}
 
 	// Add the user.
-	if err := UpsertUser(email, id, "", "", "", "", ""); err != nil {
+	if err := UpsertUser(email, id, "", "", "", ""); err != nil {
 		t.Fatalf("UpsertUser() error = %v", err)
 	}
 

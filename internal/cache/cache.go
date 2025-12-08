@@ -33,10 +33,11 @@ func (i *Item) Expired() bool {
 }
 
 const (
-	DefaultExpiration time.Duration = 0
-	NoCleanup         time.Duration = 0 // For use in [New] only.
-	NoExpiration      time.Duration = -1
-	KeepTTL           time.Duration = -2 // For use in [Replace] only.
+	DefaultCleanupInterval time.Duration = 61 * time.Minute // Prime number & slightly over an hour.
+	DefaultExpiration      time.Duration = 0
+	NoCleanup              time.Duration = 0 // For use in [New] only.
+	NoExpiration           time.Duration = -1
+	KeepTTL                time.Duration = -2 // For use in [Replace] only.
 )
 
 // New creates a new [Cache] instance.

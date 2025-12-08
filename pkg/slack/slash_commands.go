@@ -303,7 +303,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 		}
 	}
 
-	if err := data.UpsertUser("", "", "", user.SlackID, "", "", linkID); err != nil {
+	if err := data.UpsertUser("", "", "", user.SlackID, "", linkID); err != nil {
 		log.Error(ctx, "failed to opt-in user", "error", err, "email", user.Email)
 		postEphemeralError(ctx, event, "failed to write internal data about you.")
 		_ = c.deleteThrippyLink(ctx, linkID)
@@ -330,7 +330,7 @@ func (c *Config) optOutSlashCommand(ctx workflow.Context, event SlashCommandEven
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
-	if err := data.UpsertUser(user.Email, user.BitbucketID, user.GitHubID, user.SlackID, "", "", "X"); err != nil {
+	if err := data.UpsertUser(user.Email, user.BitbucketID, user.GitHubID, user.SlackID, "", "X"); err != nil {
 		log.Error(ctx, "failed to opt-out user", "error", err, "email", user.Email)
 		postEphemeralError(ctx, event, "failed to write internal data about you.")
 		return err

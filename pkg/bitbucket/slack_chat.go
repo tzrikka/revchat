@@ -203,14 +203,8 @@ func impersonateUser(ctx workflow.Context, user Account) (displayName, icon stri
 		return
 	}
 
-	profile, err := tslack.UsersProfileGet(ctx, id)
-	if err != nil {
-		displayName = user.DisplayName
-		return
-	}
-
-	displayName = profile.DisplayName
-	icon = profile.Image48
+	displayName = users.SlackIDToDisplayName(ctx, id)
+	icon = users.SlackIDToIcon(ctx, id)
 	return
 }
 
