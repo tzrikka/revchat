@@ -135,18 +135,16 @@ func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 
 		var nestedOwners []string
 		for _, owner := range owners {
-			o, isGroup := strings.CutPrefix(owner, "@")
-			msg.WriteString("\n          ◦   " + o)
-			if isGroup {
+			msg.WriteString("\n          ◦   " + strings.TrimPrefix(owner, "@"))
+			if strings.HasPrefix(owner, "@") {
 				msg.WriteString(": ")
-				for i, member := range groups[o] {
+				for i, member := range groups[owner] {
 					if i > 0 {
 						msg.WriteString(", ")
 					}
-					name, isSubGroup := strings.CutPrefix(member, "@")
-					msg.WriteString(name)
-					if isSubGroup && !slices.Contains(nestedOwners, name) {
-						nestedOwners = append(nestedOwners, name)
+					msg.WriteString(strings.TrimPrefix(member, "@"))
+					if strings.HasPrefix(member, "@") && !slices.Contains(nestedOwners, member) {
+						nestedOwners = append(nestedOwners, member)
 					}
 				}
 			}
@@ -155,21 +153,19 @@ func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		for i := 0; i < len(nestedOwners); i++ {
 			group := nestedOwners[i]
 			for _, member := range groups[group] {
-				name, isGroup := strings.CutPrefix(member, "@")
-				if isGroup && !slices.Contains(nestedOwners, name) {
-					nestedOwners = append(nestedOwners, name)
+				if strings.HasPrefix(member, "@") && !slices.Contains(nestedOwners, member) {
+					nestedOwners = append(nestedOwners, member)
 				}
 			}
 		}
 
 		for _, group := range nestedOwners {
-			msg.WriteString(fmt.Sprintf("\n          ◦   %s: ", group))
+			msg.WriteString(fmt.Sprintf("\n          ◦   %s: ", strings.TrimPrefix(group, "@")))
 			for i, member := range groups[group] {
 				if i > 0 {
 					msg.WriteString(", ")
 				}
-				name, _ := strings.CutPrefix(member, "@")
-				msg.WriteString(name)
+				msg.WriteString(strings.TrimPrefix(member, "@"))
 			}
 		}
 	}
