@@ -25,6 +25,7 @@ func BitbucketToSlack(ctx workflow.Context, text, prURL string) string {
 	// Before text styling, to prevent confusion in "*"-based bullets with text that contains "*" characters.
 	text = bitbucketToSlackLists(text)
 	text = bitbucketToSlackTextStyles(text)
+	text = bitbucketToSlackUnescapes(text)
 	text = bitbucketToSlackLinks(text, prURL)
 
 	// Mentions: "@{account:uuid}" --> "<@U123>" or "Display Name",
@@ -44,8 +45,7 @@ func bitbucketToSlackEmoji(text string) string {
 	text = strings.ReplaceAll(text, ":rofl:", ":rolling_on_the_floor_laughing:")
 	text = strings.ReplaceAll(text, ":slight_smile:", ":slightly_smiling_face:")
 	text = strings.ReplaceAll(text, ":upside_down:", ":upside_down_face:")
-	text = strings.ReplaceAll(text, ":woman_facepalming:", ":woman-facepalming:")
-	return text
+	return strings.ReplaceAll(text, ":woman_facepalming:", ":woman-facepalming:")
 }
 
 func bitbucketToSlackLinks(text, prURL string) string {
@@ -57,14 +57,6 @@ func bitbucketToSlackLinks(text, prURL string) string {
 
 	// Images: "![text](url){ ... }" --> "!<url|text>" --> ":camera: <url|text>".
 	text = regexp.MustCompile(`!(<|&lt;)(.*?)>`).ReplaceAllString(text, ":camera: <${2}>")
-
-	// Unescape non-links.
-	text = strings.ReplaceAll(text, `\+`, "+")
-	text = strings.ReplaceAll(text, `\_`, "_")
-	text = strings.ReplaceAll(text, "\\`", "`")
-	text = strings.ReplaceAll(strings.ReplaceAll(text, `\[`, "["), `\]`, "]")
-	text = strings.ReplaceAll(strings.ReplaceAll(text, `\{`, "{"), `\}`, "}")
-	text = strings.ReplaceAll(strings.ReplaceAll(text, `\(`, "("), `\)`, ")")
 
 	// PR references: "#123" --> "<PR URL|#123>".
 	baseURL := "<" + regexp.MustCompile(`/pull-requests/\d+$`).ReplaceAllString(prURL, "/pull-requests/")
@@ -114,6 +106,15 @@ func bitbucketToSlackTextStyles(text string) string {
 	return regexp.MustCompile(`(?m)^\*(#+) \*(.+?)\*\*`).ReplaceAllString(text, "*${1} ${2}*")
 }
 
+func bitbucketToSlackUnescapes(text string) string {
+	text = strings.ReplaceAll(text, `\+`, "+")
+	text = strings.ReplaceAll(text, `\_`, "_")
+	text = strings.ReplaceAll(text, "\\`", "`")
+	text = strings.ReplaceAll(strings.ReplaceAll(text, `\[`, "["), `\]`, "]")
+	text = strings.ReplaceAll(strings.ReplaceAll(text, `\{`, "{"), `\}`, "}")
+	return strings.ReplaceAll(strings.ReplaceAll(text, `\(`, "("), `\)`, ")")
+}
+
 func bitbucketToSlackWhitespaces(text string) string {
 	text = strings.TrimSpace(text)
 
@@ -158,8 +159,7 @@ func slackToBitbucketEmoji(text string) string {
 	text = strings.ReplaceAll(text, ":rolling_on_the_floor_laughing:", ":rofl:")
 	text = strings.ReplaceAll(text, ":slightly_smiling_face:", ":slight_smile:")
 	text = strings.ReplaceAll(text, ":upside_down_face:", ":upside_down:")
-	text = strings.ReplaceAll(text, ":woman-facepalming:", ":woman_facepalming:")
-	return text
+	return strings.ReplaceAll(text, ":woman-facepalming:", ":woman_facepalming:")
 }
 
 func slackToBitbucketLinks(text string) string {
