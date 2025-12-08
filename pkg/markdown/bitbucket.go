@@ -60,6 +60,8 @@ func bitbucketToSlackLinks(text, prURL string) string {
 
 	// Unescape non-links.
 	text = strings.ReplaceAll(text, `\+`, "+")
+	text = strings.ReplaceAll(text, `\_`, "_")
+	text = strings.ReplaceAll(text, "\\`", "`")
 	text = strings.ReplaceAll(strings.ReplaceAll(text, `\[`, "["), `\]`, "]")
 	text = strings.ReplaceAll(strings.ReplaceAll(text, `\{`, "{"), `\}`, "}")
 	text = strings.ReplaceAll(strings.ReplaceAll(text, `\(`, "("), `\)`, ")")
