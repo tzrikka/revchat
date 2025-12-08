@@ -292,7 +292,8 @@ func prCommentUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 				buf.WriteString(suffix)
 			}
 		}
-		msg = fmt.Sprintf(impersonationToMention(buf.String()), slackDisplayName(ctx, event.Actor))
+		// Don't use fmt.Sprintf() here to avoid issues with % signs in the diff.
+		msg = strings.Replace(impersonationToMention(buf.String()), "%s", slackDisplayName(ctx, event.Actor), 1)
 	}
 
 	return editMsg(ctx, htmlURL(event.Comment.Links), msg)

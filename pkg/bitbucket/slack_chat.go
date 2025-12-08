@@ -19,8 +19,11 @@ import (
 var workspaceURL = ""
 
 func mentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg string) {
+	// Don't use fmt.Sprintf() here to avoid issues with % signs in the text.
+	msg = strings.Replace(msg, "%s", slackDisplayName(ctx, user), 1)
+
 	// Failures here are already logged, and never a reason to abort the calling workflows.
-	_, _ = slack.PostReply(ctx, channelID, "", fmt.Sprintf(msg, slackDisplayName(ctx, user)))
+	_, _ = slack.PostReply(ctx, channelID, "", msg)
 }
 
 func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Account, msg string) error {
@@ -29,7 +32,10 @@ func mentionUserInReplyByURL(ctx workflow.Context, parentURL string, user Accoun
 		return err
 	}
 
-	_, err = slack.PostReply(ctx, ids[0], ids[1], fmt.Sprintf(msg, slackDisplayName(ctx, user)))
+	// Don't use fmt.Sprintf() here to avoid issues with % signs in the text.
+	msg = strings.Replace(msg, "%s", slackDisplayName(ctx, user), 1)
+
+	_, err = slack.PostReply(ctx, ids[0], ids[1], msg)
 	return err
 }
 
@@ -156,8 +162,9 @@ func uploadDiff(ctx workflow.Context, diff []byte, url, msg string) (string, str
 // another user ("impersonated") cannot be updated or deleted if they include file attachments.
 func postAsUser(ctx workflow.Context, msg, channelID, threadTS, fileID string, user Account) (*tslack.ChatPostMessageResponse, error) {
 	if fileID != "" {
-		msg = impersonationToMention(msg)
-		return slack.PostReply(ctx, channelID, threadTS, fmt.Sprintf(msg, slackDisplayName(ctx, user)))
+		// Don't use fmt.Sprintf() here to avoid issues with % signs in the text.
+		msg = strings.Replace(impersonationToMention(msg), "%s", slackDisplayName(ctx, user), 1)
+		return slack.PostReply(ctx, channelID, threadTS, msg)
 	}
 
 	displayName, icon := impersonateUser(ctx, user)

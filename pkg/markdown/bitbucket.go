@@ -198,8 +198,8 @@ func slackToBitbucketReferences(ctx workflow.Context, bitbucketWorkspace, text s
 		if len(slackRef) > 1 {
 			id := slackRef[1]
 			name := slackChannelIDToName(ctx, id)
-			u, _ := url.JoinPath(slackBaseURL(ctx), "archives", id) // "" on error.
-			text = strings.ReplaceAll(text, slackRef[0], fmt.Sprintf("<%s|#%s>", u, name))
+			slackURL, _ := url.JoinPath(slackBaseURL(ctx), "archives", id) // "" on error.
+			text = strings.ReplaceAll(text, slackRef[0], fmt.Sprintf("<%s|#%s>", slackURL, name))
 		}
 	}
 

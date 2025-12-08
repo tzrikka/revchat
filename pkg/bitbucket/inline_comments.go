@@ -140,7 +140,7 @@ func spliceSuggestion(ctx workflow.Context, in *Inline, suggestion, srcFile stri
 	diff.WriteString("@@\n")
 
 	for _, line := range srcLines[firstLine-1 : lastLine] {
-		diff.WriteString(fmt.Sprintf("-%s\n", line))
+		diff.WriteString("-" + line + "\n")
 	}
 
 	if suggestion == "" {
@@ -148,7 +148,7 @@ func spliceSuggestion(ctx workflow.Context, in *Inline, suggestion, srcFile stri
 	}
 
 	for line := range strings.SplitSeq(suggestion, "\n") {
-		diff.WriteString(fmt.Sprintf("+%s\n", line))
+		diff.WriteString("+" + line + "\n")
 	}
 
 	return diff.Bytes()
