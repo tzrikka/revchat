@@ -85,19 +85,18 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	var cmds strings.Builder
 
-	cmds.WriteString(":wave: Available slash commands for `%s`:\n\n")
-	cmds.WriteString("  •  `%s opt-in` - opt into being added to PR channels and receiving DMs\n")
-	cmds.WriteString("  •  `%s opt-out` - opt out of being added to PR channels and receiving DMs\n")
-	cmds.WriteString("  •  `%s reminders at <time in 12h/24h format>` (weekdays, using your timezone)\n")
-	cmds.WriteString("  •  `%s status` - show your current PR status, as an author and reviewer\n\n")
-	cmds.WriteString("More commands inside PR channels:\n\n")
-	cmds.WriteString("  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `set turn to <1 or more @users>`\n")
-	cmds.WriteString("  •  `%s nudge <1 or more @users>` / `ping <1 or more @users>` / `poke <...>`\n")
-	cmds.WriteString("  •  `%s explain` - who needs to approve per file, and have they?\n")
-	cmds.WriteString("  •  `%s approve` or `lgtm` or `+1`\n")
-	cmds.WriteString("  •  `%s unapprove` or `-1`\n")
-	cmds.WriteString("  •  `%s update channel`\n")
-
+	cmds.WriteString(":wave: Available slash commands for `%s`:\n")
+	cmds.WriteString("\n  •  `%s opt-in` - opt into being added to PR channels and receiving DMs")
+	cmds.WriteString("\n  •  `%s opt-out` - opt out of being added to PR channels and receiving DMs")
+	cmds.WriteString("\n  •  `%s reminders at <time in 12h/24h format>` (weekdays, using your timezone)")
+	cmds.WriteString("\n  •  `%s status` - show your current PR status, as an author and reviewer")
+	cmds.WriteString("\n\nMore commands inside PR channels:\n")
+	cmds.WriteString("\n  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `set turn to <1 or more @users>`")
+	cmds.WriteString("\n  •  `%s nudge <1 or more @users>` / `ping <1 or more @users>` / `poke <...>`")
+	cmds.WriteString("\n  •  `%s explain` - who needs to approve each file, and have they?")
+	cmds.WriteString("\n  •  `%s approve` or `lgtm` or `+1`")
+	cmds.WriteString("\n  •  `%s unapprove` or `-1`")
+	cmds.WriteString("\n  •  `%s update channel`")
 	msg := strings.ReplaceAll(cmds.String(), "%s", event.Command)
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
@@ -121,20 +120,57 @@ func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	}
 
 	workspace, repo, branch, commit := destinationDetails(pr)
-	codeowners := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths)
+	codeowners, groups := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths)
 
 	var msg strings.Builder
 	msg.WriteString(":mag_right: Code owners per file in this PR:")
 
 	for _, p := range paths {
-		msg.WriteString(fmt.Sprintf("\n\n  •  `%s`:", p))
+		msg.WriteString(fmt.Sprintf("\n\n  •  `%s`", p))
 		owners := codeowners[p]
-		switch len(owners) {
-		case 0:
+		if len(owners) == 0 {
 			msg.WriteString("\n          ◦   (No code owners found)")
-		default:
-			msg.WriteString("\n          ◦   ")
-			msg.WriteString(strings.Join(owners, ", "))
+			continue
+		}
+
+		var nestedOwners []string
+		for _, owner := range owners {
+			o, isGroup := strings.CutPrefix(owner, "@")
+			msg.WriteString("\n          ◦   " + o)
+			if isGroup {
+				msg.WriteString(": ")
+				for i, member := range groups[o] {
+					if i > 0 {
+						msg.WriteString(", ")
+					}
+					name, isSubGroup := strings.CutPrefix(member, "@")
+					msg.WriteString(name)
+					if isSubGroup && !slices.Contains(nestedOwners, name) {
+						nestedOwners = append(nestedOwners, name)
+					}
+				}
+			}
+		}
+
+		for i := 0; i < len(nestedOwners); i++ {
+			group := nestedOwners[i]
+			for _, member := range groups[group] {
+				name, isGroup := strings.CutPrefix(member, "@")
+				if isGroup && !slices.Contains(nestedOwners, name) {
+					nestedOwners = append(nestedOwners, name)
+				}
+			}
+		}
+
+		for _, group := range nestedOwners {
+			msg.WriteString(fmt.Sprintf("\n          ◦   %s: ", group))
+			for i, member := range groups[group] {
+				if i > 0 {
+					msg.WriteString(", ")
+				}
+				name, _ := strings.CutPrefix(member, "@")
+				msg.WriteString(name)
+			}
 		}
 	}
 

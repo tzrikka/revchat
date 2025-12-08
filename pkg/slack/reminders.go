@@ -58,6 +58,7 @@ func remindersWorkflow(ctx workflow.Context) error {
 			msg.WriteString("\n  •  `/revchat status` - updated report at any time")
 			msg.WriteString("\n  •  `/revchat reminder <time in 12h/24h format>` - change time or timezone")
 			msg.WriteString("\n  •  `/revchat who` / `my turn` / `not my turn` - only in RevChat channels")
+			msg.WriteString("\n  •  `/revchat explain` - who needs to approve each file, and have they?")
 
 			_, _ = PostMessage(ctx, userID, msg.String())
 		}
@@ -193,7 +194,7 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	workspace, repo, branch, commit := destinationDetails(pr)
 	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, commit, users.SlackIDToRealName(ctx, userID), paths)
 	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, commit, paths)
-	approvals, names := approvers(ctx, pr)
+	approvals, names := approversForReminder(ctx, pr)
 
 	if owner+highRisk+approvals > 0 {
 		summary.WriteString("\n          ◦   ")
@@ -230,7 +231,7 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	return summary.String()
 }
 
-func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
+func approversForReminder(ctx workflow.Context, pr map[string]any) (int, string) {
 	participants, ok := pr["participants"].([]any)
 	if !ok {
 		return 0, ""
