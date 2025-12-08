@@ -15,6 +15,7 @@ const (
 	indexByBitbucketID = 2
 	indexByGitHubID    = 3
 	indexBySlackID     = 4
+	indexByRealName    = 5
 )
 
 // User represents a mapping between various user IDs and email
@@ -28,9 +29,7 @@ type User struct {
 	BitbucketID string `json:"bitbucket_id,omitempty"`
 	GitHubID    string `json:"github_id,omitempty"`
 	SlackID     string `json:"slack_id,omitempty"`
-
-	RealName  string `json:"real_name,omitempty"`
-	SlackName string `json:"slack_name,omitempty"`
+	RealName    string `json:"real_name,omitempty"`
 
 	ThrippyLink string `json:"thrippy_link,omitempty"`
 
@@ -47,6 +46,7 @@ type Users struct {
 	bitbucketIndex map[string]int
 	githubIndex    map[string]int
 	slackIndex     map[string]int
+	nameIndex      map[string]int
 }
 
 var (
@@ -66,7 +66,7 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 		}
 	}
 
-	i, err := usersDB.findUserIndex(email, bitbucketID, githubID, slackID)
+	i, err := usersDB.findUserIndex(email, bitbucketID, githubID, slackID, realName)
 	if err != nil {
 		return err
 	}
@@ -100,6 +100,7 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 	}
 	if realName != "" {
 		usersDB.entries[i].RealName = realName
+		usersDB.nameIndex[realName] = i
 	}
 	if thrippyLink != "" {
 		if thrippyLink == "X" {
@@ -111,11 +112,12 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 	return usersDB.writeUsersFile()
 }
 
-func (u *Users) findUserIndex(email, bitbucketID, githubID, slackID string) (int, error) {
+func (u *Users) findUserIndex(email, bitbucketID, githubID, slackID, realName string) (int, error) {
 	emailIndex, emailFound := u.emailIndex[email]
 	bitbucketIndex, bitbucketFound := u.bitbucketIndex[bitbucketID]
 	githubIndex, githubFound := u.githubIndex[githubID]
 	slackIndex, slackFound := u.slackIndex[slackID]
+	nameIndex, nameFound := u.nameIndex[realName]
 
 	i := -1
 	if emailFound {
@@ -139,6 +141,12 @@ func (u *Users) findUserIndex(email, bitbucketID, githubID, slackID string) (int
 		}
 		i = slackIndex
 	}
+	if nameFound {
+		if i >= 0 && i != nameIndex {
+			return -1, errors.New("conflicting user entries")
+		}
+		i = nameIndex
+	}
 
 	return i, nil
 }
@@ -157,6 +165,10 @@ func SelectUserByGitHubID(githubID string) (User, error) {
 
 func SelectUserBySlackID(slackID string) (User, error) {
 	return selectUserBy(indexBySlackID, slackID)
+}
+
+func SelectUserByRealName(realName string) (User, error) {
+	return selectUserBy(indexByRealName, realName)
 }
 
 func IsOptedIn(u User) bool {
@@ -189,6 +201,8 @@ func selectUserBy(indexType int, id string) (User, error) {
 		index = usersDB.githubIndex
 	case indexBySlackID:
 		index = usersDB.slackIndex
+	case indexByRealName:
+		index = usersDB.nameIndex
 	default:
 		return User{}, errors.New("invalid index type")
 	}
@@ -232,6 +246,7 @@ func readUsersFile() (*Users, error) {
 	u.bitbucketIndex = map[string]int{}
 	u.githubIndex = map[string]int{}
 	u.slackIndex = map[string]int{}
+	u.nameIndex = map[string]int{}
 
 	for i, user := range u.entries {
 		if user.Email != "" && user.Email != "bot" {
@@ -245,6 +260,9 @@ func readUsersFile() (*Users, error) {
 		}
 		if user.SlackID != "" {
 			u.slackIndex[user.SlackID] = i
+		}
+		if user.RealName != "" {
+			u.nameIndex[user.RealName] = i
 		}
 	}
 

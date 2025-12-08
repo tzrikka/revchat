@@ -140,9 +140,9 @@ func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 				msg.WriteString(": ")
 				for i, member := range groups[owner] {
 					if i > 0 {
-						msg.WriteString(", ")
+						msg.WriteString(" ")
 					}
-					msg.WriteString(strings.TrimPrefix(member, "@"))
+					msg.WriteString(ownerMention(member))
 					if strings.HasPrefix(member, "@") && !slices.Contains(nestedOwners, member) {
 						nestedOwners = append(nestedOwners, member)
 					}
@@ -163,14 +163,27 @@ func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 			msg.WriteString(fmt.Sprintf("\n          ◦   %s: ", strings.TrimPrefix(group, "@")))
 			for i, member := range groups[group] {
 				if i > 0 {
-					msg.WriteString(", ")
+					msg.WriteString(" ")
 				}
-				msg.WriteString(strings.TrimPrefix(member, "@"))
+				msg.WriteString(ownerMention(member))
 			}
 		}
 	}
 
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
+}
+
+func ownerMention(owner string) string {
+	if name, isGroup := strings.CutPrefix(owner, "@"); isGroup {
+		return name
+	}
+
+	user, err := data.SelectUserByRealName(owner)
+	if err != nil || user.SlackID == "" {
+		return owner
+	}
+
+	return fmt.Sprintf("<@%s>", user.SlackID)
 }
 
 func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent, pattern *regexp.Regexp) ([]string, map[string]bool) {
