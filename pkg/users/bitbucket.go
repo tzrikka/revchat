@@ -76,9 +76,6 @@ func BitbucketToSlackRef(ctx workflow.Context, accountID, displayName string) st
 	if user.SlackID != "" {
 		return fmt.Sprintf("<@%s>", user.SlackID)
 	}
-	if user.SlackName != "" {
-		return "@" + user.SlackName
-	}
 	if user.RealName != "" {
 		return user.RealName
 	}
