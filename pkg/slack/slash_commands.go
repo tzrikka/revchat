@@ -13,6 +13,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -42,6 +43,8 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 		return c.optOutSlashCommand(ctx, event)
 	case "stat", "state", "status":
 		return statusSlashCommand(ctx, event)
+	case "explain":
+		return explainSlashCommand(ctx, event)
 	case "who", "whose", "whose turn":
 		return whoseTurnSlashCommand(ctx, event)
 	case "my turn":
@@ -80,20 +83,62 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 }
 
 func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	msg := ":wave: Available slash commands for `%s`:\n\n"
-	msg += "  •  `%s opt-in` - opt into being added to PR channels and receiving DMs\n"
-	msg += "  •  `%s opt-out` - opt out of being added to PR channels and receiving DMs\n"
-	msg += "  •  `%s reminders at <time in 12h/24h format>` (weekdays, using your timezone)\n"
-	msg += "  •  `%s status` - show your current PR status, as an author and reviewer\n\n"
-	msg += "More commands inside PR channels:\n\n"
-	msg += "  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `set turn to <1 or more @users>`\n"
-	msg += "  •  `%s nudge <1 or more @users>` / `ping <1 or more @users>` / `poke <...>`\n"
-	msg += "  •  `%s approve` or `lgtm` or `+1`\n"
-	msg += "  •  `%s unapprove` or `-1`\n"
-	msg += "  •  `%s update channel`\n"
-	msg = strings.ReplaceAll(msg, "%s", event.Command)
+	var cmds strings.Builder
 
+	cmds.WriteString(":wave: Available slash commands for `%s`:\n\n")
+	cmds.WriteString("  •  `%s opt-in` - opt into being added to PR channels and receiving DMs\n")
+	cmds.WriteString("  •  `%s opt-out` - opt out of being added to PR channels and receiving DMs\n")
+	cmds.WriteString("  •  `%s reminders at <time in 12h/24h format>` (weekdays, using your timezone)\n")
+	cmds.WriteString("  •  `%s status` - show your current PR status, as an author and reviewer\n\n")
+	cmds.WriteString("More commands inside PR channels:\n\n")
+	cmds.WriteString("  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `set turn to <1 or more @users>`\n")
+	cmds.WriteString("  •  `%s nudge <1 or more @users>` / `ping <1 or more @users>` / `poke <...>`\n")
+	cmds.WriteString("  •  `%s explain` - who needs to approve per file, and have they?\n")
+	cmds.WriteString("  •  `%s approve` or `lgtm` or `+1`\n")
+	cmds.WriteString("  •  `%s unapprove` or `-1`\n")
+	cmds.WriteString("  •  `%s update channel`\n")
+
+	msg := strings.ReplaceAll(cmds.String(), "%s", event.Command)
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+}
+
+func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	url := prDetailsFromChannel(ctx, event)
+	if url == nil {
+		return nil // Not a *server* error as far as we're concerned.
+	}
+
+	pr, err := data.LoadBitbucketPR(url[0])
+	if err != nil {
+		postEphemeralError(ctx, event, "failed to load PR snapshot.")
+		return err
+	}
+
+	paths := data.ReadBitbucketDiffstatPaths(url[0])
+	if len(paths) == 0 {
+		postEphemeralError(ctx, event, "no file paths found in PR diffstat.")
+		return nil
+	}
+
+	workspace, repo, branch, commit := destinationDetails(pr)
+	codeowners := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths)
+
+	var msg strings.Builder
+	msg.WriteString(":mag_right: Code owners per file in this PR:")
+
+	for _, p := range paths {
+		msg.WriteString(fmt.Sprintf("\n\n  •  `%s`:", p))
+		owners := codeowners[p]
+		switch len(owners) {
+		case 0:
+			msg.WriteString("\n          ◦   (No code owners found)")
+		default:
+			msg.WriteString("\n          ◦   ")
+			msg.WriteString(strings.Join(owners, ", "))
+		}
+	}
+
+	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
 }
 
 func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent, pattern *regexp.Regexp) ([]string, map[string]bool) {
