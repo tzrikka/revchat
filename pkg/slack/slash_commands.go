@@ -335,7 +335,20 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":bell: You're already opted in.")
 	}
 
-	user.SlackID = event.UserID // Ensure the user's Slack ID is set even if the user is unrecognized.
+	info, err := slack.UsersInfo(ctx, event.UserID)
+	if err != nil {
+		log.Error(ctx, "failed to retrieve Slack user info", "error", err, "user_id", event.UserID)
+		postEphemeralError(ctx, event, "failed to retrieve your user info from Slack.")
+		return err
+	}
+
+	// Ensure the user's basic details are set even if they're unrecognized.
+	user.Email = info.Profile.Email
+	user.RealName = info.RealName
+	user.SlackID = event.UserID
+	if info.IsBot {
+		user.Email = "bot"
+	}
 
 	switch {
 	case c.bitbucketWorkspace != "":
@@ -377,7 +390,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 		}
 	}
 
-	if err := data.UpsertUser("", "", "", user.SlackID, "", linkID); err != nil {
+	if err := data.UpsertUser(user.Email, "", "", user.SlackID, user.RealName, linkID); err != nil {
 		log.Error(ctx, "failed to opt-in user", "error", err, "email", user.Email)
 		postEphemeralError(ctx, event, "failed to write internal data about you.")
 		_ = c.deleteThrippyLink(ctx, linkID)
