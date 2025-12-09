@@ -37,25 +37,29 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 	switch event.Text {
 	case "", "help":
 		return helpSlashCommand(ctx, event)
+
 	case "opt-in", "opt in", "optin":
 		return c.optInSlashCommand(ctx, event)
 	case "opt-out", "opt out", "optout":
 		return c.optOutSlashCommand(ctx, event)
+
 	case "stat", "state", "status":
 		return statusSlashCommand(ctx, event)
 	case "explain":
 		return explainSlashCommand(ctx, event)
+
 	case "who", "whose", "whose turn":
 		return whoseTurnSlashCommand(ctx, event)
 	case "my turn":
 		return myTurnSlashCommand(ctx, event)
 	case "not my turn":
 		return notMyTurnSlashCommand(ctx, event)
+
 	case "approve", "lgtm", "+1":
 		return c.approveSlashCommand(ctx, event)
 	case "unapprove", "-1":
 		return c.unapproveSlashCommand(ctx, event)
-	case "update", "update channel":
+	case "update":
 		return updateChannelSlashCommand(ctx, event)
 	}
 
@@ -89,14 +93,15 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	cmds.WriteString("\n  •  `%s opt-in` - opt into being added to PR channels and receiving DMs")
 	cmds.WriteString("\n  •  `%s opt-out` - opt out of being added to PR channels and receiving DMs")
 	cmds.WriteString("\n  •  `%s reminders at <time in 12h/24h format>` (weekdays, using your timezone)")
-	cmds.WriteString("\n  •  `%s status` - show your current PR status, as an author and reviewer")
+	cmds.WriteString("\n  •  `%s status` - show your current PR states, as an author and reviewer")
 	cmds.WriteString("\n\nMore commands inside PR channels:\n")
 	cmds.WriteString("\n  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `set turn to <1 or more @users>`")
 	cmds.WriteString("\n  •  `%s nudge <1 or more @users>` / `ping <1 or more @users>` / `poke <...>`")
 	cmds.WriteString("\n  •  `%s explain` - who needs to approve each file, and have they?")
 	cmds.WriteString("\n  •  `%s approve` or `lgtm` or `+1`")
 	cmds.WriteString("\n  •  `%s unapprove` or `-1`")
-	cmds.WriteString("\n  •  `%s update channel`")
+	// cmds.WriteString("\n  •  `%s update`")
+
 	msg := strings.ReplaceAll(cmds.String(), "%s", event.Command)
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
@@ -120,70 +125,10 @@ func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	}
 
 	workspace, repo, branch, commit := destinationDetails(pr)
-	codeowners, groups := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths)
+	owners, groups := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths)
 
-	var msg strings.Builder
-	msg.WriteString(":mag_right: Code owners per file in this PR:")
-
-	for _, p := range paths {
-		msg.WriteString(fmt.Sprintf("\n\n  •  `%s`", p))
-		owners := codeowners[p]
-		if len(owners) == 0 {
-			msg.WriteString("\n          ◦   (No code owners found)")
-			continue
-		}
-
-		var nestedOwners []string
-		for _, owner := range owners {
-			msg.WriteString("\n          ◦   " + strings.TrimPrefix(owner, "@"))
-			if strings.HasPrefix(owner, "@") {
-				msg.WriteString(": ")
-				for i, member := range groups[owner] {
-					if i > 0 {
-						msg.WriteString(" ")
-					}
-					msg.WriteString(ownerMention(member))
-					if strings.HasPrefix(member, "@") && !slices.Contains(nestedOwners, member) {
-						nestedOwners = append(nestedOwners, member)
-					}
-				}
-			}
-		}
-
-		for i := 0; i < len(nestedOwners); i++ {
-			group := nestedOwners[i]
-			for _, member := range groups[group] {
-				if strings.HasPrefix(member, "@") && !slices.Contains(nestedOwners, member) {
-					nestedOwners = append(nestedOwners, member)
-				}
-			}
-		}
-
-		for _, group := range nestedOwners {
-			msg.WriteString(fmt.Sprintf("\n          ◦   %s: ", strings.TrimPrefix(group, "@")))
-			for i, member := range groups[group] {
-				if i > 0 {
-					msg.WriteString(" ")
-				}
-				msg.WriteString(ownerMention(member))
-			}
-		}
-	}
-
-	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
-}
-
-func ownerMention(owner string) string {
-	if name, isGroup := strings.CutPrefix(owner, "@"); isGroup {
-		return name
-	}
-
-	user, err := data.SelectUserByRealName(owner)
-	if err != nil || user.SlackID == "" {
-		return owner
-	}
-
-	return fmt.Sprintf("<@%s>", user.SlackID)
+	msg := explainCodeOwners(paths, owners, groups, approversForExplain(ctx, pr))
+	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
 func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent, pattern *regexp.Regexp) ([]string, map[string]bool) {

@@ -208,7 +208,7 @@ func selectUserBy(indexType int, id string) (User, error) {
 	}
 
 	i, found := index[id]
-	if !found {
+	if !found || i < 0 { // Negative index means non-unique (for names).
 		return User{}, nil
 	}
 
@@ -262,6 +262,10 @@ func readUsersFile() (*Users, error) {
 			u.slackIndex[user.SlackID] = i
 		}
 		if user.RealName != "" {
+			if _, found := u.nameIndex[user.RealName]; found {
+				u.nameIndex[user.RealName] = -1 // Mark this name as non-unique.
+				continue
+			}
 			u.nameIndex[user.RealName] = i
 		}
 	}
