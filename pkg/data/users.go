@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"sync"
 	"time"
 )
@@ -108,6 +109,60 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 		}
 		usersDB.entries[i].ThrippyLink = thrippyLink
 	}
+
+	return usersDB.writeUsersFile()
+}
+
+func FollowUser(followerSlackID, followedSlackID string) error {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if usersDB == nil {
+		var err error
+		usersDB, err = readUsersFile()
+		if err != nil {
+			return err
+		}
+	}
+
+	i, err := usersDB.findUserIndex("", "", "", followedSlackID, "")
+	if err != nil || i < 0 {
+		return err
+	}
+
+	if !slices.Contains(usersDB.entries[i].Followers, followerSlackID) {
+		usersDB.entries[i].Updated = time.Now().UTC().Format(time.RFC3339)
+		usersDB.entries[i].Followers = append(usersDB.entries[i].Followers, followerSlackID)
+		slices.Sort(usersDB.entries[i].Followers)
+	}
+
+	return usersDB.writeUsersFile()
+}
+
+func UnfollowUser(unfollowerSlackID, followedSlackID string) error {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if usersDB == nil {
+		var err error
+		usersDB, err = readUsersFile()
+		if err != nil {
+			return err
+		}
+	}
+
+	i, err := usersDB.findUserIndex("", "", "", followedSlackID, "")
+	if err != nil || i < 0 {
+		return err
+	}
+
+	j := slices.Index(usersDB.entries[i].Followers, unfollowerSlackID)
+	if j < 0 {
+		return nil
+	}
+
+	usersDB.entries[i].Followers = slices.Delete(usersDB.entries[i].Followers, j, j+1)
+	usersDB.entries[i].Updated = time.Now().UTC().Format(time.RFC3339)
 
 	return usersDB.writeUsersFile()
 }

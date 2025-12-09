@@ -168,13 +168,52 @@ func followSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 			postEphemeralError(ctx, event, fmt.Sprintf("<@%s> isn't opted-in yet.", userID))
 			continue
 		}
+
+		if err := data.FollowUser(event.UserID, userID); err != nil {
+			log.Error(ctx, "failed to follow user", "error", err, "follower_id", event.UserID, "followed_id", userID)
+			postEphemeralError(ctx, event, fmt.Sprintf("failed to follow <@%s>.", userID))
+			continue
+		}
+
+		msg := fmt.Sprintf("You will now be added to channels for PRs authored by <@%s>.", userID)
+		_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
 
 	return nil
 }
 
 func unfollowSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	postEphemeralError(ctx, event, "this command is not implemented yet.")
+	// Ensure that the calling user is opted-in, i.e. authorized us & allowed to join PR channels.
+	_, optedIn, err := userDetails(ctx, event, event.UserID)
+	if err != nil {
+		return nil // Not a *server* error as far as we're concerned.
+	}
+	if !optedIn {
+		postEphemeralError(ctx, event, "you need to opt-in first.")
+		return nil // Not a *server* error as far as we're concerned.
+	}
+
+	users, _ := extractAtLeastOneUserID(ctx, event, userOrTeamIDPattern)
+	for _, userID := range expandSubteams(ctx, users) {
+		_, optedIn, err := userDetails(ctx, event, userID)
+		if err != nil {
+			continue
+		}
+		if !optedIn {
+			postEphemeralError(ctx, event, fmt.Sprintf("<@%s> isn't opted-in yet.", userID))
+			continue
+		}
+
+		if err := data.UnfollowUser(event.UserID, userID); err != nil {
+			log.Error(ctx, "failed to unfollow user", "error", err, "unfollower_id", event.UserID, "followed_id", userID)
+			postEphemeralError(ctx, event, fmt.Sprintf("failed to unfollow <@%s>.", userID))
+			continue
+		}
+
+		msg := fmt.Sprintf("You will no longer be added to channels for PRs authored by <@%s>.", userID)
+		_ = PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+	}
+
 	return nil
 }
 
