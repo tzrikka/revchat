@@ -155,6 +155,8 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	} else if t, ok := pr["title"].(string); ok && len(t) > 0 {
 		title = fmt.Sprintf("\n\n  •  <%s|*%s*>", url, t)
 	}
+
+	// Draft indicator.
 	if draft, ok := pr["draft"].(bool); ok && draft {
 		title = strings.Replace(title, "•  ", "•  :construction: ", 1)
 		if !strings.Contains(strings.ToLower(title), "draft") {
@@ -162,6 +164,17 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 		}
 	}
 	summary.WriteString(title)
+
+	// Author.
+	if author, ok := pr["author"].(map[string]any); ok {
+		if id, ok := author["account_id"].(string); ok {
+			name, ok := author["display_name"].(string)
+			if !ok {
+				name = ""
+			}
+			summary.WriteString(" by " + users.BitbucketToSlackRef(ctx, id, name))
+		}
+	}
 
 	// Slack channel link.
 	channelID, err := data.SwitchURLAndID(url)
