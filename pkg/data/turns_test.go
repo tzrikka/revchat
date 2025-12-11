@@ -129,20 +129,39 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = SetTurn(url, []string{"rev2", "rev3"})
+	ok, err := FreezeTurn(url, "someone")
 	if err != nil {
-		t.Fatalf("SetTurn() error = %v", err)
+		t.Fatalf("FreezeTurn() error = %v", err)
+	}
+	if !ok {
+		t.Fatalf("FreezeTurn() = %v, want %v", ok, true)
+	}
+	ok, err = FreezeTurn(url, "someone")
+	if err != nil {
+		t.Fatalf("FreezeTurn() error = %v", err)
+	}
+	if ok {
+		t.Fatalf("FreezeTurn() = %v, want %v", ok, false)
+	}
+
+	err = SwitchTurn(url, "rev1")
+	if err != nil {
+		t.Fatalf("SwitchTurn() error = %v", err)
+	}
+	err = SwitchTurn(url, "rev2")
+	if err != nil {
+		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 	got, err = GetCurrentTurn(url)
 	if err != nil {
 		t.Fatalf("GetCurrentTurn() error = %v", err)
 	}
-	want = []string{"rev2", "rev3"}
+	want = []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = RemoveFromTurn(url, "rev3")
+	err = RemoveFromTurn(url, "rev1")
 	if err != nil {
 		t.Fatalf("RemoveFromTurn() error = %v", err)
 	}
@@ -155,7 +174,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = RemoveFromTurn(url, "rev3") // Should be a no-op.
+	err = RemoveFromTurn(url, "rev1") // Should be a no-op.
 	if err != nil {
 		t.Fatalf("RemoveFromTurn() error = %v", err)
 	}
@@ -166,6 +185,21 @@ func TestTurns(t *testing.T) {
 	want = []string{"rev2"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+	}
+
+	ok, err = UnfreezeTurn(url)
+	if err != nil {
+		t.Fatalf("UnfreezeTurn() error = %v", err)
+	}
+	if !ok {
+		t.Fatalf("UnfreezeTurn() = %v, want %v", ok, true)
+	}
+	ok, err = UnfreezeTurn(url)
+	if err != nil {
+		t.Fatalf("UnfreezeTurn() error = %v", err)
+	}
+	if ok {
+		t.Fatalf("UnfreezeTurn() = %v, want %v", ok, false)
 	}
 
 	err = SwitchTurn(url, "rev2")

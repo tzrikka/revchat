@@ -14,6 +14,7 @@ import (
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/files"
+	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -25,13 +26,13 @@ const (
 var (
 	bitbucketURLPattern = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
 	remindersPattern    = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
-	userCommandsPattern = regexp.MustCompile(`^(follow|unfollow|invite|nudge|ping|poke|set turn to)`)
+	userCommandsPattern = regexp.MustCompile(`^(follow|unfollow|invite|nudge|ping|poke)`)
 	userIDsPattern      = regexp.MustCompile(`<(@)(\w+)(\|[^>]*)?>`)
 	userOrTeamIDPattern = regexp.MustCompile(`<(@|!subteam\^)(\w+)(\|[^>]*)?>`)
 )
 
-// https://docs.slack.dev/interactivity/implementing-slash-commands#app_command_handling
 // https://docs.slack.dev/apis/events-api/using-socket-mode#command
+// https://docs.slack.dev/interactivity/implementing-slash-commands#app_command_handling
 func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEvent) error {
 	event.Text = strings.ToLower(event.Text)
 	switch event.Text {
@@ -54,13 +55,15 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 		return myTurnSlashCommand(ctx, event)
 	case "not my turn":
 		return notMyTurnSlashCommand(ctx, event)
+	case "freeze", "freeze turn", "freeze turns":
+		return freezeTurnSlashCommand(ctx, event)
+	case "unfreeze", "unfreeze turn", "unfreeze turns":
+		return unfreezeTurnSlashCommand(ctx, event)
 
 	case "approve", "lgtm", "+1":
 		return c.approveSlashCommand(ctx, event)
 	case "unapprove", "-1":
 		return c.unapproveSlashCommand(ctx, event)
-	case "update":
-		return updateChannelSlashCommand(ctx, event)
 	}
 
 	if remindersPattern.MatchString(event.Text) {
@@ -76,8 +79,6 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 			return inviteSlashCommand(ctx, event)
 		case "nudge", "ping", "poke":
 			return nudgeSlashCommand(ctx, event)
-		default:
-			return setTurnSlashCommand(ctx, event)
 		}
 	}
 
@@ -89,18 +90,17 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	var cmds strings.Builder
 
-	cmds.WriteString(":wave: Available slash commands for `%s`:\n")
+	cmds.WriteString(":wave: Available general commands:\n")
 	cmds.WriteString("\n  •  `%s opt-in` - opt into being added to PR channels and receiving DMs")
 	cmds.WriteString("\n  •  `%s opt-out` - opt out of being added to PR channels and receiving DMs")
-	cmds.WriteString("\n  •  `%s reminders at <time in 12h/24h format>` (weekdays, using your timezone)")
+	cmds.WriteString("\n  •  `%s reminders at <time in 12h/24h format>` - weekdays, using your timezone")
 	cmds.WriteString("\n  •  `%s status` - show your current PR states, as an author and reviewer")
 	cmds.WriteString("\n\nMore commands inside PR channels:\n")
-	cmds.WriteString("\n  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `set turn to <1 or more @users>`")
+	cmds.WriteString("\n  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `[un]freeze [turns]`")
 	cmds.WriteString("\n  •  `%s nudge <1 or more @users>` / `ping <1 or more @users>` / `poke <...>`")
 	cmds.WriteString("\n  •  `%s explain` - who needs to approve each file, and have they?")
 	cmds.WriteString("\n  •  `%s approve` or `lgtm` or `+1`")
 	cmds.WriteString("\n  •  `%s unapprove` or `-1`")
-	// cmds.WriteString("\n  •  `%s update`")
 
 	msg := strings.ReplaceAll(cmds.String(), "%s", event.Command)
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
@@ -611,19 +611,44 @@ func notMyTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
-func setTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+func freezeTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	url := prDetailsFromChannel(ctx, event)
 	if url == nil {
 		return nil // Not a *server* error as far as we're concerned.
 	}
 
-	users, _ := extractAtLeastOneUserID(ctx, event, userIDsPattern)
-	if len(users) == 0 {
+	ok, err := data.FreezeTurn(url[0], users.SlackIDToEmail(ctx, event.UserID))
+	if err != nil {
+		log.Error(ctx, "failed to freeze PR turn", "error", err, "pr_url", url[0])
+		postEphemeralError(ctx, event, "failed to write internal data about this PR.")
+		return err
+	}
+
+	msg := ":snowflake: Turn switching is now frozen in this PR."
+	if !ok {
+		msg = ":snowflake: Turn switching is already frozen in this PR."
+	}
+	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+}
+
+func unfreezeTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	url := prDetailsFromChannel(ctx, event)
+	if url == nil {
 		return nil // Not a *server* error as far as we're concerned.
 	}
 
-	postEphemeralError(ctx, event, "this command is not implemented yet.")
-	return nil
+	ok, err := data.UnfreezeTurn(url[0])
+	if err != nil {
+		log.Error(ctx, "failed to unfreeze PR turn", "error", err, "pr_url", url[0])
+		postEphemeralError(ctx, event, "failed to write internal data about this PR.")
+		return err
+	}
+
+	msg := ":sunny: Turn switching is now unfrozen in this PR."
+	if !ok {
+		msg = ":sunny: Turn switching is already unfrozen in this PR."
+	}
+	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
 func whoseTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
@@ -738,17 +763,6 @@ func (c *Config) unapproveSlashCommand(ctx workflow.Context, event SlashCommandE
 
 	// No need to post a confirmation message or update its bookmarks,
 	// the resulting Bitbucket/GitHub event will trigger that.
-	return nil
-}
-
-func updateChannelSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	url := prDetailsFromChannel(ctx, event)
-	if url == nil {
-		return nil
-	}
-
-	log.Warn(ctx, "this slash command is not implemented yet")
-	postEphemeralError(ctx, event, "this command is not implemented yet.")
 	return nil
 }
 
