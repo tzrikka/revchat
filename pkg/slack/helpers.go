@@ -1,11 +1,52 @@
 package slack
 
 import (
+	"strings"
+
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
 	"github.com/tzrikka/revchat/pkg/data"
 )
+
+func destinationDetails(pr map[string]any) (workspace, repo, branch, commit string) {
+	// Workspace and repo slug.
+	dest, ok := pr["destination"].(map[string]any)
+	if !ok {
+		return
+	}
+	m, ok := dest["repository"].(map[string]any)
+	if !ok {
+		return
+	}
+	fullName, ok := m["full_name"].(string)
+	if !ok {
+		return
+	}
+	workspace, repo, ok = strings.Cut(fullName, "/")
+	if !ok {
+		return
+	}
+
+	// Branch name.
+	m, ok = dest["branch"].(map[string]any)
+	if !ok {
+		return
+	}
+	branch, ok = m["name"].(string)
+	if !ok {
+		return
+	}
+
+	// Commit hash.
+	m, ok = dest["commit"].(map[string]any)
+	if !ok {
+		return
+	}
+	commit, _ = m["hash"].(string)
+
+	return
+}
 
 func selfTriggeredMemberEvent(ctx workflow.Context, auth []eventAuth, event MemberEvent) bool {
 	for _, a := range auth {

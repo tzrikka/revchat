@@ -79,13 +79,13 @@ func GotAllRequiredApprovals(ctx workflow.Context, workspace, repo, branch, comm
 
 // OwnersPerPath retrieves the list of code owners for each of the given file paths,
 // according to the "CODEOWNERS" file in the given branch (a PR's destination).
-func OwnersPerPath(ctx workflow.Context, workspace, repo, branch, commit string, paths []string) (map[string][]string, map[string][]string) {
-	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, commit, "CODEOWNERS"), false)
+func OwnersPerPath(ctx workflow.Context, workspace, repo, branch, commit string, paths []string, flatten bool) (owners, groups map[string][]string) {
+	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, commit, "CODEOWNERS"), flatten)
 	if c == nil {
-		return nil, nil
+		return
 	}
 
-	owners := make(map[string][]string, len(paths))
+	owners = make(map[string][]string, len(paths))
 	for _, p := range paths {
 		os, err := c.getOwners(p)
 		if err != nil {
@@ -95,7 +95,11 @@ func OwnersPerPath(ctx workflow.Context, workspace, repo, branch, commit string,
 		owners[p] = os
 	}
 
-	return owners, c.Groups
+	if !flatten {
+		groups = c.Groups
+	}
+
+	return
 }
 
 func parseCodeOwnersFile(ctx workflow.Context, fileContent string, flatten bool) *CodeOwners {

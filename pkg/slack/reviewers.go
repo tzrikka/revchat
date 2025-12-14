@@ -12,6 +12,17 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
+func requiredReviewers(paths []string, owners map[string][]string) []string {
+	var required []string
+
+	for _, p := range paths {
+		required = append(required, owners[p]...)
+	}
+
+	slices.Sort(required)
+	return slices.Compact(required)
+}
+
 func explainCodeOwners(paths []string, owners, groups map[string][]string, approvers map[string]bool) string {
 	var msg strings.Builder
 	msg.WriteString(":mag_right: Code owners per file in this PR:")

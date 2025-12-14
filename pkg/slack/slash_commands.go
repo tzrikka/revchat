@@ -44,10 +44,12 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 	case "opt-out", "opt out", "optout":
 		return c.optOutSlashCommand(ctx, event)
 
-	case "stat", "state", "status":
-		return statusSlashCommand(ctx, event)
+	case "clean":
+		return cleanSlashCommand(ctx, event)
 	case "explain":
 		return explainSlashCommand(ctx, event)
+	case "stat", "state", "status":
+		return statusSlashCommand(ctx, event)
 
 	case "who", "whose", "whose turn":
 		return whoseTurnSlashCommand(ctx, event)
@@ -66,9 +68,6 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 		return c.unapproveSlashCommand(ctx, event)
 	}
 
-	if remindersPattern.MatchString(event.Text) {
-		return remindersSlashCommand(ctx, event)
-	}
 	if cmd := userCommandsPattern.FindStringSubmatch(event.Text); cmd != nil {
 		switch cmd[1] {
 		case "follow":
@@ -80,6 +79,9 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 		case "nudge", "ping", "poke":
 			return nudgeSlashCommand(ctx, event)
 		}
+	}
+	if remindersPattern.MatchString(event.Text) {
+		return remindersSlashCommand(ctx, event)
 	}
 
 	log.Warn(ctx, "unrecognized Slack slash command", "username", event.UserName, "text", event.Text)
@@ -97,8 +99,9 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	cmds.WriteString("\n  •  `%s status` - show your current PR states, as an author and reviewer")
 	cmds.WriteString("\n\nMore commands inside PR channels:\n")
 	cmds.WriteString("\n  •  `%s who` / `whose turn` / `my turn` / `not my turn` / `[un]freeze [turns]`")
-	cmds.WriteString("\n  •  `%s nudge <1 or more @users>` / `ping <1 or more @users>` / `poke <...>`")
+	cmds.WriteString("\n  •  `%s nudge <1 or more @users or @groups>` / `ping <...>` / `poke <...>`")
 	cmds.WriteString("\n  •  `%s explain` - who needs to approve each file, and have they?")
+	cmds.WriteString("\n  •  `%s clean` - remove unnecessary reviewers from the PR")
 	cmds.WriteString("\n  •  `%s approve` or `lgtm` or `+1`")
 	cmds.WriteString("\n  •  `%s unapprove` or `-1`")
 
@@ -106,29 +109,71 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
-func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	url := prDetailsFromChannel(ctx, event)
-	if url == nil {
-		return nil // Not a *server* error as far as we're concerned.
-	}
-
-	pr, err := data.LoadBitbucketPR(url[0])
-	if err != nil {
-		postEphemeralError(ctx, event, "failed to load PR snapshot.")
+func cleanSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	url, paths, pr, err := reviewerData(ctx, event)
+	if err != nil || url == nil || len(paths) == 0 {
 		return err
 	}
 
-	paths := data.ReadBitbucketDiffstatPaths(url[0])
+	workspace, repo, branch, commit := destinationDetails(pr)
+	owners, _ := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths, true)
+	required := requiredReviewers(paths, owners)
+	approvers := approversForExplain(ctx, pr)
+	log.Info(ctx, "reviewers", "required", required, "approvers", approvers)
+
+	return nil
+}
+
+func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []string, pr map[string]any, err error) {
+	url = prDetailsFromChannel(ctx, event)
+	if url == nil {
+		return
+	}
+
+	pr, err = data.LoadBitbucketPR(url[0])
+	if err != nil {
+		postEphemeralError(ctx, event, "failed to load PR snapshot.")
+		return
+	}
+
+	paths = data.ReadBitbucketDiffstatPaths(url[0])
 	if len(paths) == 0 {
 		postEphemeralError(ctx, event, "no file paths found in PR diffstat.")
-		return nil
+		return
+	}
+
+	return
+}
+
+func explainSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	url, paths, pr, err := reviewerData(ctx, event)
+	if err != nil || url == nil || len(paths) == 0 {
+		return err
 	}
 
 	workspace, repo, branch, commit := destinationDetails(pr)
-	owners, groups := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths)
+	owners, groups := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths, false)
 
 	msg := explainCodeOwners(paths, owners, groups, approversForExplain(ctx, pr))
 	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+}
+
+func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
+	prs := loadPRTurns(ctx)[event.UserID]
+	if len(prs) == 0 {
+		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
+			":joy: No PRs require your attention at this time!")
+	}
+
+	var msg strings.Builder
+	msg.WriteString(":eyes: These PRs currently require your attention:")
+
+	slices.Sort(prs)
+	for _, url := range prs {
+		msg.WriteString(prDetails(ctx, url, event.UserID))
+	}
+
+	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
 }
 
 func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent, pattern *regexp.Regexp) ([]string, map[string]bool) {
@@ -494,24 +539,6 @@ func setReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 	}
 
 	return nil
-}
-
-func statusSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
-	prs := loadPRTurns(ctx)[event.UserID]
-	if len(prs) == 0 {
-		return PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
-			":joy: No PRs require your attention at this time!")
-	}
-
-	var msg strings.Builder
-	msg.WriteString(":eyes: These PRs currently require your attention:")
-
-	slices.Sort(prs)
-	for _, url := range prs {
-		msg.WriteString(prDetails(ctx, url, event.UserID))
-	}
-
-	return PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
 }
 
 func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []string, data.User, error) {

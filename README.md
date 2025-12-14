@@ -43,8 +43,9 @@ General commands:
 More commands inside PR channels:
 
 - `/revchat who` / `whose turn` / `my turn` / `not my turn` / `[un]freeze [turns]`
-- `/revchat nudge <1 or more @users>` / `ping <1 or more @users>` / `poke <...>`
+- `/revchat nudge <1 or more @users or @groups>` / `ping <...>` / `poke <...>`
 - `/revchat explain` - who needs to approve each file, and have they?
+- `/revchat clean` - remove unnecessary reviewers from the PR
 - `/revchat approve` or `lgtm` or `+1`
 - `/revchat unapprove` or `-1`
 
@@ -55,7 +56,9 @@ Caveat:
 
 The `status` command has the same output as daily reminders (see above), but users can run it at any time.
 
-The `explain` command analyzes the current code ownership and approvals in a PR channel:
+The `explain` command analyzes the current code ownership and approvals in a PR channel.
+
+The `clean` command removes all unnecessary reviewers from a PR: those who do not own any files, were not added manually, and did not already approve the PR.
 
 ## Whose Turn Is It Anyway?
 

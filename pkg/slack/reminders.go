@@ -57,7 +57,7 @@ func remindersWorkflow(ctx workflow.Context) error {
 			msg.WriteString("\n\n:information_source: Slash command tips:")
 			msg.WriteString("\n  •  `/revchat status` - updated report at any time")
 			msg.WriteString("\n  •  `/revchat reminder <time in 12h/24h format>` - change time or timezone")
-			msg.WriteString("\n  •  `/revchat who` / `my turn` / `not my turn` - only in RevChat channels")
+			msg.WriteString("\n  •  `/revchat who` / `[not] my turn` / `[un]freeze` - only in PR channels")
 			msg.WriteString("\n  •  `/revchat explain` - who needs to approve each file, and have they?")
 
 			_, _ = PostMessage(ctx, userID, msg.String())
@@ -279,43 +279,4 @@ func approversForReminder(ctx workflow.Context, pr map[string]any) (int, string)
 	}
 
 	return count, names.String()
-}
-
-func destinationDetails(pr map[string]any) (workspace, repo, branch, commit string) {
-	// Workspace and repo slug.
-	dest, ok := pr["destination"].(map[string]any)
-	if !ok {
-		return
-	}
-	m, ok := dest["repository"].(map[string]any)
-	if !ok {
-		return
-	}
-	fullName, ok := m["full_name"].(string)
-	if !ok {
-		return
-	}
-	workspace, repo, ok = strings.Cut(fullName, "/")
-	if !ok {
-		return
-	}
-
-	// Branch name.
-	m, ok = dest["branch"].(map[string]any)
-	if !ok {
-		return
-	}
-	branch, ok = m["name"].(string)
-	if !ok {
-		return
-	}
-
-	// Commit hash.
-	m, ok = dest["commit"].(map[string]any)
-	if !ok {
-		return
-	}
-	commit, _ = m["hash"].(string)
-
-	return
 }
