@@ -60,12 +60,9 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 
 	// Title edited.
 	if snapshot.Title != event.PullRequest.Title {
-		mentionUserInMsg(ctx, channelID, event.Actor, ":pencil2: %s edited the PR title.")
+		msg := ":pencil2: %s edited the PR title: " + c.linkifyTitle(ctx, event.PullRequest.Title)
+		mentionUserInMsg(ctx, channelID, event.Actor, msg)
 		slack.SetChannelDescription(ctx, channelID, event.PullRequest.Title, url)
-		if msg := c.linkifyIDs(ctx, event.PullRequest.Title); msg != "" {
-			_, _ = slack.PostMessage(ctx, channelID, msg)
-		}
-
 		err = c.renameChannel(ctx, event.PullRequest, channelID)
 	}
 

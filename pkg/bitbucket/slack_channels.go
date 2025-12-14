@@ -139,10 +139,12 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	slack.SetChannelTopic(ctx, channelID, prURL)
 	slack.SetChannelDescription(ctx, channelID, pr.Title, prURL)
 	setChannelBookmarks(ctx, channelID, prURL, pr)
-	postIntroMsg(ctx, channelID, event.Type, pr, event.Actor)
-	if msg := c.linkifyIDs(ctx, pr.Title); msg != "" {
-		_, _ = slack.PostMessage(ctx, channelID, msg)
+
+	msg := "%s created this PR: " + c.linkifyTitle(ctx, pr.Title)
+	if desc := strings.TrimSpace(pr.Description); desc != "" {
+		msg += "\n\n" + markdown.BitbucketToSlack(ctx, desc, prURL)
 	}
+	mentionUserInMsg(ctx, channelID, event.Actor, msg)
 
 	err = slack.InviteUsersToChannel(ctx, channelID, prParticipants(ctx, pr))
 	if err != nil {
@@ -224,45 +226,21 @@ func reportCreationErrorToAuthor(ctx workflow.Context, accountID, url string) {
 	_, _ = slack.PostMessage(ctx, userID, "Failed to create Slack channel for "+url)
 }
 
-func postIntroMsg(ctx workflow.Context, channelID, eventType string, pr PullRequest, actor Account) {
-	action := "created"
-	if eventType == "updated" {
-		action = "marked as ready for review"
-	}
+var linkifyPattern = regexp.MustCompile(`[A-Z]{2,}-\d+`)
 
-	prURL := htmlURL(pr.Links)
-	msg := fmt.Sprintf("%s %s: `%s`", action, prURL, pr.Title)
-	if text := strings.TrimSpace(pr.Description); text != "" {
-		msg += "\n\n" + markdown.BitbucketToSlack(ctx, text, prURL)
-	}
-
-	mentionUserInMsg(ctx, channelID, actor, "%s "+msg)
-}
-
-var linkifyPattern = regexp.MustCompile(`[A-Z]+-\d+`)
-
-// linkifyIDs finds IDs in the text and tries to linkify them based on the configured issue
-// trackers. If no IDs are found, or none are recognized, an empty string is returned.
-func (c Config) linkifyIDs(ctx workflow.Context, text string) string {
-	ids := linkifyPattern.FindAllString(text, -1)
-	slices.Sort(ids)
-	ids = slices.Compact(ids)
-
-	msg := "> References in the PR:"
-	for _, id := range ids {
-		if url := c.linkify(ctx, id); url != "" {
-			msg += fmt.Sprintf("\n>  •  <%s|%s>", url, id)
+// linkifyTitle finds IDs in the text and tries to linkify them based on the configured issue
+// trackers. If no IDs are found, or none are recognized, it returns the input text as-is.
+func (c Config) linkifyTitle(ctx workflow.Context, title string) string {
+	for _, id := range linkifyPattern.FindAllString(title, -1) {
+		if url := c.linkifyID(ctx, id); url != "" {
+			title = strings.Replace(title, id, fmt.Sprintf("<%s|%s>", url, id), 1)
 		}
 	}
-
-	if strings.Count(msg, "\n") == 0 {
-		msg = ""
-	}
-	return msg
+	return title
 }
 
-// linkify can recognize specific case-sensitive keys, as well as a generic "default" key.
-func (c Config) linkify(ctx workflow.Context, id string) string {
+// linkifyID can recognize specific case-sensitive keys, as well as a generic "default" key.
+func (c Config) linkifyID(ctx workflow.Context, id string) string {
 	lm := c.Cmd.StringSlice("linkification-map")
 	keys := map[string]string{}
 	for _, kv := range lm {
