@@ -36,7 +36,7 @@ func (c *Config) channelArchivedWorkflow(ctx workflow.Context, event archiveEven
 		return err
 	}
 
-	data.FullPRCleanup(ctx, url)
+	data.FullPRCleanup(ctx, channelID, url)
 	return nil
 }
 

@@ -67,11 +67,13 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	mentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
 	prURL := htmlURL(pr.Links)
-	if err := data.LogSlackChannelArchived(channelID, prURL); err != nil {
-		log.Error(ctx, "failed to log Slack channel archived", "error", err, "channel_id", channelID, "pr_url", prURL)
-	}
+	data.FullPRCleanup(ctx, channelID, prURL)
 
 	if err := tslack.ConversationsArchive(ctx, channelID); err != nil {
+		if strings.Contains(err.Error(), "is_archived") {
+			return nil
+		}
+
 		log.Error(ctx, "failed to archive Slack channel", "error", err, "channel_id", channelID, "pr_url", prURL)
 
 		state = strings.Replace(state, " this PR", "", 1)
@@ -80,7 +82,6 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 		return err
 	}
 
-	data.FullPRCleanup(ctx, prURL)
 	return nil
 }
 
@@ -150,7 +151,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	if err != nil {
 		reportCreationErrorToAuthor(ctx, event.Actor.AccountID, prURL)
 		_ = tslack.ConversationsArchive(ctx, channelID)
-		data.FullPRCleanup(ctx, prURL)
+		data.FullPRCleanup(ctx, channelID, prURL)
 		return err
 	}
 

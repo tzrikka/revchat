@@ -7,6 +7,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -48,6 +49,11 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 		Text:     msg,
 	})
 	if err != nil {
+		// If the channel is archived but we still store data for it, clean it up.
+		if strings.Contains(err.Error(), "is_archived") {
+			url, _ := data.SwitchURLAndID(channelID)
+			data.FullPRCleanup(ctx, channelID, url)
+		}
 		log.Error(ctx, "failed to post Slack message", "error", err, "channel_id", channelID, "thread_ts", timestamp)
 		return nil, err
 	}

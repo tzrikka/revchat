@@ -60,6 +60,12 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, desc)
 	_, err = slack.PostMessage(ctx, channelID, msg)
 
+	// If the channel is archived but we still store data for it, clean it up.
+	if err != nil && strings.Contains(err.Error(), "is_archived") {
+		data.FullPRCleanup(ctx, channelID, url)
+		return nil
+	}
+
 	// Other than announcing this specific event, also announce if the PR is ready to be merged
 	// (all builds are successful, the PR has at least 2 approvals, and no pending action items).
 	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(url) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
