@@ -156,3 +156,75 @@ func approversForExplain(ctx workflow.Context, pr map[string]any) map[string]boo
 
 	return mentions
 }
+
+func approversForClean(pr map[string]any) []string {
+	participants, ok := pr["participants"].([]any)
+	if !ok {
+		return nil
+	}
+
+	var accountIDs []string
+	for _, p := range participants {
+		participant, ok := p.(map[string]any)
+		if !ok {
+			continue
+		}
+		approved, ok := participant["approved"].(bool)
+		if !ok || !approved {
+			continue
+		}
+
+		user, ok := participant["user"].(map[string]any)
+		if !ok {
+			continue
+		}
+		accountID, ok := user["account_id"].(string)
+		if !ok {
+			continue
+		}
+
+		accountIDs = append(accountIDs, accountID)
+	}
+
+	return accountIDs
+}
+
+func allReviewers(pr map[string]any) []string {
+	reviewers, ok := pr["reviewers"].([]any)
+	if !ok {
+		return nil
+	}
+
+	var accountIDs []string
+	for _, r := range reviewers {
+		reviewer, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		accountID, ok := reviewer["account_id"].(string)
+		if !ok {
+			continue
+		}
+
+		accountIDs = append(accountIDs, accountID)
+	}
+
+	return accountIDs
+}
+
+func filterReviewers(pr map[string]any, required []string) []string {
+	isRequired := make(map[string]bool, len(required))
+	for _, req := range required {
+		isRequired[req] = true
+	}
+
+	var remaining []string
+	for _, r := range allReviewers(pr) {
+		if isRequired[r] { // More efficient than [slices.Contains].
+			remaining = append(remaining, r)
+		}
+	}
+
+	return remaining
+}

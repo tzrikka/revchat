@@ -163,12 +163,14 @@ func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, u
 	msg += "\n\n[This comment was created by RevChat]: #"
 
 	resp, err := bitbucket.PullRequestsCreateComment(ctx, bitbucket.PullRequestsCreateCommentRequest{
-		ThrippyLinkID: linkID,
-		Workspace:     url[1],
-		RepoSlug:      url[2],
-		PullRequestID: url[3],
-		Markdown:      msg,
-		ParentID:      url[5], // Optional.
+		PullRequestsRequest: bitbucket.PullRequestsRequest{
+			ThrippyLinkID: linkID,
+			Workspace:     url[1],
+			RepoSlug:      url[2],
+			PullRequestID: url[3],
+		},
+		Markdown: msg,
+		ParentID: url[5], // Optional.
 	})
 	if err != nil {
 		log.Error(ctx, "failed to create Bitbucket PR comment", "error", err, "slack_ids", ids, "pr_url", url[0])
@@ -273,12 +275,14 @@ func (c *Config) editMessageBitbucket(ctx workflow.Context, event MessageEvent, 
 
 	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Message.Text)
 	err = bitbucket.PullRequestsUpdateComment(ctx, bitbucket.PullRequestsUpdateCommentRequest{
-		ThrippyLinkID: linkID,
-		Workspace:     url[1],
-		RepoSlug:      url[2],
-		PullRequestID: url[3],
-		CommentID:     url[5],
-		Markdown:      msg,
+		PullRequestsRequest: bitbucket.PullRequestsRequest{
+			ThrippyLinkID: linkID,
+			Workspace:     url[1],
+			RepoSlug:      url[2],
+			PullRequestID: url[3],
+		},
+		CommentID: url[5],
+		Markdown:  msg,
 	})
 	if err != nil {
 		log.Error(ctx, "failed to update Bitbucket PR comment", "error", err, "slack_ids", ids, "comment_url", url[0])
@@ -318,11 +322,13 @@ func deleteMessageBitbucket(ctx workflow.Context, event MessageEvent, userID str
 	}
 
 	err = bitbucket.PullRequestsDeleteComment(ctx, bitbucket.PullRequestsDeleteCommentRequest{
-		ThrippyLinkID: linkID,
-		Workspace:     url[1],
-		RepoSlug:      url[2],
-		PullRequestID: url[3],
-		CommentID:     url[5],
+		PullRequestsRequest: bitbucket.PullRequestsRequest{
+			ThrippyLinkID: linkID,
+			Workspace:     url[1],
+			RepoSlug:      url[2],
+			PullRequestID: url[3],
+		},
+		CommentID: url[5],
 	})
 	if err != nil {
 		log.Error(ctx, "failed to delete Bitbucket PR comment", "error", err, "slack_ids", ids, "comment_url", url[0])

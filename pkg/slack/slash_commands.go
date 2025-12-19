@@ -111,15 +111,65 @@ func helpSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 
 func cleanSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	url, paths, pr, err := reviewerData(ctx, event)
-	if err != nil || url == nil || len(paths) == 0 {
+	if err != nil || url == nil || len(url) < 4 || len(paths) == 0 {
 		return err
 	}
 
 	workspace, repo, branch, commit := destinationDetails(pr)
 	owners, _ := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths, true)
-	required := requiredReviewers(paths, owners)
-	approvers := approversForExplain(ctx, pr)
-	log.Info(ctx, "reviewers", "required", required, "approvers", approvers)
+	reviewers := requiredReviewers(paths, owners)
+	for i, fullName := range reviewers {
+		user, _ := data.SelectUserByRealName(fullName)
+		if user.BitbucketID != "" {
+			reviewers[i] = user.BitbucketID
+		}
+	}
+
+	reviewers = append(reviewers, approversForClean(pr)...)
+	reviewers = filterReviewers(pr, reviewers)
+
+	// Need to impersonate in Bitbucket the user who sent this Slack command.
+	linkID, err := thrippyLinkID(ctx, event.UserID, event.ChannelID)
+	if err != nil || linkID == "" {
+		postEphemeralError(ctx, event, "failed to get current PR details from Bitbucket.")
+		return err
+	}
+
+	// Retrieve the latest PR metadata from Bitbucket, just in case our stored snapshot is outdated.
+	pr, err = bitbucket.PullRequestsGet(ctx, bitbucket.PullRequestsGetRequest{
+		ThrippyLinkID: linkID,
+		Workspace:     workspace,
+		RepoSlug:      repo,
+		PullRequestID: url[3],
+	})
+	if err != nil {
+		log.Error(ctx, "failed to get Bitbucket PR", "error", err, "pr_url", event.UserID)
+		postEphemeralError(ctx, event, "failed to get current PR details from Bitbucket.")
+		return err
+	}
+
+	// Update the reviewers list in Bitbucket.
+	pr["reviewers"] = make([]map[string]any, len(reviewers))
+	for i, accountID := range reviewers {
+		pr["reviewers"].([]map[string]any)[i] = map[string]any{
+			"account_id": accountID,
+		}
+	}
+
+	_, err = bitbucket.PullRequestsUpdate(ctx, bitbucket.PullRequestsUpdateRequest{
+		PullRequestsRequest: bitbucket.PullRequestsRequest{
+			ThrippyLinkID: linkID,
+			Workspace:     workspace,
+			RepoSlug:      repo,
+			PullRequestID: url[3],
+		},
+		PullRequest: pr,
+	})
+	if err != nil {
+		log.Error(ctx, "failed to update Bitbucket PR", "error", err, "pr_url", event.UserID, "slack_user_id", event.UserID)
+		postEphemeralError(ctx, event, "failed to update PR reviewers in Bitbucket.")
+		return err
+	}
 
 	return nil
 }
