@@ -148,6 +148,9 @@ func cleanSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 
+	// Bitbucket API quirk: it rejects updates with the "summary.html" field.
+	delete(pr, "summary")
+
 	// Update the reviewers list in Bitbucket.
 	pr["reviewers"] = make([]map[string]any, len(reviewers))
 	for i, accountID := range reviewers {
