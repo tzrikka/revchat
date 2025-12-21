@@ -22,7 +22,7 @@ No more:
 
 Sent as DMs from RevChat on weekdays. The default time is 8am in the user's timezone, but users may change this time and update the timezone with the `/revchat reminders` slash command (see the [next section](#slash-commands) below).
 
-Reminders reflects the status and urgency of PRs:
+Reminders reflect the status and urgency of PRs:
 
 - Special marking for drafts in the title
 - Age (time since creation and last update)
@@ -38,7 +38,7 @@ General commands:
 - `/revchat opt-in` - opt into being added to PR channels and receiving DMs
 - `/revchat opt-out` - opt out of being added to PR channels and receiving DMs
 - `/revchat reminders at <time in 12h/24h format>` - on weekdays, using your timezone
-- `/revchat status` - show your current PR states, as an author and reviewer
+- `/revchat status` - show your current PR states, both as an author and a reviewer
 
 More commands inside PR channels:
 
@@ -56,7 +56,9 @@ Caveat:
 
 The `status` command has the same output as daily reminders (see above), but users can run it at any time.
 
-The `explain` command analyzes the current code ownership and approvals in a PR channel.
+The `explain` command analyzes the current code ownership and approvals in a PR channel:
+
+(TODO: screenshot/s)
 
 The `clean` command removes all unnecessary reviewers from a PR: those who do not own any files, were not added manually, and did not already approve the PR.
 

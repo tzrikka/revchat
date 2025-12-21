@@ -36,6 +36,8 @@ Detailed instructions: <https://github.com/tzrikka/thrippy/blob/main/docs/slack/
 - Reactions
   - [reactions:read](https://docs.slack.dev/reference/scopes/reactions.read)
   - [reactions:write](https://docs.slack.dev/reference/scopes/reactions.write)
+- User Groups
+  - [usergroups:read](https://docs.slack.dev/reference/scopes/usergroups.read)
 - Users
   - [users:read](https://docs.slack.dev/reference/scopes/users.read)
   - [users:read.email](https://docs.slack.dev/reference/scopes/users.read.email)
