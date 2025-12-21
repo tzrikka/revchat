@@ -135,25 +135,16 @@ func (c *Cache) Replace(key, value string, ttl time.Duration) bool {
 	defer c.mu.Unlock()
 
 	item, ok := c.data[key]
-	if !ok {
-		return false
-	}
-	if item.Expired() {
+	if !ok || item.Expired() {
 		delete(c.data, key)
 		return false
 	}
 
-	if ttl == KeepTTL {
-		if item.Expiration.IsZero() {
-			ttl = NoExpiration
-		} else {
-			ttl = time.Until(item.Expiration)
-		}
+	item.Value = value
+	if ttl != KeepTTL {
+		item.Expiration = c.expirationTime(ttl)
 	}
 
-	c.data[key] = Item{
-		Value:      value,
-		Expiration: c.expirationTime(ttl),
-	}
+	c.data[key] = item
 	return true
 }

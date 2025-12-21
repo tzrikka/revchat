@@ -165,26 +165,26 @@ func TestCacheAdd(t *testing.T) {
 
 func TestCacheReplace(t *testing.T) {
 	c := cache.New(cache.NoExpiration, cache.NoCleanup)
-	k, v := "key1", "val1"
+	k, v1, v2 := "key1", "val1", "val2"
 
-	if replaced := c.Replace(k, v, cache.DefaultExpiration); replaced {
+	if replaced := c.Replace(k, v1, cache.DefaultExpiration); replaced {
 		t.Errorf("Cache.Replace() = %v; want false", replaced)
 	}
 
-	c.Set(k, v, cache.DefaultExpiration)
+	c.Set(k, v1, cache.DefaultExpiration)
 
-	if replaced := c.Replace(k, "val2", 1*time.Hour); !replaced {
+	if replaced := c.Replace(k, v2, 1*time.Hour); !replaced {
 		t.Errorf("Cache.Replace() = %v; want true", replaced)
 	}
-	if got, found := c.Get(k); !found || got != "val2" {
-		t.Errorf("Cache.Get() = %q, %v; want %q, true", got, found, "val2")
+	if got, found := c.Get(k); !found || got != v2 {
+		t.Errorf("Cache.Get() = %q, %v; want %q, true", got, found, v2)
 	}
 	if item, found := c.Item(k); !found || item.Expiration.IsZero() {
-		t.Errorf("Cache.Item() expiration was not updated properly: got %v, want non-zero", item.Expiration)
+		t.Errorf("Cache.Item() expiration was not replaced: got %v, want non-zero", item.Expiration)
 	}
 }
 
-func TestCacheNoExpirationReplaceKeepTTL(t *testing.T) {
+func TestCacheReplaceKeepNoExpiration(t *testing.T) {
 	c := cache.New(cache.NoExpiration, cache.NoCleanup)
 	k, v := "key1", "val1"
 	c.Set(k, v, cache.DefaultExpiration)
@@ -207,26 +207,35 @@ func TestCacheNoExpirationReplaceKeepTTL(t *testing.T) {
 	}
 }
 
-func TestCacheWithExpirationReplaceKeepTTL(t *testing.T) {
+func TestCacheReplaceKeepExactTTL(t *testing.T) {
 	c := cache.New(1*time.Hour, cache.NoCleanup)
-	k, v := "key1", "val1"
-	c.Set(k, v, 2*time.Minute)
+	k, v1, v2 := "key1", "val1", "val2"
 
-	if replaced := c.Replace(k, "val2", cache.KeepTTL); !replaced {
-		t.Errorf("Cache.Replace() = %v, want true", replaced)
-	}
-
-	item, found := c.Item(k)
+	c.Set(k, v1, 3*time.Hour)
+	item1, found := c.Item(k)
 	if !found {
-		t.Fatalf("Cache.Item() did not find key: %s", k)
+		t.Fatalf("Cache.Item() = false (key %q not found), want true", k)
+	}
+	if item1.Value != v1 {
+		t.Fatalf("Cache.Item().Value = %q, want %q", item1.Value, v1)
+	}
+	if item1.Expiration.IsZero() || time.Until(item1.Expiration) < 2*time.Hour || time.Until(item1.Expiration) >= 3*time.Hour {
+		t.Fatalf("Cache.Item().Expiration = %v, want a little less than 3 hours", item1.Expiration)
 	}
 
-	if item.Value != "val2" {
-		t.Errorf("Cache.Replace() did not update value: got %q, want %q", item.Value, "val2")
-	}
+	time.Sleep(time.Millisecond) // Just for clarity, the test isn't sensitive to timing.
 
-	remainingTTL := time.Until(item.Expiration)
-	if remainingTTL <= 0 || remainingTTL >= 2*time.Minute {
-		t.Errorf("Cache.Replace() did not keep TTL: got %v, want around 2 minutes", remainingTTL)
+	if replaced := c.Replace(k, v2, cache.KeepTTL); !replaced {
+		t.Fatal("Cache.Replace() = false, want true")
+	}
+	item2, found := c.Item(k)
+	if !found {
+		t.Fatalf("Cache.Item() = false (key %q not found), want true", k)
+	}
+	if item2.Value != v2 {
+		t.Errorf("Cache.Replace() did not update value: got %q, want %q", item2.Value, v2)
+	}
+	if item2.Expiration != item1.Expiration {
+		t.Errorf("Cache.Replace() did not keep exact TTL: got expiration %v, want %v", item2.Expiration, item1.Expiration)
 	}
 }
