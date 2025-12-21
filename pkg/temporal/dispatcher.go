@@ -2,13 +2,14 @@ package temporal
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/github"
 	"github.com/tzrikka/revchat/pkg/slack"
@@ -52,16 +53,16 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 		// https://docs.temporal.io/develop/go/message-passing#wait-for-message-handlers
 		if info := workflow.GetInfo(ctx); info.GetContinueAsNewSuggested() {
 			startTime := time.Now()
-			log.Info(ctx, "continue-as-new suggested by Temporal server",
-				"history_length", info.GetCurrentHistoryLength(),
-				"history_size", info.GetCurrentHistorySize())
+			logger.Info(ctx, "continue-as-new suggested by Temporal server",
+				slog.Int("history_length", info.GetCurrentHistoryLength()),
+				slog.Int("history_size", info.GetCurrentHistorySize()))
 
 			// "Lame duck" mode: drain all signal channels before resetting workflow history.
 			// This minimizes - but doesn't entirely eliminate - the chance of losing signals.
 			// We run in this mode until the worker is relatively idle.
 			for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 5; cyclesSinceLastSignal++ {
 				if err := workflow.Sleep(ctx, time.Second); err != nil {
-					log.Error(ctx, "failed to wait 1 second between drain cycles", "error", err)
+					logger.Error(ctx, "failed to wait 1 second between drain cycles", err)
 				}
 				if c.drainCycle(ctx) {
 					cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
@@ -69,10 +70,10 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 			}
 
 			duration := time.Since(startTime)
-			log.Warn(ctx, "triggering continue-as-new for dispatcher workflow",
-				"history_length", info.GetCurrentHistoryLength(),
-				"history_size", info.GetCurrentHistorySize(),
-				"lead_time", duration.String())
+			logger.Warn(ctx, "triggering continue-as-new for dispatcher workflow",
+				slog.Int("history_length", info.GetCurrentHistoryLength()),
+				slog.Int("history_size", info.GetCurrentHistorySize()),
+				slog.String("lead_time", duration.String()))
 
 			return workflow.NewContinueAsNewError(ctx, EventDispatcher)
 		}

@@ -1,11 +1,12 @@
 package bitbucket
 
 import (
+	"log/slog"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -15,13 +16,14 @@ import (
 func addOKReaction(ctx workflow.Context, url string) {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "bitbucket_url", url)
+		logger.Error(ctx, "failed to retrieve PR comment's Slack IDs", err, slog.String("bitbucket_url", url))
 		return
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		log.Warn(ctx, "can't add reaction to Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		logger.Warn(ctx, "can't add reaction to Slack message - missing/bad IDs",
+			slog.String("bitbucket_url", url), slog.String("slack_ids", ids))
 		return
 	}
 
@@ -33,13 +35,14 @@ func addOKReaction(ctx workflow.Context, url string) {
 func removeOKReaction(ctx workflow.Context, url string) {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve PR comment's Slack IDs", "error", err, "bitbucket_url", url)
+		logger.Error(ctx, "failed to retrieve PR comment's Slack IDs", err, slog.String("bitbucket_url", url))
 		return
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		log.Error(ctx, "can't remove reaction from Slack message - missing/bad IDs", "bitbucket_url", url, "slack_ids", ids)
+		logger.Error(ctx, "can't remove reaction from Slack message - missing/bad IDs", nil,
+			slog.String("bitbucket_url", url), slog.String("slack_ids", ids))
 		return
 	}
 

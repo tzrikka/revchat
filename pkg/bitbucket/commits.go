@@ -1,21 +1,22 @@
 package bitbucket
 
 import (
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
 func commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 	workspace, repo, found := strings.Cut(event.Repository.FullName, "/")
 	if !found {
-		log.Error(ctx, "failed to parse Bitbucket workspace and repository name",
-			"full_name", event.Repository.FullName)
+		logger.Error(ctx, "failed to parse Bitbucket workspace and repository name",
+			nil, slog.String("full_name", event.Repository.FullName))
 		return nil
 	}
 
@@ -27,8 +28,9 @@ func commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 		},
 	})
 	if err != nil {
-		log.Error(ctx, "failed to list Bitbucket PR commits", "error", err, "pr_url", htmlURL(event.PullRequest.Links),
-			"workspace", workspace, "repo", repo, "pr_id", event.PullRequest.ID)
+		logger.Error(ctx, "failed to list Bitbucket PR commits", err,
+			slog.String("pr_url", htmlURL(event.PullRequest.Links)), slog.String("workspace", workspace),
+			slog.String("repo", repo), slog.Int("pr_id", event.PullRequest.ID))
 		return nil
 	}
 
@@ -40,7 +42,7 @@ var diffURLPattern = regexp.MustCompile(`/([^/]+)/([^/]+)/diff/([^?]+)(\?path=(.
 func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 	matches := diffURLPattern.FindStringSubmatch(diffURL)
 	if len(matches) < 6 {
-		log.Error(ctx, "failed to parse Bitbucket diff URL", "diff_url", diffURL)
+		logger.Error(ctx, "failed to parse Bitbucket diff URL", nil, slog.String("diff_url", diffURL))
 		return ""
 	}
 
@@ -51,7 +53,8 @@ func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 		Path:      matches[5],
 	})
 	if err != nil {
-		log.Error(ctx, "failed to get Bitbucket file content", "error", err, "commit", hash, "path", matches[5])
+		logger.Error(ctx, "failed to get Bitbucket file content", err,
+			slog.String("commit", hash), slog.String("path", matches[5]))
 		return ""
 	}
 
@@ -61,7 +64,7 @@ func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 // func fileDiff(ctx workflow.Context, url string) string {
 // 	matches := diffURLPattern.FindStringSubmatch(url)
 // 	if len(matches) < 4 {
-// 		log.Error(ctx, "failed to parse Bitbucket diff URL", "diff_url", url)
+// 		logger.Error(ctx, "failed to parse Bitbucket diff URL", nil, slog.String("diff_url", url))
 // 		return ""
 // 	}
 // 	if len(matches) < 6 {
@@ -75,7 +78,7 @@ func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 // 		Path:      matches[5],
 // 	})
 // 	if err != nil {
-// 		log.Error(ctx, "failed to get Bitbucket PR diff", "error", err, "diff_url", url)
+// 		logger.Error(ctx, "failed to get Bitbucket PR diff", err, slog.String("diff_url", url))
 // 		return ""
 // 	}
 //
@@ -86,7 +89,8 @@ func sourceFile(ctx workflow.Context, diffURL, hash string) string {
 func diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.Diffstat {
 	workspace, repo, found := strings.Cut(event.Repository.FullName, "/")
 	if !found {
-		log.Error(ctx, "failed to parse Bitbucket workspace and repository name", "full_name", event.Repository.FullName)
+		logger.Error(ctx, "failed to parse Bitbucket workspace and repository name",
+			nil, slog.String("full_name", event.Repository.FullName))
 		return nil
 	}
 
@@ -98,8 +102,9 @@ func diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.Diffstat
 		},
 	})
 	if err != nil {
-		log.Error(ctx, "failed to get Bitbucket PR diffstat", "error", err, "pr_url", htmlURL(event.PullRequest.Links),
-			"workspace", workspace, "repo", repo, "pr_id", event.PullRequest.ID)
+		logger.Error(ctx, "failed to get Bitbucket PR diffstat", err, slog.String("pr_url",
+			htmlURL(event.PullRequest.Links)), slog.String("workspace", workspace),
+			slog.String("repo", repo), slog.Int("pr_id", event.PullRequest.ID))
 		return nil
 	}
 

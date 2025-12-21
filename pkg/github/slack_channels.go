@@ -3,13 +3,14 @@ package github
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
@@ -60,7 +61,8 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 
 	channelID, err := data.SwitchURLAndID(pr.HTMLURL)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve PR's Slack channel ID", "error", err, "action", action, "pr_url", pr.HTMLURL)
+		logger.Error(ctx, "failed to retrieve PR's Slack channel ID", err,
+			slog.String("action", action), slog.String("pr_url", pr.HTMLURL))
 		return "", false
 	}
 
@@ -71,7 +73,7 @@ func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string,
 // they are logged but ignored, as they do not affect the overall workflow.
 func (c Config) cleanupPRData(ctx workflow.Context, url string) {
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
-		log.Error(ctx, "failed to delete PR URL / Slack channel mappings", "error", err, "pr_url", url)
+		logger.Error(ctx, "failed to delete PR URL / Slack channel mappings", err, slog.String("pr_url", url))
 	}
 }
 
@@ -87,7 +89,8 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 
 	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	if err := data.MapURLAndID(url, channelID); err != nil {
-		log.Error(ctx, "failed to save PR URL / Slack channel mapping", "error", err, "channel_id", channelID, "pr_url", url)
+		logger.Error(ctx, "failed to save PR URL / Slack channel mapping", err,
+			slog.String("channel_id", channelID), slog.String("pr_url", url))
 		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
 		c.cleanupPRData(ctx, url)
 		return err
@@ -131,7 +134,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 	}
 
 	msg := "too many failed attempts to create Slack channel"
-	log.Error(ctx, msg, "pr_url", pr.HTMLURL)
+	logger.Error(ctx, msg, nil, slog.String("pr_url", pr.HTMLURL))
 	return "", errors.New(msg)
 }
 

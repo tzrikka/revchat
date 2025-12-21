@@ -1,11 +1,13 @@
 package github
 
 import (
+	"log/slog"
+
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
@@ -47,7 +49,7 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		ch.Receive(ctx, payload)
 		signal := ch.Name()
 
-		log.Info(ctx, "received signal", "signal", signal, "action", payload.Action)
+		logger.Info(ctx, "received signal", slog.String("signal", signal), slog.String("action", payload.Action))
 		metrics.IncrementSignalCounter(ctx, signal)
 
 		wf := workflow.ExecuteChildWorkflow(childCtx, signal, payload)
@@ -71,7 +73,7 @@ func addReceive[T any](ctx, childCtx workflow.Context, sel workflow.Selector, si
 		ch.Receive(ctx, payload)
 		signal := ch.Name()
 
-		log.Info(ctx, "received signal", "signal", signal)
+		logger.Info(ctx, "received signal", slog.String("signal", signal))
 		metrics.IncrementSignalCounter(ctx, signal)
 
 		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
@@ -91,7 +93,7 @@ func DrainSignals(ctx workflow.Context, taskQueue string) bool {
 			break
 		}
 
-		log.Info(ctx, "received signal while draining", "signal", Signals[0])
+		logger.Info(ctx, "received signal while draining", slog.String("signal", Signals[0]))
 		metrics.IncrementSignalCounter(ctx, Signals[0])
 		totalEvents++
 
@@ -104,7 +106,7 @@ func DrainSignals(ctx workflow.Context, taskQueue string) bool {
 		}
 	}
 	if totalEvents > 0 {
-		log.Info(ctx, "drained signal channel", "signal_name", Signals[0], "event_count", totalEvents)
+		logger.Info(ctx, "drained signal channel", slog.String("signal", Signals[0]), slog.Int("event_count", totalEvents))
 	}
 
 	totalEvents += receiveAsync[PullRequestReviewEvent](ctx, childCtx, Signals[1])
@@ -123,7 +125,7 @@ func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
 			break
 		}
 
-		log.Info(ctx, "received signal while draining", "signal", signal)
+		logger.Info(ctx, "received signal while draining", slog.String("signal", signal))
 		metrics.IncrementSignalCounter(ctx, signal)
 		signalEvents++
 
@@ -131,7 +133,7 @@ func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
 	}
 
 	if signalEvents > 0 {
-		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+		logger.Info(ctx, "drained signal channel", slog.String("signal", signal), slog.Int("event_count", signalEvents))
 	}
 	return signalEvents
 }

@@ -5,13 +5,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/github"
@@ -22,21 +23,21 @@ import (
 // Run initializes the Temporal worker, and blocks to keep it running.
 // This worker exposes (mostly asynchronous) Temporal workflows, and
 // starts the event dispatcher workflow if it's not already running.
-func Run(ctx context.Context, l zerolog.Logger, cmd *cli.Command) error {
+func Run(ctx context.Context, cmd *cli.Command) error {
+	l := logger.FromContext(ctx)
 	addr := cmd.String("temporal-address")
-	l.Info().Msgf("Temporal server address: %s", addr)
+	l.Info("Temporal server address: " + addr)
 
 	c, err := client.Dial(client.Options{
 		HostPort:  addr,
 		Namespace: cmd.String("temporal-namespace"),
-		Logger:    LogAdapter{zerolog: l.With().CallerWithSkipFrameCount(8).Logger()},
+		Logger:    log.NewStructuredLogger(l),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to dial Temporal: %w", err)
 	}
 	defer c.Close()
 
-	ctx = l.WithContext(ctx)
 	tq := cmd.String("temporal-task-queue-revchat")
 	w := worker.New(c, tq, worker.Options{})
 	bitbucket.RegisterPullRequestWorkflows(w, cmd)

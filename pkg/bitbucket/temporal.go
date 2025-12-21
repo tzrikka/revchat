@@ -1,13 +1,14 @@
 package bitbucket
 
 import (
+	"log/slog"
 	"strings"
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
@@ -107,7 +108,7 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 			ch.Receive(ctx, payload)
 
 			signal := ch.Name()
-			log.Info(ctx, "received signal", "signal", signal)
+			logger.Info(ctx, "received signal", slog.String("signal", signal))
 			metrics.IncrementSignalCounter(ctx, signal)
 
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
@@ -132,7 +133,7 @@ func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, task
 			ch.Receive(ctx, payload)
 
 			signal := ch.Name()
-			log.Info(ctx, "received signal", "signal", signal)
+			logger.Info(ctx, "received signal", slog.String("signal", signal))
 			metrics.IncrementSignalCounter(ctx, signal)
 
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
@@ -156,7 +157,7 @@ func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) bool {
 				break
 			}
 
-			log.Info(ctx, "received signal while draining", "signal", signal)
+			logger.Info(ctx, "received signal while draining", slog.String("signal", signal))
 			metrics.IncrementSignalCounter(ctx, signal)
 			signalEvents++
 
@@ -171,7 +172,7 @@ func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) bool {
 		}
 
 		if signalEvents > 0 {
-			log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+			logger.Info(ctx, "drained signal channel", slog.String("signal", signal), slog.Int("event_count", signalEvents))
 		}
 		totalEvents += signalEvents
 	}
@@ -194,7 +195,7 @@ func DrainRepositorySignals(ctx workflow.Context, taskQueue string) bool {
 				break
 			}
 
-			log.Info(ctx, "received signal while draining", "signal", signal)
+			logger.Info(ctx, "received signal while draining", slog.String("signal", signal))
 			metrics.IncrementSignalCounter(ctx, signal)
 			signalEvents++
 
@@ -203,7 +204,7 @@ func DrainRepositorySignals(ctx workflow.Context, taskQueue string) bool {
 		}
 
 		if signalEvents > 0 {
-			log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+			logger.Info(ctx, "drained signal channel", slog.String("signal", signal), slog.Int("event_count", signalEvents))
 		}
 		totalEvents += signalEvents
 	}

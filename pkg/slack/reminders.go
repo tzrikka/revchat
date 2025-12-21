@@ -3,6 +3,7 @@ package slack
 import (
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,7 +12,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/files"
@@ -45,7 +46,8 @@ func remindersWorkflow(ctx workflow.Context) error {
 		// Send a reminder to the user if their reminder time matches
 		// the current time, and there are reminders to be sent to them.
 		if userPRs := prs[userID]; reminderTime.Equal(now) && len(userPRs) > 0 {
-			log.Info(ctx, "sending scheduled Slack reminder to user", "user_id", userID, "pr_count", len(userPRs))
+			logger.Info(ctx, "sending scheduled Slack reminder to user",
+				slog.String("user_id", userID), slog.Int("pr_count", len(userPRs)))
 			slices.Sort(userPRs)
 
 			var msg strings.Builder
@@ -84,7 +86,7 @@ func loadPRTurns(ctx workflow.Context) map[string][]string {
 		url := "https://" + strings.TrimSuffix(path, "_turn.json")
 		emails, err := data.GetCurrentTurn(url)
 		if err != nil {
-			log.Error(ctx, "failed to get current attention state for PR", "error", err, "pr_url", url)
+			logger.Error(ctx, "failed to get current attention state for PR", err, slog.String("pr_url", url))
 			return nil // Continue walking.
 		}
 
@@ -94,7 +96,8 @@ func loadPRTurns(ctx workflow.Context) map[string][]string {
 				slackIDs = append(slackIDs, id)
 				continue
 			}
-			log.Warn(ctx, "Slack email lookup error - removing from turn", "missing_email", email, "pr_url", url)
+			logger.Warn(ctx, "Slack email lookup error - removing from turn",
+				slog.String("missing_email", email), slog.String("pr_url", url))
 			_ = data.RemoveFromTurn(url, email) // Example: user deactivated after being added to the PR.
 		}
 
@@ -102,7 +105,7 @@ func loadPRTurns(ctx workflow.Context) map[string][]string {
 		return nil
 	})
 	if err != nil {
-		log.Error(ctx, "failed to get current attention state for PRs", "error", err)
+		logger.Error(ctx, "failed to get current attention state for PRs", err)
 		return nil
 	}
 
@@ -121,14 +124,15 @@ func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder s
 	// Read and parse the daily reminder time for each user.
 	kitchenTime, tz, found := strings.Cut(reminder, " ")
 	if !found {
-		log.Error(ctx, "invalid Slack reminder", "user_id", userID, "text", reminder)
+		logger.Error(ctx, "invalid Slack reminder", nil, slog.String("user_id", userID), slog.String("text", reminder))
 		err = fmt.Errorf("invalid Slack reminder for Slack user %q: %q", userID, reminder)
 		return parsed, now, err
 	}
 
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
-		log.Error(ctx, "invalid timezone in Slack reminder", "error", err, "user_id", userID, "time", reminder, "tz", tz)
+		logger.Error(ctx, "invalid timezone in Slack reminder", err,
+			slog.String("user_id", userID), slog.String("time", reminder), slog.String("tz", tz))
 		return parsed, now, err
 	}
 
@@ -137,7 +141,8 @@ func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder s
 	rt := fmt.Sprintf("%s %s", today, kitchenTime)
 	parsed, err = time.ParseInLocation(dateTimeLayout, rt, loc)
 	if err != nil {
-		log.Error(ctx, "invalid time in Slack reminder", "error", err, "user_id", userID, "date_time", rt)
+		logger.Error(ctx, "invalid time in Slack reminder", err,
+			slog.String("user_id", userID), slog.String("date_time", rt))
 		return parsed, now, err
 	}
 
@@ -151,7 +156,7 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	title := fmt.Sprintf("\n\n  •  *<%s>*", url)
 	pr, err := data.LoadBitbucketPR(url)
 	if err != nil {
-		log.Error(ctx, "failed to load Bitbucket PR snapshot for reminder", "error", err, "pr_url", url)
+		logger.Error(ctx, "failed to load Bitbucket PR snapshot for reminder", err, slog.String("pr_url", url))
 	} else if t, ok := pr["title"].(string); ok && len(t) > 0 {
 		title = fmt.Sprintf("\n\n  •  <%s|*%s*>", url, t)
 	}
@@ -179,7 +184,7 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	// Slack channel link.
 	channelID, err := data.SwitchURLAndID(url)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve Slack channel ID for reminder", "error", err, "pr_url", url)
+		logger.Error(ctx, "failed to retrieve Slack channel ID for reminder", err, slog.String("pr_url", url))
 	} else {
 		summary.WriteString(fmt.Sprintf("\n          ◦   <#%s>", channelID))
 	}

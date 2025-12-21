@@ -6,17 +6,17 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/rs/zerolog"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	thrippypb "github.com/tzrikka/thrippy-api/thrippy/v1"
 )
 
@@ -29,7 +29,7 @@ const (
 	pollLinkInterval   = 1 * time.Second
 	waitForLinkTimeout = 1 * time.Minute
 
-	ErrLinkAuthzTimeout = "link not authorized yet" // For some reason errors.Is() doesn't work across Temporal.
+	ErrLinkAuthzTimeout = "link not authorized yet" // For some reason [errors.Is] doesn't work across Temporal.
 )
 
 type linkData struct {
@@ -41,10 +41,9 @@ type linkData struct {
 // based on the Thrippy link with the given ID. This is expected to be called
 // once at worker startup, and is used by [Config.createThrippyLinkActivity].
 func (c *Config) initThrippyLinks(ctx context.Context, id string) {
-	l := zerolog.Ctx(ctx)
 	conn, client, err := c.thrippyClient()
 	if err != nil {
-		l.Fatal().Err(err).Msg("failed to initialize Thrippy client")
+		logger.FatalContext(ctx, "failed to initialize Thrippy client", err)
 	}
 	defer conn.Close()
 
@@ -54,13 +53,13 @@ func (c *Config) initThrippyLinks(ctx context.Context, id string) {
 	req := thrippypb.GetLinkRequest_builder{LinkId: proto.String(id)}.Build()
 	resp, err := client.GetLink(ctx, req)
 	if err != nil {
-		l.Fatal().Err(err).Msgf("failed to read the Thrippy link associated with the ID %q", id)
+		logger.FatalContext(ctx, fmt.Sprintf("failed to read the Thrippy link associated with the ID %q", id), err)
 	}
 
 	c.thrippyLinksTemplate = resp.GetTemplate()
 	c.thrippyLinksClientID = resp.GetOauthConfig().GetClientId()
 	c.thrippyLinksClientSecret = resp.GetOauthConfig().GetClientSecret()
-	l.Info().Msg("template for personal Thrippy links: " + c.thrippyLinksTemplate)
+	logger.FromContext(ctx).Info("template for personal Thrippy links: " + c.thrippyLinksTemplate)
 }
 
 // createThrippyLink executes [createThrippyLinkActivity] as a local activity.
@@ -164,7 +163,7 @@ func (c *Config) deleteThrippyLink(ctx workflow.Context, linkID string) error {
 
 	req := thrippypb.DeleteLinkRequest_builder{LinkId: proto.String(linkID)}.Build()
 	if _, err = client.DeleteLink(grpcCtx, req); err != nil {
-		log.Error(ctx, "failed to delete Thrippy link", "error", err, "link_id", linkID)
+		logger.Error(ctx, "failed to delete Thrippy link", err, slog.String("link_id", linkID))
 		return err
 	}
 	return nil

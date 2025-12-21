@@ -2,12 +2,13 @@ package bitbucket
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
@@ -92,7 +93,8 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			continue
 		}
 		if err := data.AddReviewerToPR(url, email); err != nil {
-			log.Error(ctx, "failed to add reviewer to Bitbucket PR's attention state", "error", err, "pr_url", url)
+			logger.Error(ctx, "failed to add reviewer to Bitbucket PR's attention state",
+				err, slog.String("pr_url", url))
 		}
 	}
 
@@ -102,14 +104,15 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 			continue
 		}
 		if err := data.RemoveFromTurn(url, email); err != nil {
-			log.Error(ctx, "failed to remove reviewers from Bitbucket PR's attention state", "error", err, "pr_url", url)
+			logger.Error(ctx, "failed to remove reviewers from Bitbucket PR's attention state",
+				err, slog.String("pr_url", url))
 		}
 	}
 
 	// Commit(s) pushed to the PR branch.
 	if event.PullRequest.CommitCount > 0 && snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
 		if err := data.UpdateBitbucketDiffstat(url, diffstat(ctx, event)); err != nil {
-			log.Error(ctx, "failed to update Bitbucket PR's diffstat", "error", err, "pr_url", url)
+			logger.Error(ctx, "failed to update Bitbucket PR's diffstat", err, slog.String("pr_url", url))
 			// Continue anyway.
 		}
 
@@ -169,28 +172,32 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 	switch event.Type {
 	case "approved":
 		if err := data.RemoveFromTurn(url, email); err != nil {
-			log.Error(ctx, "failed to remove user from Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
+			logger.Error(ctx, "failed to remove user from Bitbucket PR's attention state",
+				err, slog.String("pr_url", url), slog.String("email", email))
 		}
 		msg += "approved this PR. :+1:"
 
 	case "unapproved":
 		if err := data.AddReviewerToPR(url, email); err != nil {
-			log.Error(ctx, "failed to add user back to Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
+			logger.Error(ctx, "failed to add user back to Bitbucket PR's attention state",
+				err, slog.String("pr_url", url), slog.String("email", email))
 		}
 		if err := data.SwitchTurn(url, email); err != nil {
-			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
+			logger.Error(ctx, "failed to switch Bitbucket PR's attention state",
+				err, slog.String("pr_url", url), slog.String("email", email))
 		}
 		msg += "unapproved this PR. :-1:"
 
 	case "changes_request_created":
 		pr.ChangeRequestCount++
 		if _, err := switchSnapshot(ctx, url, pr); err != nil {
-			log.Error(ctx, "failed to update change-request count in PR snapshot",
-				"error", err, "pr_url", url, "new_count", pr.ChangeRequestCount)
+			logger.Error(ctx, "failed to update change-request count in PR snapshot",
+				err, slog.String("pr_url", url), slog.Int("new_count", pr.ChangeRequestCount))
 		}
 
 		if err := data.SwitchTurn(url, email); err != nil {
-			log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", url, "email", email)
+			logger.Error(ctx, "failed to switch Bitbucket PR's attention state",
+				err, slog.String("pr_url", url), slog.String("email", email))
 		}
 		msg += "requested changes in this PR. :warning:"
 
@@ -200,13 +207,13 @@ func prReviewedWorkflow(ctx workflow.Context, event PullRequestEvent) error {
 			pr.ChangeRequestCount = 0 // Should not happen, but just in case.
 		}
 		if _, err := switchSnapshot(ctx, url, pr); err != nil {
-			log.Error(ctx, "failed to update change-request count in PR snapshot",
-				"error", err, "pr_url", url, "new_count", pr.ChangeRequestCount)
+			logger.Error(ctx, "failed to update change-request count in PR snapshot",
+				err, slog.String("pr_url", url), slog.Int("new_count", pr.ChangeRequestCount))
 		}
 		return nil
 
 	default:
-		log.Error(ctx, "unrecognized Bitbucket PR review event type", "event_type", event.Type)
+		logger.Error(ctx, "unrecognized Bitbucket PR review event type", nil, slog.String("event_type", event.Type))
 		return nil
 	}
 
@@ -227,13 +234,13 @@ func prCommentCreatedWorkflow(ctx workflow.Context, event PullRequestEvent) erro
 	prURL := htmlURL(pr.Links)
 	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
 	if err := data.SwitchTurn(prURL, email); err != nil {
-		log.Error(ctx, "failed to switch Bitbucket PR's attention state", "error", err, "pr_url", prURL)
+		logger.Error(ctx, "failed to switch Bitbucket PR's attention state", err, slog.String("pr_url", prURL))
 		// Don't abort - we still want to post the comment.
 	}
 
 	// If the comment was created by RevChat, don't repost it.
 	if strings.HasSuffix(event.Comment.Content.Raw, "\n\n[This comment was created by RevChat]: #") {
-		log.Debug(ctx, "ignoring self-triggered Bitbucket event")
+		logger.Debug(ctx, "ignoring self-triggered Bitbucket event")
 		return nil
 	}
 

@@ -1,9 +1,11 @@
 package markdown
 
 import (
+	"log/slog"
+
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -21,7 +23,7 @@ func slackBaseURL(ctx workflow.Context) string {
 
 	resp, err := slack.AuthTest(ctx)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve Slack auth info", "error", err)
+		logger.Error(ctx, "failed to retrieve Slack auth info", err)
 		return ""
 	}
 
@@ -36,13 +38,13 @@ func slackChannelIDToName(ctx workflow.Context, id string) string {
 
 	channel, err := slack.ConversationsInfo(ctx, id, false, false)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve Slack channel info", "error", err, "channel_id", id)
+		logger.Error(ctx, "failed to retrieve Slack channel info", err, slog.String("channel_id", id))
 		return ""
 	}
 
 	name, ok := channel["name"].(string)
 	if !ok {
-		log.Error(ctx, "Slack channel 'name' field missing or not a string", "channel_id", id)
+		logger.Error(ctx, "Slack channel 'name' field missing or not a string", nil, slog.String("channel_id", id))
 		return ""
 	}
 

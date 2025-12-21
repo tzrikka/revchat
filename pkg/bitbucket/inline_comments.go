@@ -7,7 +7,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 )
 
 // beautifyInlineComment adds an informative prefix to the comment's text.
@@ -128,7 +128,7 @@ func spliceSuggestion(ctx workflow.Context, in *Inline, suggestion, srcFile stri
 	srcLines := strings.Split(srcFile, "\n")
 	numLines := len(srcLines)
 	if firstLine < 1 || lastLine < 1 || firstLine > numLines || lastLine > numLines || lenFrom <= 0 || lenTo < 0 {
-		log.Warn(ctx, "mistake in generating pretty diff")
+		logger.Warn(ctx, "mistake in generating pretty diff")
 		return nil
 	}
 

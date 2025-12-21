@@ -2,10 +2,11 @@ package github
 
 import (
 	"errors"
+	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 )
 
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request_review
@@ -20,7 +21,7 @@ func (c Config) prReviewWorkflow(ctx workflow.Context, event PullRequestReviewEv
 		return c.reviewDismissed(ctx)
 
 	default:
-		log.Error(ctx, "unrecognized GitHub PR review event action", "action", event.Action)
+		logger.Error(ctx, "unrecognized GitHub PR review event action", nil, slog.String("action", event.Action))
 		return errors.New("unrecognized GitHub PR review event action: " + event.Action)
 	}
 }
@@ -28,18 +29,18 @@ func (c Config) prReviewWorkflow(ctx workflow.Context, event PullRequestReviewEv
 // A review on a pull request was submitted. This is interesting when
 // the review state is "approved", and/or the review body isn't empty.
 func (c Config) reviewSubmitted(ctx workflow.Context) error {
-	log.Warn(ctx, "GitHub PR review submitted - event handler not implemented yet")
+	logger.Warn(ctx, "GitHub PR review submitted - event handler not implemented yet")
 	return nil
 }
 
 // The body comment on a pull request review was edited.
 func (c Config) reviewEdited(ctx workflow.Context) error {
-	log.Warn(ctx, "GitHub PR review edited - event handler not implemented yet")
+	logger.Warn(ctx, "GitHub PR review edited - event handler not implemented yet")
 	return nil
 }
 
 // A review on a pull request was dismissed.
 func (c Config) reviewDismissed(ctx workflow.Context) error {
-	log.Warn(ctx, "GitHub PR review dismissed - event handler not implemented yet")
+	logger.Warn(ctx, "GitHub PR review dismissed - event handler not implemented yet")
 	return nil
 }

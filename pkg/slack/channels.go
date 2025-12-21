@@ -2,12 +2,13 @@ package slack
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -27,12 +28,12 @@ func (c *Config) channelArchivedWorkflow(ctx workflow.Context, event archiveEven
 	// Channel archived by someone other than RevChat. The most common reason is
 	// that the last member has left the channel, so Slackbot auto-archived it.
 	channelID := event.InnerEvent.Channel
-	log.Info(ctx, "Slack channel archived by someone else",
-		"channel_id", channelID, "user", event.InnerEvent.User)
+	logger.Info(ctx, "Slack channel archived by someone else",
+		slog.String("channel_id", channelID), slog.String("user", event.InnerEvent.User))
 
 	url, err := data.SwitchURLAndID(channelID)
 	if err != nil {
-		log.Error(ctx, "failed to convert Slack channel to PR URL", "error", err, "channel_id", channelID)
+		logger.Error(ctx, "failed to convert Slack channel to PR URL", err, slog.String("channel_id", channelID))
 		return err
 	}
 
@@ -75,15 +76,16 @@ func CreateChannel(ctx workflow.Context, name, url string, private bool) (string
 		msg := "failed to create Slack channel"
 
 		if strings.Contains(err.Error(), "name_taken") {
-			log.Debug(ctx, msg+" - already exists", "channel_name", name, "pr_url", url)
+			logger.Debug(ctx, msg+" - already exists", slog.String("channel_name", name), slog.String("pr_url", url))
 			return "", true, err // Retry with a different name.
 		}
 
-		log.Error(ctx, msg, "error", err, "channel_name", name, "pr_url", url)
+		logger.Error(ctx, msg, err, slog.String("channel_name", name), slog.String("pr_url", url))
 		return "", false, err // Non-retryable error.
 	}
 
-	log.Info(ctx, "created Slack channel", "channel_id", id, "channel_name", name, "pr_url", url)
+	logger.Info(ctx, "created Slack channel", slog.String("channel_id", id),
+		slog.String("channel_name", name), slog.String("pr_url", url))
 	return id, false, nil
 }
 
@@ -92,15 +94,15 @@ func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
 		msg := "failed to rename Slack channel"
 
 		if strings.Contains(err.Error(), "name_taken") {
-			log.Debug(ctx, msg+" - already exists", "channel_id", channelID, "new_name", name)
+			logger.Debug(ctx, msg+" - already exists", slog.String("channel_id", channelID), slog.String("new_name", name))
 			return true, err // Retry with a different name.
 		}
 
-		log.Error(ctx, msg, "error", err, "channel_id", channelID, "new_name", name)
+		logger.Error(ctx, msg, err, slog.String("channel_id", channelID), slog.String("new_name", name))
 		return false, err // Non-retryable error.
 	}
 
-	log.Info(ctx, "renamed Slack channel", "channel_id", channelID, "new_name", name)
+	logger.Info(ctx, "renamed Slack channel", slog.String("channel_id", channelID), slog.String("new_name", name))
 	return false, nil
 }
 
@@ -111,7 +113,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []stri
 
 	if len(userIDs) > 1000 { // API limitation.
 		msg := "trying to add more than 1000 users to Slack channel - truncating"
-		log.Warn(ctx, msg, "channel_id", channelID, "users_len", len(userIDs))
+		logger.Warn(ctx, msg, slog.String("channel_id", channelID), slog.Int("users_len", len(userIDs)))
 		userIDs = userIDs[:1000]
 	}
 
@@ -120,11 +122,13 @@ func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []stri
 
 		if strings.Contains(err.Error(), "already_in_channel") {
 			msg += " - already in channel" // This is not a problem.
-			log.Debug(ctx, msg, "error", err, "channel_id", channelID, "user_ids", strings.Join(userIDs, ","))
+			logger.Debug(ctx, msg, slog.Any("error", err), slog.String("channel_id", channelID),
+				slog.String("user_ids", strings.Join(userIDs, ",")))
 			return nil
 		}
 
-		log.Error(ctx, msg, "error", err, "channel_id", channelID, "user_ids", strings.Join(userIDs, ","))
+		logger.Error(ctx, msg, err, slog.String("channel_id", channelID),
+			slog.String("user_ids", strings.Join(userIDs, ",")))
 		return err
 	}
 
@@ -140,11 +144,12 @@ func KickUsersFromChannel(ctx workflow.Context, channelID string, userIDs []stri
 
 			if strings.Contains(err.Error(), "not_in_channel") {
 				msg += " - not in channel" // This is not a problem.
-				log.Debug(ctx, msg, "error", err, "channel_id", channelID, "user_id", userID)
+				logger.Debug(ctx, msg, slog.Any("error", err),
+					slog.String("channel_id", channelID), slog.String("user_id", userID))
 				continue
 			}
 
-			log.Error(ctx, msg, "error", err, "channel_id", channelID, "user_id", userID)
+			logger.Error(ctx, msg, err, slog.String("channel_id", channelID), slog.String("user_id", userID))
 		}
 	}
 
@@ -158,8 +163,8 @@ func SetChannelDescription(ctx workflow.Context, channelID, title, url string) {
 	}
 
 	if err := slack.ConversationsSetPurpose(ctx, channelID, desc); err != nil {
-		msg := "failed to set Slack channel description"
-		log.Error(ctx, msg, "error", err, "channel_id", channelID, "pr_url", url)
+		logger.Error(ctx, "failed to set Slack channel description", err,
+			slog.String("channel_id", channelID), slog.String("pr_url", url))
 	}
 }
 
@@ -170,6 +175,7 @@ func SetChannelTopic(ctx workflow.Context, channelID, url string) {
 	}
 
 	if err := slack.ConversationsSetTopic(ctx, channelID, topic); err != nil {
-		log.Error(ctx, "failed to set Slack channel topic", "error", err, "channel_id", channelID, "pr_url", url)
+		logger.Error(ctx, "failed to set Slack channel topic", err,
+			slog.String("channel_id", channelID), slog.String("pr_url", url))
 	}
 }
