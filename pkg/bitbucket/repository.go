@@ -130,7 +130,7 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 		return nil
 	})
 
-	return
+	return pr, err
 }
 
 func prCommitHash(pr map[string]any) (string, bool) {

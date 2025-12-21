@@ -123,13 +123,13 @@ func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder s
 	if !found {
 		log.Error(ctx, "invalid Slack reminder", "user_id", userID, "text", reminder)
 		err = fmt.Errorf("invalid Slack reminder for Slack user %q: %q", userID, reminder)
-		return
+		return parsed, now, err
 	}
 
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
 		log.Error(ctx, "invalid timezone in Slack reminder", "error", err, "user_id", userID, "time", reminder, "tz", tz)
-		return
+		return parsed, now, err
 	}
 
 	now = startTime.In(loc)
@@ -138,10 +138,10 @@ func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder s
 	parsed, err = time.ParseInLocation(dateTimeLayout, rt, loc)
 	if err != nil {
 		log.Error(ctx, "invalid time in Slack reminder", "error", err, "user_id", userID, "date_time", rt)
-		return
+		return parsed, now, err
 	}
 
-	return
+	return parsed, now, err
 }
 
 func prDetails(ctx workflow.Context, url, userID string) string {

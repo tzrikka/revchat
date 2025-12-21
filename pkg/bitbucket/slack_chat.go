@@ -199,13 +199,10 @@ func impersonationToMention(msg string) string {
 func impersonateUser(ctx workflow.Context, user Account) (displayName, icon string) {
 	id := users.BitbucketToSlackID(ctx, user.AccountID, false)
 	if id == "" {
-		displayName = user.DisplayName
-		return
+		return user.DisplayName, ""
 	}
 
-	displayName = users.SlackIDToDisplayName(ctx, id)
-	icon = users.SlackIDToIcon(ctx, id)
-	return
+	return users.SlackIDToDisplayName(ctx, id), users.SlackIDToIcon(ctx, id)
 }
 
 func deleteMsg(ctx workflow.Context, url string) error {

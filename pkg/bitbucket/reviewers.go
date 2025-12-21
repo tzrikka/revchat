@@ -46,7 +46,7 @@ func reviewersDiff(prev, curr PullRequest) (added, removed []string) {
 		}
 	}
 
-	return
+	return added, removed
 }
 
 // reviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.

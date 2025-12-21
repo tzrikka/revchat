@@ -13,39 +13,39 @@ func destinationDetails(pr map[string]any) (workspace, repo, branch, commit stri
 	// Workspace and repo slug.
 	dest, ok := pr["destination"].(map[string]any)
 	if !ok {
-		return
+		return "", "", "", ""
 	}
 	m, ok := dest["repository"].(map[string]any)
 	if !ok {
-		return
+		return "", "", "", ""
 	}
 	fullName, ok := m["full_name"].(string)
 	if !ok {
-		return
+		return "", "", "", ""
 	}
 	workspace, repo, ok = strings.Cut(fullName, "/")
 	if !ok {
-		return
+		return "", "", "", ""
 	}
 
 	// Branch name.
 	m, ok = dest["branch"].(map[string]any)
 	if !ok {
-		return
+		return workspace, repo, "", ""
 	}
 	branch, ok = m["name"].(string)
 	if !ok {
-		return
+		return workspace, repo, "", ""
 	}
 
 	// Commit hash.
 	m, ok = dest["commit"].(map[string]any)
 	if !ok {
-		return
+		return workspace, repo, branch, ""
 	}
 	commit, _ = m["hash"].(string)
 
-	return
+	return workspace, repo, branch, commit
 }
 
 func selfTriggeredMemberEvent(ctx workflow.Context, auth []eventAuth, event MemberEvent) bool {

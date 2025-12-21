@@ -124,17 +124,19 @@ func (c Config) prUpdatedWorkflow(ctx workflow.Context, event PullRequestEvent) 
 		}
 		cmts = cmts[prevCount:]
 
-		msg := fmt.Sprintf("pushed <%s/commits|%d commit", url, len(cmts))
+		var msg strings.Builder
+		msg.WriteString(fmt.Sprintf("pushed <%s/commits|%d commit", url, len(cmts)))
 		if len(cmts) != 1 {
-			msg += "s"
+			msg.WriteString("s")
 		}
 
-		msg += "> to this PR:"
+		msg.WriteString("> to this PR:")
 		for _, c := range cmts {
 			title, _, _ := strings.Cut(c.Message, "\n")
-			msg += fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title)
+			msg.WriteString(fmt.Sprintf("\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title))
 		}
-		mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
+
+		mentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg.String())
 	}
 
 	// Retargeted destination branch.

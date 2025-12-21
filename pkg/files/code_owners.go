@@ -82,7 +82,7 @@ func GotAllRequiredApprovals(ctx workflow.Context, workspace, repo, branch, comm
 func OwnersPerPath(ctx workflow.Context, workspace, repo, branch, commit string, paths []string, flatten bool) (owners, groups map[string][]string) {
 	c := parseCodeOwnersFile(ctx, getBitbucketSourceFile(ctx, workspace, repo, branch, commit, "CODEOWNERS"), flatten)
 	if c == nil {
-		return
+		return nil, nil
 	}
 
 	owners = make(map[string][]string, len(paths))
@@ -99,7 +99,7 @@ func OwnersPerPath(ctx workflow.Context, workspace, repo, branch, commit string,
 		groups = c.Groups
 	}
 
-	return
+	return owners, groups
 }
 
 func parseCodeOwnersFile(ctx workflow.Context, fileContent string, flatten bool) *CodeOwners {
@@ -144,12 +144,12 @@ func parseCodeOwnersLine(line string) (pathPattern, group string, members []stri
 	line = strings.TrimSpace(line)
 
 	if len(line) == 0 || strings.HasPrefix(line, "Check(") {
-		return
+		return "", "", nil
 	}
 
 	parts := linePattern.FindAllStringSubmatch(line, -1)
 	if len(parts) != 1 || len(parts[0]) != 3 {
-		return
+		return "", "", nil
 	}
 	if strings.HasPrefix(parts[0][1], "@@") {
 		group = parts[0][1][2:]
@@ -161,7 +161,7 @@ func parseCodeOwnersLine(line string) (pathPattern, group string, members []stri
 	for i, m := range members {
 		members[i] = strings.Trim(strings.TrimPrefix(strings.TrimSpace(m), "@"), `"`)
 	}
-	return
+	return pathPattern, group, members
 }
 
 // normalizePattern ensures that the given pattern is in a form suitable for doublestar matching.
