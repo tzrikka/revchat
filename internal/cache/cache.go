@@ -46,9 +46,30 @@ func New(defaultExpiration, cleanupInterval time.Duration) *Cache {
 		defaultExpiration = NoExpiration
 	}
 
-	return &Cache{
+	c := &Cache{
 		data:              make(map[string]Item),
 		defaultExpiration: defaultExpiration,
+	}
+	if cleanupInterval > NoCleanup {
+		go cleanupWorker(c, cleanupInterval)
+	}
+
+	return c
+}
+
+// cleanupWorker is an optional goroutine that periodically removes expired items.
+// We do not support stopping it - it's expected to run for the lifetime of the program.
+// Either way, Go 1.23+ can garbage collect the ticker even if it's not stopped.
+// Note that lazy expiration is also handled in [Get] and [Item].
+func cleanupWorker(c *Cache, interval time.Duration) {
+	for now := range time.NewTicker(interval).C {
+		c.mu.Lock()
+		for key, item := range c.data {
+			if !item.Expiration.IsZero() && now.After(item.Expiration) {
+				delete(c.data, key)
+			}
+		}
+		c.mu.Unlock()
 	}
 }
 
