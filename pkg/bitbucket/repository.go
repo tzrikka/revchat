@@ -3,13 +3,14 @@ package bitbucket
 import (
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
@@ -17,7 +18,7 @@ import (
 )
 
 func commitCommentCreatedWorkflow(ctx workflow.Context, event RepositoryEvent) error {
-	log.Warn(ctx, "Bitbucket commit comment created event - not implemented yet")
+	logger.Warn(ctx, "Bitbucket commit comment created event - not implemented yet")
 	return nil
 }
 
@@ -29,7 +30,8 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 		return err
 	}
 	if m == nil {
-		log.Debug(ctx, "PR not found for commit status", "hash", cs.Commit.Hash, "build_name", cs.Name, "build_url", cs.URL)
+		logger.Debug(ctx, "PR not found for commit status", slog.String("hash", cs.Commit.Hash),
+			slog.String("build_name", cs.Name), slog.String("build_url", cs.URL))
 		// Not an error: the commit may not belong to any open PR,
 		// or may be obsoleted by a newer commit in the snapshot.
 		return nil
@@ -37,7 +39,7 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 
 	pr := new(PullRequest)
 	if err := mapToStruct(m, pr); err != nil {
-		log.Error(ctx, "invalid Bitbucket PR", "error", err, "pr_url", prURL(m))
+		logger.Error(ctx, "invalid Bitbucket PR", err, slog.String("pr_url", prURL(m)))
 		return err
 	}
 
@@ -52,7 +54,8 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 
 	status := data.CommitStatus{Name: cs.Name, State: cs.State, Desc: cs.Description, URL: cs.URL}
 	if err := data.UpdateBitbucketBuilds(url, cs.Commit.Hash, cs.Key, status); err != nil {
-		log.Error(ctx, "failed to update Bitbucket build states", "error", err, "pr_url", url, "commit_hash", cs.Commit.Hash)
+		logger.Error(ctx, "failed to update Bitbucket build states", err,
+			slog.String("pr_url", url), slog.String("commit_hash", cs.Commit.Hash))
 		// Continue anyway.
 	}
 
@@ -81,7 +84,7 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 		return err
 	}
 
-	log.Info(ctx, "Bitbucket PR is ready to be merged", "pr_url", url)
+	logger.Info(ctx, "Bitbucket PR is ready to be merged", slog.String("pr_url", url))
 	_, err = slack.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
 	return err
 }
@@ -111,7 +114,7 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 		url := "https://" + strings.TrimSuffix(path, "_snapshot.json")
 		snapshot, err := data.LoadBitbucketPR(url)
 		if err != nil {
-			log.Error(ctx, "failed to load Bitbucket PR snapshot for reminder", "error", err, "pr_url", url)
+			logger.Error(ctx, "failed to load Bitbucket PR snapshot for reminder", err, slog.String("pr_url", url))
 			return nil // Continue walking.
 		}
 
@@ -121,7 +124,8 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 		}
 		if strings.HasPrefix(eventHash, prHash) {
 			if pr != nil {
-				log.Warn(ctx, "commit hash collision", "hash", eventHash, "existing_pr", prURL(pr), "new_pr", prURL(snapshot))
+				logger.Warn(ctx, "commit hash collision", slog.String("hash", eventHash),
+					slog.String("existing_pr", prURL(pr)), slog.String("new_pr", prURL(snapshot)))
 				return nil // Continue walking.
 			}
 			pr = snapshot

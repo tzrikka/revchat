@@ -3,10 +3,11 @@ package bitbucket
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
@@ -16,7 +17,7 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 
 	prev, err := data.LoadBitbucketPR(url)
 	if err != nil {
-		log.Error(ctx, "failed to load Bitbucket PR snapshot", "error", err, "pr_url", url)
+		logger.Error(ctx, "failed to load Bitbucket PR snapshot", err, slog.String("pr_url", url))
 		return nil, err
 	}
 
@@ -26,7 +27,7 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 
 	pr := new(PullRequest)
 	if err := mapToStruct(prev, pr); err != nil {
-		log.Error(ctx, "previous snapshot of Bitbucket PR is invalid", "error", err, "pr_url", url)
+		logger.Error(ctx, "previous snapshot of Bitbucket PR is invalid", err, slog.String("pr_url", url))
 		return nil, err
 	}
 

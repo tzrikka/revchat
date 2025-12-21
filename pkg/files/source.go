@@ -2,12 +2,13 @@ package files
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/cache"
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
@@ -30,8 +31,9 @@ func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, branch, commi
 		Path:      path,
 	})
 	if err != nil {
-		log.Error(ctx, "failed to read Bitbucket source file", "error", err,
-			"workspace", workspace, "repo", repo, "branch", branch, "commit", commit, "path", path)
+		logger.Error(ctx, "failed to read Bitbucket source file", err,
+			slog.String("workspace", workspace), slog.String("repo", repo),
+			slog.String("branch", branch), slog.String("commit", commit), slog.String("path", path))
 		return ""
 	}
 

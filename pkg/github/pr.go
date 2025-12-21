@@ -3,10 +3,11 @@ package github
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/markdown"
 )
 
@@ -46,7 +47,7 @@ func (c Config) pullRequestWorkflow(ctx workflow.Context, event PullRequestEvent
 	case "milestoned", "demilestoned":
 
 	default:
-		log.Error(ctx, "unrecognized GitHub PR event action", "action", event.Action)
+		logger.Error(ctx, "unrecognized GitHub PR event action", nil, slog.String("action", event.Action))
 		return errors.New("unrecognized GitHub PR event action: " + event.Action)
 	}
 

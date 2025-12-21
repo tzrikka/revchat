@@ -9,7 +9,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -42,35 +42,35 @@ func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channe
 
 	bookmarks, err := slack.BookmarksList(ctx, channelID)
 	if err != nil {
-		log.Error(ctx, "failed to list Slack channel bookmarks", "error", err)
+		logger.Error(ctx, "failed to list Slack channel bookmarks", err)
 		return
 	}
 
 	if cnt := len(reviewers(event.PullRequest, false)); len(bookmarks) > 0 && len(reviewers(*snapshot, false)) != cnt {
 		title := fmt.Sprintf("Reviewers (%d)", cnt)
 		if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[0].ID, title); err != nil {
-			log.Error(ctx, "failed to update Slack channel's reviewers bookmark", "error", err)
+			logger.Error(ctx, "failed to update Slack channel's reviewers bookmark", err)
 		}
 	}
 
 	if len(bookmarks) > 1 && snapshot.CommentCount != event.PullRequest.CommentCount {
 		title := fmt.Sprintf("Comments (%d)", event.PullRequest.CommentCount)
 		if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[1].ID, title); err != nil {
-			log.Error(ctx, "failed to update Slack channel's comments bookmark", "error", err)
+			logger.Error(ctx, "failed to update Slack channel's comments bookmark", err)
 		}
 	}
 
 	if len(bookmarks) > 2 && snapshot.TaskCount != event.PullRequest.TaskCount {
 		title := fmt.Sprintf("Tasks (%d)", event.PullRequest.TaskCount)
 		if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[2].ID, title); err != nil {
-			log.Error(ctx, "failed to update Slack channel's tasks bookmark", "error", err)
+			logger.Error(ctx, "failed to update Slack channel's tasks bookmark", err)
 		}
 	}
 
 	if len(bookmarks) > 3 && countApprovals(*snapshot) != countApprovals(event.PullRequest) {
 		title := fmt.Sprintf("Approvals (%d)", countApprovals(event.PullRequest))
 		if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[3].ID, title); err != nil {
-			log.Error(ctx, "failed to update Slack channel's approvals bookmark", "error", err)
+			logger.Error(ctx, "failed to update Slack channel's approvals bookmark", err)
 		}
 	}
 
@@ -78,7 +78,7 @@ func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channe
 		title := fmt.Sprintf("Commits (%d)", event.PullRequest.CommitCount)
 		if title != bookmarks[4].Title {
 			if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[4].ID, title); err != nil {
-				log.Error(ctx, "failed to update Slack channel's commits bookmark", "error", err)
+				logger.Error(ctx, "failed to update Slack channel's commits bookmark", err)
 			}
 		}
 	}
@@ -87,7 +87,7 @@ func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channe
 		title := fmt.Sprintf("Files changed (%d)", data.ReadBitbucketDiffstatLength(url))
 		if title != bookmarks[5].Title {
 			if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[5].ID, title); err != nil {
-				log.Error(ctx, "failed to update Slack channel's files bookmark", "error", err)
+				logger.Error(ctx, "failed to update Slack channel's files bookmark", err)
 			}
 		}
 	}
@@ -112,7 +112,7 @@ const (
 func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 	bookmarks, err := slack.BookmarksList(ctx, channelID)
 	if err != nil {
-		log.Error(ctx, "failed to list Slack channel bookmarks", "error", err)
+		logger.Error(ctx, "failed to list Slack channel bookmarks", err)
 		return
 	}
 	if len(bookmarks) < 7 {
@@ -151,7 +151,7 @@ func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 	}
 
 	if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[6].ID, title); err != nil {
-		log.Error(ctx, "failed to update Slack channel's builds bookmark", "error", err)
+		logger.Error(ctx, "failed to update Slack channel's builds bookmark", err)
 	}
 }
 

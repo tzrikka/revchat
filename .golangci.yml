@@ -38,8 +38,10 @@ linters:
     - nosprintfhostport
     - perfsprint
     - predeclared
+    - protogetter
     - recvcheck
     # - revive
+    - sloglint
     - staticcheck
     - thelper
     - unconvert
@@ -68,6 +70,9 @@ linters:
       locale: US
     predeclared:
       qualified-name: true
+    sloglint:
+      attr-only: true
+      key-naming-case: snake
 
 formatters:
   enable:

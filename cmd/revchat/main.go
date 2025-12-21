@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime/debug"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/rs/zerolog/pkgerrors"
 	"github.com/urfave/cli/v3"
 
 	"github.com/tzrikka/revchat/pkg/config"
@@ -25,7 +23,7 @@ func main() {
 		Flags:   config.Flags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			initLog(cmd.Bool("dev") || cmd.Bool("pretty-log"))
-			return temporal.Run(ctx, log.Logger, cmd)
+			return temporal.Run(ctx, cmd)
 		},
 	}
 
@@ -38,18 +36,18 @@ func main() {
 // initLog initializes the logger for RevChat's Temporal worker,
 // based on whether it's running in development mode or not.
 func initLog(devMode bool) {
-	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
-
-	if !devMode {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		log.Logger = zerolog.New(os.Stderr).With().Timestamp().Caller().Logger()
-		return
+	var handler slog.Handler
+	if devMode {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     slog.LevelDebug,
+			AddSource: true,
+		})
+	} else {
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			Level:     slog.LevelDebug,
+			AddSource: true,
+		})
 	}
 
-	zerolog.SetGlobalLevel(zerolog.TraceLevel)
-	log.Logger = log.Output(zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: "15:04:05.000",
-	}).With().Caller().Logger()
+	slog.SetDefault(slog.New(handler))
 }

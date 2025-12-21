@@ -2,12 +2,13 @@ package bitbucket
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -76,8 +77,8 @@ func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Acco
 
 	id := fmt.Sprintf("%s/%s", channelID, resp.TS)
 	if err := data.MapURLAndID(url, id); err != nil {
-		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping",
-			"error", err, "bitbucket_url", url, "slack_id", id)
+		logger.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", err,
+			slog.String("bitbucket_url", url), slog.String("slack_id", id))
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}
@@ -85,8 +86,8 @@ func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Acco
 	// Also remember to delete diff files later, if we update or delete the message.
 	if fileID != "" {
 		if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", id, fileID)); err != nil {
-			log.Error(ctx, "failed to save Slack file mapping", "error", err,
-				"bitbucket_url", url, "slack_id", id, "file_id", fileID)
+			logger.Error(ctx, "failed to save Slack file mapping", err,
+				slog.String("bitbucket_url", url), slog.String("slack_id", id), slog.String("file_id", fileID))
 			// Don't return the error - the message is already posted in Slack, so we
 			// don't want to retry and post it again, even though this is problematic.
 		}
@@ -113,8 +114,8 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 
 	sid := fmt.Sprintf("%s/%s/%s", ids[0], ids[1], resp.TS)
 	if err := data.MapURLAndID(url, sid); err != nil {
-		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping",
-			"error", err, "bitbucket_url", url, "slack_id", sid)
+		logger.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", err,
+			slog.String("bitbucket_url", url), slog.String("slack_id", sid))
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}
@@ -122,8 +123,8 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 	// Also remember to delete diff files later, if we update or delete the message.
 	if fileID != "" {
 		if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", sid, fileID)); err != nil {
-			log.Error(ctx, "failed to save Slack file mapping", "error", err,
-				"bitbucket_url", url, "slack_id", sid, "file_id", fileID)
+			logger.Error(ctx, "failed to save Slack file mapping", err,
+				slog.String("bitbucket_url", url), slog.String("slack_id", sid), slog.String("file_id", fileID))
 			// Don't return the error - the message is already posted in Slack, so we
 			// don't want to retry and post it again, even though this is problematic.
 		}
@@ -212,8 +213,9 @@ func deleteMsg(ctx workflow.Context, url string) error {
 	}
 
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
-		log.Error(ctx, "failed to delete URL/Slack mappings", "error", err, "comment_url", url)
-		// Don't abort - we still want to attempt to delete the Slack message.
+		logger.Error(ctx, "failed to delete URL/Slack mappings", err, slog.String("comment_url", url))
+		// Don't return the error (i.e. don't abort the calling workflow) -
+		// we still want to attempt to delete the Slack message.
 	}
 
 	return slack.DeleteMessage(ctx, ids[0], ids[len(ids)-1])
@@ -231,14 +233,14 @@ func editMsg(ctx workflow.Context, url, msg string) error {
 func msgIDsForCommentURL(ctx workflow.Context, url, action string) ([]string, error) {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		log.Error(ctx, "failed to load PR comment's Slack IDs", "error", err, "url", url)
+		logger.Error(ctx, "failed to load PR comment's Slack IDs", err, slog.String("url", url))
 		return nil, err
 	}
 
 	parts := strings.Split(ids, "/")
 	if len(parts) < 2 {
 		msg := fmt.Sprintf("can't %s Slack message - missing/bad IDs", action)
-		log.Warn(ctx, msg, "bitbucket_url", url, "slack_ids", ids)
+		logger.Warn(ctx, msg, slog.String("bitbucket_url", url), slog.String("slack_ids", ids))
 		return nil, nil
 	}
 

@@ -3,12 +3,13 @@ package slack
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
@@ -24,7 +25,7 @@ func (c *Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper
 	userID := extractUserID(ctx, &event.InnerEvent)
 	if userID == "" {
 		msg := "could not determine who triggered a Slack message event"
-		log.Error(ctx, msg)
+		logger.Error(ctx, msg, nil)
 		return errors.New(msg)
 	}
 
@@ -49,7 +50,7 @@ func (c *Config) messageWorkflow(ctx workflow.Context, event messageEventWrapper
 		return c.deleteMessage(ctx, event.InnerEvent, userID)
 	}
 
-	log.Warn(ctx, "unhandled Slack message event", "event", event.InnerEvent)
+	logger.Warn(ctx, "unhandled Slack message event", slog.Any("event", event.InnerEvent))
 	return nil
 }
 
@@ -83,7 +84,7 @@ func extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 	userID, err := data.GetSlackBotUserID(botID)
 	if err != nil {
-		log.Error(ctx, "failed to load Slack bot's user ID", "bot_id", botID, "error", err)
+		logger.Error(ctx, "failed to load Slack bot's user ID", err, slog.String("bot_id", botID))
 		return ""
 	}
 
@@ -93,13 +94,14 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 
 	bot, err := slack.BotsInfo(ctx, botID)
 	if err != nil {
-		log.Error(ctx, "failed to retrieve bot info from Slack", "bot_id", botID, "error", err)
+		logger.Error(ctx, "failed to retrieve bot info from Slack", err, slog.String("bot_id", botID))
 		return ""
 	}
 
-	log.Debug(ctx, "retrieved bot info from Slack", "bot_id", botID, "user_id", bot.UserID, "name", bot.Name)
+	logger.Debug(ctx, "retrieved bot info from Slack", slog.String("bot_id", botID),
+		slog.String("user_id", bot.UserID), slog.String("name", bot.Name))
 	if err := data.SetSlackBotUserID(botID, bot.UserID); err != nil {
-		log.Error(ctx, "failed to save Slack bot's user ID", "bot_id", botID, "error", err)
+		logger.Error(ctx, "failed to save Slack bot's user ID", err, slog.String("bot_id", botID))
 	}
 
 	return bot.UserID
@@ -110,7 +112,7 @@ func (c *Config) addMessage(ctx workflow.Context, event MessageEvent, userID str
 	case c.bitbucketWorkspace != "":
 		return c.addMessageBitbucket(ctx, event, userID)
 	default:
-		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
 }
@@ -120,7 +122,7 @@ func (c *Config) changeMessage(ctx workflow.Context, event MessageEvent, userID 
 	case c.bitbucketWorkspace != "":
 		return c.editMessageBitbucket(ctx, event, userID)
 	default:
-		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
 }
@@ -130,7 +132,7 @@ func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID 
 	case c.bitbucketWorkspace != "":
 		return deleteMessageBitbucket(ctx, event, userID)
 	default:
-		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
 }
@@ -173,7 +175,8 @@ func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, u
 		ParentID: url[5], // Optional.
 	})
 	if err != nil {
-		log.Error(ctx, "failed to create Bitbucket PR comment", "error", err, "slack_ids", ids, "pr_url", url[0])
+		logger.Error(ctx, "failed to create Bitbucket PR comment", err,
+			slog.String("slack_ids", ids), slog.String("pr_url", url[0]))
 		return fmt.Errorf("failed to create Bitbucket PR comment: %w", err)
 	}
 
@@ -181,7 +184,8 @@ func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, u
 	ids = fmt.Sprintf("%s/%s", ids, event.TS)
 
 	if err := data.MapURLAndID(url[0], ids); err != nil {
-		log.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", "error", err, "slack_ids", ids, "comment_url", url[0])
+		logger.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", err,
+			slog.String("slack_ids", ids), slog.String("comment_url", url[0]))
 		// Don't return the error - the message is already created in Bitbucket, so
 		// we don't want to retry and post it again, even though this is problematic.
 	}
@@ -207,7 +211,7 @@ func (c *Config) fileTypeEmoji(ctx workflow.Context, f File) string {
 	case c.bitbucketWorkspace != "":
 		return fileTypeEmojiBitbucket(f)
 	default:
-		log.Error(ctx, "neither Bitbucket nor GitHub are configured")
+		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
 		return "paperclip"
 	}
 }
@@ -285,7 +289,8 @@ func (c *Config) editMessageBitbucket(ctx workflow.Context, event MessageEvent, 
 		Markdown:  msg,
 	})
 	if err != nil {
-		log.Error(ctx, "failed to update Bitbucket PR comment", "error", err, "slack_ids", ids, "comment_url", url[0])
+		logger.Error(ctx, "failed to update Bitbucket PR comment", err,
+			slog.String("slack_ids", ids), slog.String("comment_url", url[0]))
 		return err
 	}
 
@@ -311,7 +316,7 @@ func deleteMessageBitbucket(ctx workflow.Context, event MessageEvent, userID str
 	}
 
 	if err := data.DeleteURLAndIDMapping(url[0]); err != nil {
-		log.Error(ctx, "failed to delete URL/Slack mappings", "error", err, "comment_url", url[0])
+		logger.Error(ctx, "failed to delete URL/Slack mappings", err, slog.String("comment_url", url[0]))
 		// Don't abort - we still want to attempt to delete the PR comment.
 	}
 
@@ -331,7 +336,8 @@ func deleteMessageBitbucket(ctx workflow.Context, event MessageEvent, userID str
 		CommentID: url[5],
 	})
 	if err != nil {
-		log.Error(ctx, "failed to delete Bitbucket PR comment", "error", err, "slack_ids", ids, "comment_url", url[0])
+		logger.Error(ctx, "failed to delete Bitbucket PR comment", err,
+			slog.String("slack_ids", ids), slog.String("comment_url", url[0]))
 		return err
 	}
 
@@ -351,7 +357,7 @@ func urlElements(ctx workflow.Context, ids string) ([]string, error) {
 	sub := commentURLPattern.FindStringSubmatch(url)
 	if len(sub) != ExpectedSubmatches {
 		msg := "failed to parse Slack message's PR comment URL"
-		log.Error(ctx, msg, "slack_ids", ids, "comment_url", url)
+		logger.Error(ctx, msg, nil, slog.String("slack_ids", ids), slog.String("comment_url", url))
 		return nil, fmt.Errorf("invalid Bitbucket PR URL: %s", url)
 	}
 
@@ -365,7 +371,7 @@ func thrippyLinkID(ctx workflow.Context, userID, channelID string) (string, erro
 
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
-		log.Error(ctx, "failed to load user by Slack ID", "error", err, "user_id", userID)
+		logger.Error(ctx, "failed to load user by Slack ID", err, slog.String("user_id", userID))
 		return "", err
 	}
 

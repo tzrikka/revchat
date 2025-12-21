@@ -5,7 +5,6 @@ go 1.25.5
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/gogo/protobuf v1.3.2
-	github.com/rs/zerolog v1.34.0
 	github.com/tzrikka/thrippy-api v1.5.0
 	github.com/tzrikka/timpani-api v1.7.2
 	github.com/tzrikka/xdg v1.3.3
@@ -24,10 +23,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/nexus-rpc/sdk-go v0.5.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect

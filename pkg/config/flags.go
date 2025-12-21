@@ -3,12 +3,12 @@ package config
 import (
 	"time"
 
-	"github.com/rs/zerolog/log"
 	altsrc "github.com/urfave/cli-altsrc/v3"
 	"github.com/urfave/cli-altsrc/v3/toml"
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/client"
 
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/xdg"
 )
 
@@ -34,7 +34,7 @@ const (
 func configFile() altsrc.StringSourcer {
 	path, err := xdg.CreateFile(xdg.ConfigHome, DirName, ConfigFileName)
 	if err != nil {
-		log.Fatal().Err(err).Caller().Send()
+		logger.Fatal("failed to create config file", err)
 	}
 	return altsrc.StringSourcer(path)
 }

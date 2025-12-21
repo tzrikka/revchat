@@ -2,15 +2,15 @@ package slack
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/log"
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
@@ -108,7 +108,7 @@ func addReceive[T any](ctx, childCtx workflow.Context, sel workflow.Selector, si
 		ch.Receive(ctx, payload)
 		signal := ch.Name()
 
-		log.Info(ctx, "received signal", "signal", signal)
+		logger.Info(ctx, "received signal", slog.String("signal", signal))
 		metrics.IncrementSignalCounter(ctx, signal)
 
 		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
@@ -142,7 +142,7 @@ func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
 			break
 		}
 
-		log.Info(ctx, "received signal while draining", "signal", signal)
+		logger.Info(ctx, "received signal while draining", slog.String("signal", signal))
 		metrics.IncrementSignalCounter(ctx, signal)
 		signalEvents++
 
@@ -150,7 +150,7 @@ func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
 	}
 
 	if signalEvents > 0 {
-		log.Info(ctx, "drained signal channel", "signal_name", signal, "event_count", signalEvents)
+		logger.Info(ctx, "drained signal channel", slog.String("signal", signal), slog.Int("event_count", signalEvents))
 	}
 	return signalEvents
 }
@@ -175,6 +175,7 @@ func CreateSchedule(ctx context.Context, c client.Client, cmd *cli.Command) {
 		},
 	})
 	if err != nil {
-		zerolog.Ctx(ctx).Warn().Err(err).Str("id", Schedules[0]).Msg("schedule creation error")
+		logger.FromContext(ctx).Warn("schedule creation error",
+			slog.Any("error", err), slog.String("schedule_id", Schedules[0]))
 	}
 }
