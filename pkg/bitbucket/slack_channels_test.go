@@ -2,55 +2,40 @@ package bitbucket
 
 import (
 	"testing"
-
-	"github.com/urfave/cli/v3"
 )
 
 func TestConfigLinkifyTitle(t *testing.T) {
-	cmdWithDefault := &cli.Command{Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:  "linkification-map",
-			Value: []string{"default=https://domain.atlassian.net/browse/"},
-		},
-	}}
-	cmdWithoutDefault := &cli.Command{Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:  "linkification-map",
-			Value: []string{"FOO = https://domain.atlassian.net/browse/"},
-		},
-	}}
-
 	tests := []struct {
 		name string
-		cmd  *cli.Command
 		text string
+		cfg  map[string]string
 		want string
 	}{
 		{
-			name: "empty title",
-			cmd:  cmdWithDefault,
+			name: "empty_title",
+			cfg:  map[string]string{"default": "https://domain.atlassian.net/browse/"},
 		},
 		{
-			name: "no IDs",
-			cmd:  cmdWithDefault,
+			name: "no_ids",
+			cfg:  map[string]string{"default": "https://domain.atlassian.net/browse/"},
 			text: "This is a PR title",
 			want: "This is a PR title",
 		},
 		{
-			name: "single_ID",
-			cmd:  cmdWithDefault,
-			text: "PROJ-1234",
-			want: "<https://domain.atlassian.net/browse/PROJ-1234|PROJ-1234>",
+			name: "single_id",
+			cfg:  map[string]string{"default": "https://domain.atlassian.net/browse/"},
+			text: "PROJ-1234: blah",
+			want: "<https://domain.atlassian.net/browse/PROJ-1234|PROJ-1234>: blah",
 		},
 		{
-			name: "multiple_IDs",
-			cmd:  cmdWithDefault,
-			text: "[PROJ-1234] and PROJ-5678",
-			want: "[<https://domain.atlassian.net/browse/PROJ-1234|PROJ-1234>] and <https://domain.atlassian.net/browse/PROJ-5678|PROJ-5678>",
+			name: "multiple_ids",
+			cfg:  map[string]string{"default": "https://domain.atlassian.net/browse/"},
+			text: "Blah [PROJ-1234] and PROJ-5678",
+			want: "Blah [<https://domain.atlassian.net/browse/PROJ-1234|PROJ-1234>] and <https://domain.atlassian.net/browse/PROJ-5678|PROJ-5678>",
 		},
 		{
 			name: "multiple_no_default",
-			cmd:  cmdWithoutDefault,
+			cfg:  map[string]string{"FOO": "https://domain.atlassian.net/browse/"},
 			text: "FOO-1234 and [BAR-5678]",
 			want: "<https://domain.atlassian.net/browse/FOO-1234|FOO-1234> and [BAR-5678]",
 		},
@@ -58,7 +43,7 @@ func TestConfigLinkifyTitle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := Config{Cmd: tt.cmd}
+			c := Config{LinkifyMap: tt.cfg}
 			if got := c.linkifyTitle(nil, tt.text); got != tt.want {
 				t.Errorf("linkifyTitle() = %q, want %q", got, tt.want)
 			}

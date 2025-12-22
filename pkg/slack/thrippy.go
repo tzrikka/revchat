@@ -56,10 +56,10 @@ func (c *Config) initThrippyLinks(ctx context.Context, id string) {
 		logger.FatalContext(ctx, fmt.Sprintf("failed to read the Thrippy link associated with the ID %q", id), err)
 	}
 
-	c.thrippyLinksTemplate = resp.GetTemplate()
+	c.ThrippyLinksTemplate = resp.GetTemplate()
 	c.thrippyLinksClientID = resp.GetOauthConfig().GetClientId()
 	c.thrippyLinksClientSecret = resp.GetOauthConfig().GetClientSecret()
-	logger.FromContext(ctx).Info("template for personal Thrippy links: " + c.thrippyLinksTemplate)
+	logger.FromContext(ctx).Info("template for personal Thrippy links: " + c.ThrippyLinksTemplate)
 }
 
 // createThrippyLink executes [createThrippyLinkActivity] as a local activity.
@@ -90,7 +90,7 @@ func (c *Config) createThrippyLinkActivity(ctx context.Context) (*linkData, erro
 
 	// Create the link to generate an ID.
 	createReq := thrippypb.CreateLinkRequest_builder{
-		Template: proto.String(c.thrippyLinksTemplate),
+		Template: proto.String(c.ThrippyLinksTemplate),
 		OauthConfig: thrippypb.OAuthConfig_builder{
 			ClientId:     proto.String(c.thrippyLinksClientID),
 			ClientSecret: proto.String(c.thrippyLinksClientSecret),

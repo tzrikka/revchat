@@ -24,7 +24,7 @@ const (
 	MaxRetryAttempts       = 5
 
 	DefaultChannelNamePrefix    = "_pr"
-	DefaultMaxChannelNameLength = 50 // Slack's hard limit = 80, but that's still too long.
+	DefaultChannelNameMaxLength = 50 // Slack's hard limit = 80, but that's still too long.
 
 	DefaultThrippyGRPCAddress = "localhost:14460"
 )
@@ -107,6 +107,15 @@ func Flags() []cli.Flag {
 		},
 
 		// Slack.
+		&cli.IntFlag{
+			Name:  "slack-channel-name-max-length",
+			Usage: "Maximum length of Slack channel names",
+			Value: DefaultChannelNameMaxLength,
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("SLACK_CHANNEL_NAME_MAX_LENGTH"),
+				toml.TOML("slack.channel_name_max_length", path),
+			),
+		},
 		&cli.StringFlag{
 			Name:  "slack-channel-name-prefix",
 			Usage: "Prefix for Slack channel names",
@@ -114,15 +123,6 @@ func Flags() []cli.Flag {
 			Sources: cli.NewValueSourceChain(
 				cli.EnvVar("SLACK_CHANNEL_NAME_PREFIX"),
 				toml.TOML("slack.channel_name_prefix", path),
-			),
-		},
-		&cli.IntFlag{
-			Name:  "slack-max-channel-name-length",
-			Usage: "Maximum length of Slack channel names",
-			Value: DefaultMaxChannelNameLength,
-			Sources: cli.NewValueSourceChain(
-				cli.EnvVar("SLACK_MAX_CHANNEL_NAME_LENGTH"),
-				toml.TOML("slack.max_channel_name_length", path),
 			),
 		},
 		&cli.BoolFlag{

@@ -40,7 +40,7 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 
 	tq := cmd.String("temporal-task-queue-revchat")
 	w := worker.New(c, tq, worker.Options{})
-	bitbucket.RegisterPullRequestWorkflows(w, cmd)
+	bitbucket.RegisterPullRequestWorkflows(cmd, w)
 	bitbucket.RegisterRepositoryWorkflows(w)
 	github.RegisterWorkflows(w, cmd)
 	slack.RegisterWorkflows(ctx, w, cmd)

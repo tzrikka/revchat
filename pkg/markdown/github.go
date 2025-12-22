@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/urfave/cli/v3"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/users"
@@ -17,7 +16,7 @@ import (
 // Based on:
 //   - https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
 //   - https://docs.slack.dev/messaging/formatting-message-text/
-func GitHubToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string) string {
+func GitHubToSlack(ctx workflow.Context, text, prURL string) string {
 	// Before list styling, because our fake lists rely on whitespace prefixes.
 	text = gitHubToSlackWhitespaces(text)
 	// Before text styling, to prevent confusion in "*"-based bullets with text that contains "*" characters.
@@ -46,7 +45,7 @@ func GitHubToSlack(ctx workflow.Context, cmd *cli.Command, text, prURL string) s
 		}
 
 		profile := fmt.Sprintf("%s://%s/%s", u.Scheme, u.Host, username)
-		slackRef := users.GitHubToSlackRef(ctx, cmd, username, profile)
+		slackRef := users.GitHubToSlackRef(ctx, username, profile)
 		text = strings.ReplaceAll(text, ghRef, slackRef)
 	}
 

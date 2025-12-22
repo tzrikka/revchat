@@ -8,11 +8,26 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 type Config struct {
-	Cmd *cli.Command
+	SlackChannelNamePrefix    string
+	SlackChannelNameMaxLength int
+	SlackChannelsArePrivate   bool
+
+	LinkifyMap map[string]string
+}
+
+func newConfig(cmd *cli.Command) *Config {
+	return &Config{
+		SlackChannelNamePrefix:    cmd.String("slack-channel-name-prefix"),
+		SlackChannelNameMaxLength: cmd.Int("slack-channel-name-max-length"),
+		SlackChannelsArePrivate:   cmd.Bool("slack-private-channels"),
+
+		LinkifyMap: config.KVSliceToMap(cmd.StringSlice("linkification-map")),
+	}
 }
 
 // Signals is a list of signal names that RevChat receives
@@ -32,7 +47,7 @@ var Signals = []string{
 
 // RegisterWorkflows maps event-handling workflow functions to [Signals].
 func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
-	c := Config{Cmd: cmd}
+	c := newConfig(cmd)
 	w.RegisterWorkflowWithOptions(c.pullRequestWorkflow, workflow.RegisterOptions{Name: Signals[0]})
 	w.RegisterWorkflowWithOptions(c.prReviewWorkflow, workflow.RegisterOptions{Name: Signals[1]})
 	w.RegisterWorkflowWithOptions(c.prReviewCommentWorkflow, workflow.RegisterOptions{Name: Signals[2]})

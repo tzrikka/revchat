@@ -82,7 +82,7 @@ func (c Config) removeChannelMember(ctx workflow.Context, channelID string, revi
 }
 
 func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, sender User, role, action string) string {
-	slackRef := users.GitHubToSlackRef(ctx, c.Cmd, reviewer.Login, reviewer.HTMLURL)
+	slackRef := users.GitHubToSlackRef(ctx, reviewer.Login, reviewer.HTMLURL)
 
 	person := slackRef
 	if reviewer.Login == sender.Login {

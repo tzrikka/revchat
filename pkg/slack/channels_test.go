@@ -59,8 +59,7 @@ func TestNormalizeChannelName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			maxLen := config.DefaultMaxChannelNameLength
-			if got := NormalizeChannelName(tt.s, maxLen); got != tt.want {
+			if got := NormalizeChannelName(tt.s, config.DefaultChannelNameMaxLength); got != tt.want {
 				t.Errorf("NormalizeChannelName() = %q, want %q", got, tt.want)
 			}
 		})

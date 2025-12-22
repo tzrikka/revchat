@@ -454,7 +454,7 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 	}
 
 	switch {
-	case c.bitbucketWorkspace != "":
+	case c.BitbucketWorkspace != "":
 		return c.optInBitbucket(ctx, event, user)
 	default:
 		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
@@ -808,7 +808,7 @@ func (c *Config) approveSlashCommand(ctx workflow.Context, event SlashCommandEve
 
 	var err error
 	switch {
-	case c.bitbucketWorkspace != "":
+	case c.BitbucketWorkspace != "":
 		req := bitbucket.PullRequestsApproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
 		err = bitbucket.PullRequestsApprove(ctx, req)
 	default:
@@ -835,7 +835,7 @@ func (c *Config) unapproveSlashCommand(ctx workflow.Context, event SlashCommandE
 	}
 
 	switch {
-	case c.bitbucketWorkspace != "":
+	case c.BitbucketWorkspace != "":
 		req := bitbucket.PullRequestsUnapproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
 		err = bitbucket.PullRequestsUnapprove(ctx, req)
 	default:

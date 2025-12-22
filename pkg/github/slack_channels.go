@@ -113,15 +113,15 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 }
 
 func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
-	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
+	title := slack.NormalizeChannelName(pr.Title, c.SlackChannelNameMaxLength)
 
 	for i := 1; i < 50; i++ {
-		name := fmt.Sprintf("%s-%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.Number, title)
+		name := fmt.Sprintf("%s-%d_%s", c.SlackChannelNamePrefix, pr.Number, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		id, retry, err := slack.CreateChannel(ctx, name, pr.HTMLURL, c.Cmd.Bool("slack-private-channels"))
+		id, retry, err := slack.CreateChannel(ctx, name, pr.HTMLURL, c.SlackChannelsArePrivate)
 		if err != nil {
 			if retry {
 				continue
@@ -140,7 +140,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 
 func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, username, url string) {
 	// True = don't send a DM to the user if they're opted-out.
-	userID := users.GitHubToSlackID(ctx, c.Cmd, username, true)
+	userID := users.GitHubToSlackID(ctx, username, true)
 	if userID == "" {
 		return
 	}
@@ -165,7 +165,7 @@ func (c Config) postIntroMsg(ctx workflow.Context, channelID, action string, pr 
 
 	msg := fmt.Sprintf("%%s %s %s: `%s`", action, pr.HTMLURL, pr.Title)
 	if pr.Body != nil && strings.TrimSpace(*pr.Body) != "" {
-		msg += "\n\n" + markdown.GitHubToSlack(ctx, c.Cmd, *pr.Body, pr.HTMLURL)
+		msg += "\n\n" + markdown.GitHubToSlack(ctx, *pr.Body, pr.HTMLURL)
 	}
 
 	_ = c.mentionUserInMsg(ctx, channelID, sender, msg)
@@ -186,7 +186,7 @@ func (c Config) prParticipants(ctx workflow.Context, pr PullRequest) []string {
 	for _, u := range usernames {
 		// True = don't include opted-out users. They will still be mentioned
 		// in the channel, but as non-members they won't be notified about it.
-		if id := users.GitHubToSlackID(ctx, c.Cmd, u, true); id != "" {
+		if id := users.GitHubToSlackID(ctx, u, true); id != "" {
 			slackIDs = append(slackIDs, id)
 		}
 	}

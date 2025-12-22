@@ -162,16 +162,16 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 }
 
 func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, error) {
-	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
+	title := slack.NormalizeChannelName(pr.Title, c.SlackChannelNameMaxLength)
 	prURL := htmlURL(pr.Links)
 
 	for i := 1; i < 10; i++ {
-		name := fmt.Sprintf("%s-%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.ID, title)
+		name := fmt.Sprintf("%s-%d_%s", c.SlackChannelNamePrefix, pr.ID, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		id, retry, err := slack.CreateChannel(ctx, name, prURL, c.Cmd.Bool("slack-private-channels"))
+		id, retry, err := slack.CreateChannel(ctx, name, prURL, c.SlackChannelsArePrivate)
 		if err != nil {
 			if retry {
 				continue
@@ -195,10 +195,10 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 }
 
 func (c Config) renameChannel(ctx workflow.Context, pr PullRequest, channelID string) error {
-	title := slack.NormalizeChannelName(pr.Title, c.Cmd.Int("slack-max-channel-name-length"))
+	title := slack.NormalizeChannelName(pr.Title, c.SlackChannelNameMaxLength)
 
 	for i := 1; i < 10; i++ {
-		name := fmt.Sprintf("%s-%d_%s", c.Cmd.String("slack-channel-name-prefix"), pr.ID, title)
+		name := fmt.Sprintf("%s-%d_%s", c.SlackChannelNamePrefix, pr.ID, title)
 		if i > 1 {
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
@@ -247,24 +247,13 @@ func (c Config) linkifyTitle(ctx workflow.Context, title string) string {
 
 // linkifyID can recognize specific case-sensitive keys, as well as a generic "default" key.
 func (c Config) linkifyID(ctx workflow.Context, id string) string {
-	lm := c.Cmd.StringSlice("linkification-map")
-	keys := map[string]string{}
-	for _, kv := range lm {
-		k, v, ok := strings.Cut(kv, "=")
-		if !ok {
-			logger.Error(ctx, "invalid key-value pair in linkification map configuration", nil, slog.String("kv", kv))
-			continue
-		}
-		keys[strings.TrimSpace(k)] = strings.TrimSpace(v)
+	linkKey, _, _ := strings.Cut(id, "-")
+	if baseURL, found := c.LinkifyMap[linkKey]; found {
+		return buildURL(ctx, baseURL, id)
 	}
 
-	key, _, _ := strings.Cut(id, "-")
-	if base, found := keys[key]; found {
-		return buildURL(ctx, base, id)
-	}
-
-	if base, found := keys["default"]; found {
-		return buildURL(ctx, base, id)
+	if baseURL, found := c.LinkifyMap["default"]; found {
+		return buildURL(ctx, baseURL, id)
 	}
 
 	return ""
@@ -273,7 +262,7 @@ func (c Config) linkifyID(ctx workflow.Context, id string) string {
 func buildURL(ctx workflow.Context, base, id string) string {
 	u, err := url.JoinPath(base, id)
 	if err != nil {
-		logger.Error(ctx, "failed to join URL paths", err, slog.String("pr_base", base), slog.String("pr_id", id))
+		logger.Warn(ctx, "failed to join URL paths", err, slog.String("base_url", base), slog.String("key_id", id))
 		return ""
 	}
 	return u

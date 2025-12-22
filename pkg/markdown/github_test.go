@@ -225,7 +225,7 @@ func TestGitHubToSlack(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GitHubToSlack(nil, nil, tt.text, tt.url); got != tt.want {
+			if got := GitHubToSlack(nil, tt.text, tt.url); got != tt.want {
 				t.Errorf("GitHubToSlack() = %q, want %q", got, tt.want)
 			}
 		})

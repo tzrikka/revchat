@@ -9,11 +9,26 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 type Config struct {
-	Cmd *cli.Command
+	SlackChannelNamePrefix    string
+	SlackChannelNameMaxLength int
+	SlackChannelsArePrivate   bool
+
+	LinkifyMap map[string]string
+}
+
+func newConfig(cmd *cli.Command) *Config {
+	return &Config{
+		SlackChannelNamePrefix:    cmd.String("slack-channel-name-prefix"),
+		SlackChannelNameMaxLength: cmd.Int("slack-channel-name-max-length"),
+		SlackChannelsArePrivate:   cmd.Bool("slack-private-channels"),
+
+		LinkifyMap: config.KVSliceToMap(cmd.StringSlice("linkification-map")),
+	}
 }
 
 type (
@@ -60,9 +75,9 @@ var RepositorySignals = []string{
 }
 
 // RegisterPullRequestWorkflows maps event-handling workflow functions to [PullRequestSignals].
-func RegisterPullRequestWorkflows(w worker.Worker, cmd *cli.Command) {
-	c := Config{Cmd: cmd}
-	fs := []prWorkflowFunc{
+func RegisterPullRequestWorkflows(cmd *cli.Command, w worker.Worker) {
+	c := newConfig(cmd)
+	funcs := []prWorkflowFunc{
 		c.prCreatedWorkflow,
 		c.prUpdatedWorkflow,
 		prReviewedWorkflow, // Approved.
@@ -78,22 +93,20 @@ func RegisterPullRequestWorkflows(w worker.Worker, cmd *cli.Command) {
 		prCommentResolvedWorkflow,
 		prCommentReopenedWorkflow,
 	}
-
-	for i, f := range fs {
+	for i, f := range funcs {
 		w.RegisterWorkflowWithOptions(f, workflow.RegisterOptions{Name: PullRequestSignals[i]})
 	}
 }
 
 // RegisterRepositoryWorkflows maps event-handling workflow functions to [RepositorySignals].
 func RegisterRepositoryWorkflows(w worker.Worker) {
-	fs := []repoWorkflowFunc{
+	funcs := []repoWorkflowFunc{
 		commitCommentCreatedWorkflow,
 
 		commitStatusWorkflow,
 		commitStatusWorkflow,
 	}
-
-	for i, f := range fs {
+	for i, f := range funcs {
 		w.RegisterWorkflowWithOptions(f, workflow.RegisterOptions{Name: RepositorySignals[i]})
 	}
 }

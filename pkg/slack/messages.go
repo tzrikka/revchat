@@ -109,7 +109,7 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 
 func (c *Config) addMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
-	case c.bitbucketWorkspace != "":
+	case c.BitbucketWorkspace != "":
 		return c.addMessageBitbucket(ctx, event, userID)
 	default:
 		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
@@ -119,7 +119,7 @@ func (c *Config) addMessage(ctx workflow.Context, event MessageEvent, userID str
 
 func (c *Config) changeMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
-	case c.bitbucketWorkspace != "":
+	case c.BitbucketWorkspace != "":
 		return c.editMessageBitbucket(ctx, event, userID)
 	default:
 		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
@@ -129,7 +129,7 @@ func (c *Config) changeMessage(ctx workflow.Context, event MessageEvent, userID 
 
 func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID string) error {
 	switch {
-	case c.bitbucketWorkspace != "":
+	case c.BitbucketWorkspace != "":
 		return deleteMessageBitbucket(ctx, event, userID)
 	default:
 		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
@@ -161,7 +161,7 @@ func (c *Config) addMessageBitbucket(ctx workflow.Context, event MessageEvent, u
 		return err
 	}
 
-	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Text) + c.fileLinks(ctx, event.Files)
+	msg := markdown.SlackToBitbucket(ctx, c.BitbucketWorkspace, event.Text) + c.fileLinks(ctx, event.Files)
 	msg += "\n\n[This comment was created by RevChat]: #"
 
 	resp, err := bitbucket.PullRequestsCreateComment(ctx, bitbucket.PullRequestsCreateCommentRequest{
@@ -208,7 +208,7 @@ func (c *Config) fileLinks(ctx workflow.Context, files []File) string {
 
 func (c *Config) fileTypeEmoji(ctx workflow.Context, f File) string {
 	switch {
-	case c.bitbucketWorkspace != "":
+	case c.BitbucketWorkspace != "":
 		return fileTypeEmojiBitbucket(f)
 	default:
 		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
@@ -277,7 +277,7 @@ func (c *Config) editMessageBitbucket(ctx workflow.Context, event MessageEvent, 
 		return err
 	}
 
-	msg := markdown.SlackToBitbucket(ctx, c.bitbucketWorkspace, event.Message.Text)
+	msg := markdown.SlackToBitbucket(ctx, c.BitbucketWorkspace, event.Message.Text)
 	err = bitbucket.PullRequestsUpdateComment(ctx, bitbucket.PullRequestsUpdateCommentRequest{
 		PullRequestsRequest: bitbucket.PullRequestsRequest{
 			ThrippyLinkID: linkID,

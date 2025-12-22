@@ -137,7 +137,7 @@ func (c Config) prEdited(ctx workflow.Context, event PullRequestEvent) error {
 	if event.Changes.Body != nil {
 		msg := "%s "
 		if *pr.Body != "" {
-			msg += "updated the PR description to:\n\n" + markdown.GitHubToSlack(ctx, c.Cmd, *pr.Body, pr.HTMLURL)
+			msg += "updated the PR description to:\n\n" + markdown.GitHubToSlack(ctx, *pr.Body, pr.HTMLURL)
 		} else {
 			msg += "deleted the PR description"
 		}

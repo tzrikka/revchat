@@ -15,7 +15,7 @@ import (
 )
 
 type Config struct {
-	bitbucketWorkspace string
+	BitbucketWorkspace string
 
 	thrippyGRPCAddress        string
 	thrippyHTTPAddress        string
@@ -24,14 +24,14 @@ type Config struct {
 	thrippyServerCACert       string
 	thrippyServerNameOverride string
 
-	thrippyLinksTemplate     string
+	ThrippyLinksTemplate     string
 	thrippyLinksClientID     string
 	thrippyLinksClientSecret string
 }
 
 func newConfig(cmd *cli.Command) *Config {
 	return &Config{
-		bitbucketWorkspace: cmd.String("bitbucket-workspace"),
+		BitbucketWorkspace: cmd.String("bitbucket-workspace"),
 
 		thrippyGRPCAddress:        cmd.String("thrippy-grpc-address"),
 		thrippyHTTPAddress:        cmd.String("thrippy-http-address"),
