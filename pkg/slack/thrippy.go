@@ -177,7 +177,7 @@ func (c *Config) thrippyClient() (*grpc.ClientConn, thrippypb.ThrippyServiceClie
 		return nil, nil, err
 	}
 
-	conn, err := grpc.NewClient(c.thrippyGRPCAddress, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.NewClient(c.ThrippyGRPCAddress, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, nil, err
 	}

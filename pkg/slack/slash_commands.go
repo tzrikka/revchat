@@ -472,7 +472,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 	}
 
 	msg := ":point_right: <https://%s/start?id=%s&nonce=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket."
-	msg = fmt.Sprintf(msg, c.thrippyHTTPAddress, linkID, nonce)
+	msg = fmt.Sprintf(msg, c.ThrippyHTTPAddress, linkID, nonce)
 	if err := PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg); err != nil {
 		logger.Error(ctx, "failed to post ephemeral opt-in message in Slack", err)
 		_ = c.deleteThrippyLink(ctx, linkID)

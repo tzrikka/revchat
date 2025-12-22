@@ -29,9 +29,15 @@ type Config struct {
 }
 
 // EventDispatcherWorkflow is an always-running singleton workflow that receives Temporal
-// signals from [Timpani] and spawns event-specific child workflows to handle them.
+// signals from [Timpani] and spawns event-specific child workflows to handle them. Most
+// of these child workflows run asynchronously, with the exception of PR creation events.
+//
+// This workflow also has a "lame duck" mode in which it waits for all message handlers
+// to finish and then drains all signal channels before following the Temporal server's
+// [continue-as-new] suggestions, to ensure that no events are lost during history reset.
 //
 // [Timpani]: https://pkg.go.dev/github.com/tzrikka/timpani/pkg/listeners
+// [continue-as-new]: https://docs.temporal.io/develop/go/continue-as-new
 func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	// https://docs.temporal.io/develop/go/observability#visibility
 	sig := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals, slack.Signals)
@@ -49,31 +55,38 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	for {
 		selector.Select(ctx)
 
-		// https://docs.temporal.io/develop/go/continue-as-new
 		// https://docs.temporal.io/develop/go/message-passing#wait-for-message-handlers
+		// https://github.com/temporalio/samples-go/tree/main/safe_message_handler
 		if info := workflow.GetInfo(ctx); info.GetContinueAsNewSuggested() {
 			startTime := time.Now()
 			logger.Info(ctx, "continue-as-new suggested by Temporal server",
 				slog.Int("history_length", info.GetCurrentHistoryLength()),
 				slog.Int("history_size", info.GetCurrentHistorySize()))
 
-			// "Lame duck" mode: drain all signal channels before resetting workflow history.
-			// This minimizes - but doesn't entirely eliminate - the chance of losing signals.
-			// We run in this mode until the worker is relatively idle.
+			// "Lame duck" mode: wait for all child workflows to finish, and
+			// drain all signal channels, before resetting workflow history.
+			err := workflow.Await(ctx, func() bool {
+				return workflow.AllHandlersFinished(ctx)
+			})
+			if err != nil {
+				logger.Error(ctx, "failed to wait for all handlers to finish", err)
+			}
+
+			logger.Info(ctx, "all child workflow handlers have finished before continue-as-new",
+				slog.Int("history_length", info.GetCurrentHistoryLength()),
+				slog.Int("history_size", info.GetCurrentHistorySize()),
+				slog.String("lead_time", time.Since(startTime).String()))
+
 			for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 5; cyclesSinceLastSignal++ {
-				if err := workflow.Sleep(ctx, time.Second); err != nil {
-					logger.Error(ctx, "failed to wait 1 second between drain cycles", err)
-				}
 				if c.drainCycle(ctx) {
 					cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
 				}
 			}
 
-			duration := time.Since(startTime)
 			logger.Warn(ctx, "triggering continue-as-new for dispatcher workflow",
 				slog.Int("history_length", info.GetCurrentHistoryLength()),
 				slog.Int("history_size", info.GetCurrentHistorySize()),
-				slog.String("lead_time", duration.String()))
+				slog.String("lead_time", time.Since(startTime).String()))
 
 			return workflow.NewContinueAsNewError(ctx, EventDispatcher)
 		}

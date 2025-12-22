@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/urfave/cli/v3"
+	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
@@ -57,86 +58,73 @@ func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
 
 // RegisterSignals routes [Signals] to their registered workflows.
 func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
-	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-
 	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[0]), func(ch workflow.ReceiveChannel, _ bool) {
 		payload := new(PullRequestEvent)
 		ch.Receive(ctx, payload)
-		signal := ch.Name()
 
+		signal := ch.Name()
 		logger.Info(ctx, "received signal", slog.String("signal", signal), slog.String("action", payload.Action))
 		metrics.IncrementSignalCounter(ctx, signal)
 
-		wf := workflow.ExecuteChildWorkflow(childCtx, signal, payload)
+		// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
+		opts := workflow.ChildWorkflowOptions{TaskQueue: taskQueue}
+		if payload.Action != "opened" {
+			opts.ParentClosePolicy = enums.PARENT_CLOSE_POLICY_ABANDON
+		}
+		ctx = workflow.WithChildOptions(ctx, opts)
+		wf := workflow.ExecuteChildWorkflow(ctx, signal, payload)
 
 		// Wait for [Config.prOpened] completion before returning, to ensure we handle
 		// subsequent PR initialization events appropriately (e.g. check states).
 		if payload.Action == "opened" {
-			_ = wf.Get(ctx, nil)
+			_ = wf.Get(ctx, nil) // Blocks until child workflow completes.
+		} else {
+			_ = wf.GetChildWorkflowExecution().Get(ctx, nil) // Blocks until child workflow starts.
 		}
 	})
 
-	addReceive[PullRequestReviewEvent](ctx, childCtx, sel, Signals[1])
-	addReceive[PullRequestReviewCommentEvent](ctx, childCtx, sel, Signals[2])
-	addReceive[PullRequestReviewThreadEvent](ctx, childCtx, sel, Signals[3])
-	addReceive[IssueCommentEvent](ctx, childCtx, sel, Signals[4])
+	addReceive[PullRequestReviewEvent](ctx, sel, taskQueue, Signals[1])
+	addReceive[PullRequestReviewCommentEvent](ctx, sel, taskQueue, Signals[2])
+	addReceive[PullRequestReviewThreadEvent](ctx, sel, taskQueue, Signals[3])
+	addReceive[IssueCommentEvent](ctx, sel, taskQueue, Signals[4])
 }
 
-func addReceive[T any](ctx, childCtx workflow.Context, sel workflow.Selector, signalName string) {
+func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, signalName string) {
 	sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
 		payload := new(T)
 		ch.Receive(ctx, payload)
-		signal := ch.Name()
 
+		signal := ch.Name()
 		logger.Info(ctx, "received signal", slog.String("signal", signal))
 		metrics.IncrementSignalCounter(ctx, signal)
 
-		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
+		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
+			TaskQueue:         taskQueue,
+		})
+		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).GetChildWorkflowExecution().Get(ctx, nil)
 	})
 }
 
-// DrainSignals drains all pending [Signals] channels, starts their
-// corresponding workflows as usual, and returns true if any signals were found.
+// DrainSignals drains all pending [Signals] channels, and waits
+// for their corresponding workflow executions to complete in order.
 // This is called in preparation for resetting the dispatcher workflow's history.
 func DrainSignals(ctx workflow.Context, taskQueue string) bool {
-	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-	totalEvents := 0
-
-	for {
-		payload := new(PullRequestEvent)
-		if !workflow.GetSignalChannel(ctx, Signals[0]).ReceiveAsync(payload) {
-			break
-		}
-
-		logger.Info(ctx, "received signal while draining", slog.String("signal", Signals[0]))
-		metrics.IncrementSignalCounter(ctx, Signals[0])
-		totalEvents++
-
-		wf := workflow.ExecuteChildWorkflow(childCtx, Signals[0], payload)
-
-		// Wait for [Config.prOpened] completion before returning, to ensure we handle
-		// subsequent PR initialization events appropriately (e.g. check states).
-		if payload.Action == "opened" {
-			_ = wf.Get(ctx, nil)
-		}
-	}
-	if totalEvents > 0 {
-		logger.Info(ctx, "drained signal channel", slog.String("signal", Signals[0]), slog.Int("event_count", totalEvents))
-	}
-
-	totalEvents += receiveAsync[PullRequestReviewEvent](ctx, childCtx, Signals[1])
-	totalEvents += receiveAsync[PullRequestReviewCommentEvent](ctx, childCtx, Signals[2])
-	totalEvents += receiveAsync[PullRequestReviewThreadEvent](ctx, childCtx, Signals[3])
-	totalEvents += receiveAsync[IssueCommentEvent](ctx, childCtx, Signals[4])
+	totalEvents := receiveAsync[PullRequestEvent](ctx, taskQueue, Signals[0])
+	totalEvents += receiveAsync[PullRequestReviewEvent](ctx, taskQueue, Signals[1])
+	totalEvents += receiveAsync[PullRequestReviewCommentEvent](ctx, taskQueue, Signals[2])
+	totalEvents += receiveAsync[PullRequestReviewThreadEvent](ctx, taskQueue, Signals[3])
+	totalEvents += receiveAsync[IssueCommentEvent](ctx, taskQueue, Signals[4])
 
 	return totalEvents > 0
 }
 
-func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
+func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
+	ch := workflow.GetSignalChannel(ctx, signal)
 	signalEvents := 0
 	for {
 		payload := new(T)
-		if !workflow.GetSignalChannel(ctx, signal).ReceiveAsync(payload) {
+		if !ch.ReceiveAsync(payload) {
 			break
 		}
 
@@ -144,7 +132,8 @@ func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
 		metrics.IncrementSignalCounter(ctx, signal)
 		signalEvents++
 
-		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
+		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
+		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
 	}
 
 	if signalEvents > 0 {

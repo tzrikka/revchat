@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v3"
+	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
@@ -17,8 +18,8 @@ import (
 type Config struct {
 	BitbucketWorkspace string
 
-	thrippyGRPCAddress        string
-	thrippyHTTPAddress        string
+	ThrippyGRPCAddress        string
+	ThrippyHTTPAddress        string
 	thrippyClientCert         string
 	thrippyClientKey          string
 	thrippyServerCACert       string
@@ -33,8 +34,8 @@ func newConfig(cmd *cli.Command) *Config {
 	return &Config{
 		BitbucketWorkspace: cmd.String("bitbucket-workspace"),
 
-		thrippyGRPCAddress:        cmd.String("thrippy-grpc-address"),
-		thrippyHTTPAddress:        cmd.String("thrippy-http-address"),
+		ThrippyGRPCAddress:        cmd.String("thrippy-grpc-address"),
+		ThrippyHTTPAddress:        cmd.String("thrippy-http-address"),
 		thrippyClientCert:         cmd.String("thrippy-client-cert"),
 		thrippyClientKey:          cmd.String("thrippy-client-key"),
 		thrippyServerCACert:       cmd.String("thrippy-server-ca-cert"),
@@ -89,56 +90,58 @@ func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
 
 // RegisterSignals routes [Signals] to their registered workflows.
 func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
-	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-
-	addReceive[map[string]any](ctx, childCtx, sel, Signals[0])
-	addReceive[archiveEventWrapper](ctx, childCtx, sel, Signals[1])
-	addReceive[archiveEventWrapper](ctx, childCtx, sel, Signals[2])
-	addReceive[memberEventWrapper](ctx, childCtx, sel, Signals[3])
-	addReceive[memberEventWrapper](ctx, childCtx, sel, Signals[4])
-	addReceive[messageEventWrapper](ctx, childCtx, sel, Signals[5])
-	addReceive[reactionEventWrapper](ctx, childCtx, sel, Signals[6])
-	addReceive[reactionEventWrapper](ctx, childCtx, sel, Signals[7])
-	addReceive[SlashCommandEvent](ctx, childCtx, sel, Signals[8])
+	addReceive[map[string]any](ctx, sel, taskQueue, Signals[0])
+	addReceive[archiveEventWrapper](ctx, sel, taskQueue, Signals[1])
+	addReceive[archiveEventWrapper](ctx, sel, taskQueue, Signals[2])
+	addReceive[memberEventWrapper](ctx, sel, taskQueue, Signals[3])
+	addReceive[memberEventWrapper](ctx, sel, taskQueue, Signals[4])
+	addReceive[messageEventWrapper](ctx, sel, taskQueue, Signals[5])
+	addReceive[reactionEventWrapper](ctx, sel, taskQueue, Signals[6])
+	addReceive[reactionEventWrapper](ctx, sel, taskQueue, Signals[7])
+	addReceive[SlashCommandEvent](ctx, sel, taskQueue, Signals[8])
 }
 
-func addReceive[T any](ctx, childCtx workflow.Context, sel workflow.Selector, signalName string) {
+func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, signalName string) {
 	sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
 		payload := new(T)
 		ch.Receive(ctx, payload)
-		signal := ch.Name()
 
+		signal := ch.Name()
 		logger.Info(ctx, "received signal", slog.String("signal", signal))
 		metrics.IncrementSignalCounter(ctx, signal)
 
-		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
+		// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
+		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
+			TaskQueue:         taskQueue,
+		})
+		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).GetChildWorkflowExecution().Get(ctx, nil)
 	})
 }
 
-// DrainSignals drains all pending [Signals] channels, starts their
-// corresponding workflows as usual, and returns true if any signals were found.
+// DrainSignals drains all pending [Signals] channels, and waits
+// for their corresponding workflow executions to complete in order.
 // This is called in preparation for resetting the dispatcher workflow's history.
 func DrainSignals(ctx workflow.Context, taskQueue string) bool {
-	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-
-	totalEvents := receiveAsync[map[string]any](ctx, childCtx, Signals[0])
-	totalEvents += receiveAsync[archiveEventWrapper](ctx, childCtx, Signals[1])
-	totalEvents += receiveAsync[archiveEventWrapper](ctx, childCtx, Signals[2])
-	totalEvents += receiveAsync[memberEventWrapper](ctx, childCtx, Signals[3])
-	totalEvents += receiveAsync[memberEventWrapper](ctx, childCtx, Signals[4])
-	totalEvents += receiveAsync[messageEventWrapper](ctx, childCtx, Signals[5])
-	totalEvents += receiveAsync[reactionEventWrapper](ctx, childCtx, Signals[6])
-	totalEvents += receiveAsync[reactionEventWrapper](ctx, childCtx, Signals[7])
-	totalEvents += receiveAsync[SlashCommandEvent](ctx, childCtx, Signals[8])
+	totalEvents := receiveAsync[map[string]any](ctx, taskQueue, Signals[0])
+	totalEvents += receiveAsync[archiveEventWrapper](ctx, taskQueue, Signals[1])
+	totalEvents += receiveAsync[archiveEventWrapper](ctx, taskQueue, Signals[2])
+	totalEvents += receiveAsync[memberEventWrapper](ctx, taskQueue, Signals[3])
+	totalEvents += receiveAsync[memberEventWrapper](ctx, taskQueue, Signals[4])
+	totalEvents += receiveAsync[messageEventWrapper](ctx, taskQueue, Signals[5])
+	totalEvents += receiveAsync[reactionEventWrapper](ctx, taskQueue, Signals[6])
+	totalEvents += receiveAsync[reactionEventWrapper](ctx, taskQueue, Signals[7])
+	totalEvents += receiveAsync[SlashCommandEvent](ctx, taskQueue, Signals[8])
 
 	return totalEvents > 0
 }
 
-func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
+func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
+	ch := workflow.GetSignalChannel(ctx, signal)
 	signalEvents := 0
 	for {
 		payload := new(T)
-		if !workflow.GetSignalChannel(ctx, signal).ReceiveAsync(payload) {
+		if !ch.ReceiveAsync(payload) {
 			break
 		}
 
@@ -146,7 +149,8 @@ func receiveAsync[T any](ctx, childCtx workflow.Context, signal string) int {
 		metrics.IncrementSignalCounter(ctx, signal)
 		signalEvents++
 
-		workflow.ExecuteChildWorkflow(childCtx, signal, payload)
+		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
+		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
 	}
 
 	if signalEvents > 0 {
