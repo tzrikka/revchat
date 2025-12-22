@@ -14,7 +14,7 @@ func (c *Config) reactionAddedWorkflow(ctx workflow.Context, event reactionEvent
 		return nil
 	}
 
-	logger.Warn(ctx, "reaction added event", slog.Any("event", event))
+	logger.From(ctx).Warn("reaction added event", slog.Any("event", event))
 	return nil
 }
 
@@ -24,6 +24,6 @@ func (c *Config) reactionRemovedWorkflow(ctx workflow.Context, event reactionEve
 		return nil
 	}
 
-	logger.Warn(ctx, "reaction removed event", slog.Any("event", event))
+	logger.From(ctx).Warn("reaction removed event", slog.Any("event", event))
 	return nil
 }

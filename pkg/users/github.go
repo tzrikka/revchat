@@ -22,7 +22,8 @@ func GitHubToSlackID(ctx workflow.Context, username string, checkOptIn bool) str
 
 	user, err := data.SelectUserByGitHubID(username)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by GitHub ID", err, slog.String("username", username))
+		logger.From(ctx).Error("failed to load user by GitHub ID",
+			slog.Any("error", err), slog.String("username", username))
 		return ""
 	}
 

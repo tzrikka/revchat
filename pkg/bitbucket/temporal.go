@@ -121,7 +121,7 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 
 			signal := ch.Name()
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
-			logger.Info(ctx, "received signal", slog.String("signal", signal))
+			logger.From(ctx).Info("received signal", slog.String("signal", signal))
 			metrics.IncrementSignalCounter(ctx, signal)
 
 			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
@@ -152,7 +152,7 @@ func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, task
 
 			signal := ch.Name()
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
-			logger.Info(ctx, "received signal", slog.String("signal", signal))
+			logger.From(ctx).Info("received signal", slog.String("signal", signal))
 			metrics.IncrementSignalCounter(ctx, signal)
 
 			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
@@ -180,7 +180,7 @@ func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) bool {
 			}
 
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
-			logger.Info(ctx, "received signal while draining", slog.String("signal", signal))
+			logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
 			metrics.IncrementSignalCounter(ctx, signal)
 			signalEvents++
 
@@ -189,7 +189,8 @@ func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) bool {
 		}
 
 		if signalEvents > 0 {
-			logger.Info(ctx, "drained signal channel", slog.String("signal", signal), slog.Int("event_count", signalEvents))
+			logger.From(ctx).Info("drained signal channel",
+				slog.String("signal", signal), slog.Int("event_count", signalEvents))
 		}
 		totalEvents += signalEvents
 	}
@@ -211,7 +212,7 @@ func DrainRepositorySignals(ctx workflow.Context, taskQueue string) bool {
 			}
 
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
-			logger.Info(ctx, "received signal while draining", slog.String("signal", signal))
+			logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
 			metrics.IncrementSignalCounter(ctx, signal)
 			signalEvents++
 
@@ -220,7 +221,8 @@ func DrainRepositorySignals(ctx workflow.Context, taskQueue string) bool {
 		}
 
 		if signalEvents > 0 {
-			logger.Info(ctx, "drained signal channel", slog.String("signal", signal), slog.Int("event_count", signalEvents))
+			logger.From(ctx).Info("drained signal channel",
+				slog.String("signal", signal), slog.Int("event_count", signalEvents))
 		}
 		totalEvents += signalEvents
 	}

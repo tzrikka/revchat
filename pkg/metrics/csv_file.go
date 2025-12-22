@@ -41,7 +41,8 @@ func incrementSignalCounterAsSideEffect(ctx workflow.Context, name string) any {
 	now := time.Now().UTC()
 	path := fmt.Sprintf(DefaultMetricsFileSignals, now.Format(time.DateOnly))
 	if err := AppendToCSVFile(path, []string{now.Format(time.RFC3339), name}); err != nil && ctx != nil {
-		logger.Error(ctx, "metrics error: failed to increment signal counter", err, slog.String("signal", name))
+		logger.From(ctx).Error("metrics error: failed to increment signal counter",
+			slog.Any("error", err), slog.String("signal", name))
 	}
 
 	return nil

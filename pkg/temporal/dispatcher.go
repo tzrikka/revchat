@@ -59,7 +59,7 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 		// https://github.com/temporalio/samples-go/tree/main/safe_message_handler
 		if info := workflow.GetInfo(ctx); info.GetContinueAsNewSuggested() {
 			startTime := time.Now()
-			logger.Info(ctx, "continue-as-new suggested by Temporal server",
+			logger.From(ctx).Info("continue-as-new suggested by Temporal server",
 				slog.Int("history_length", info.GetCurrentHistoryLength()),
 				slog.Int("history_size", info.GetCurrentHistorySize()))
 
@@ -69,10 +69,10 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 				return workflow.AllHandlersFinished(ctx)
 			})
 			if err != nil {
-				logger.Error(ctx, "failed to wait for all handlers to finish", err)
+				logger.From(ctx).Error("failed to wait for all handlers to finish", slog.Any("error", err))
 			}
 
-			logger.Info(ctx, "all child workflow handlers have finished before continue-as-new",
+			logger.From(ctx).Info("all child workflow handlers have finished before continue-as-new",
 				slog.Int("history_length", info.GetCurrentHistoryLength()),
 				slog.Int("history_size", info.GetCurrentHistorySize()),
 				slog.String("lead_time", time.Since(startTime).String()))
@@ -83,7 +83,7 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 				}
 			}
 
-			logger.Warn(ctx, "triggering continue-as-new for dispatcher workflow",
+			logger.From(ctx).Warn("triggering continue-as-new for dispatcher workflow",
 				slog.Int("history_length", info.GetCurrentHistoryLength()),
 				slog.Int("history_size", info.GetCurrentHistorySize()),
 				slog.String("lead_time", time.Since(startTime).String()))

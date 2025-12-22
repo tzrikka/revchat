@@ -77,8 +77,8 @@ func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Acco
 
 	id := fmt.Sprintf("%s/%s", channelID, resp.TS)
 	if err := data.MapURLAndID(url, id); err != nil {
-		logger.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", err,
-			slog.String("bitbucket_url", url), slog.String("slack_id", id))
+		logger.From(ctx).Error("failed to save PR comment URL / Slack IDs mapping",
+			slog.Any("error", err), slog.String("bitbucket_url", url), slog.String("slack_id", id))
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}
@@ -86,7 +86,7 @@ func impersonateUserInMsg(ctx workflow.Context, url, channelID string, user Acco
 	// Also remember to delete diff files later, if we update or delete the message.
 	if fileID != "" {
 		if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", id, fileID)); err != nil {
-			logger.Error(ctx, "failed to save Slack file mapping", err,
+			logger.From(ctx).Error("failed to save Slack file mapping", slog.Any("error", err),
 				slog.String("bitbucket_url", url), slog.String("slack_id", id), slog.String("file_id", fileID))
 			// Don't return the error - the message is already posted in Slack, so we
 			// don't want to retry and post it again, even though this is problematic.
@@ -114,8 +114,8 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 
 	sid := fmt.Sprintf("%s/%s/%s", ids[0], ids[1], resp.TS)
 	if err := data.MapURLAndID(url, sid); err != nil {
-		logger.Error(ctx, "failed to save PR comment URL / Slack IDs mapping", err,
-			slog.String("bitbucket_url", url), slog.String("slack_id", sid))
+		logger.From(ctx).Error("failed to save PR comment URL / Slack IDs mapping",
+			slog.Any("error", err), slog.String("bitbucket_url", url), slog.String("slack_id", sid))
 		// Don't return the error - the message is already posted in Slack, so we
 		// don't want to retry and post it again, even though this is problematic.
 	}
@@ -123,7 +123,7 @@ func impersonateUserInReply(ctx workflow.Context, url, parentURL string, user Ac
 	// Also remember to delete diff files later, if we update or delete the message.
 	if fileID != "" {
 		if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", sid, fileID)); err != nil {
-			logger.Error(ctx, "failed to save Slack file mapping", err,
+			logger.From(ctx).Error("failed to save Slack file mapping", slog.Any("error", err),
 				slog.String("bitbucket_url", url), slog.String("slack_id", sid), slog.String("file_id", fileID))
 			// Don't return the error - the message is already posted in Slack, so we
 			// don't want to retry and post it again, even though this is problematic.
@@ -213,7 +213,8 @@ func deleteMsg(ctx workflow.Context, url string) error {
 	}
 
 	if err := data.DeleteURLAndIDMapping(url); err != nil {
-		logger.Error(ctx, "failed to delete URL/Slack mappings", err, slog.String("comment_url", url))
+		logger.From(ctx).Error("failed to delete URL/Slack mappings",
+			slog.Any("error", err), slog.String("comment_url", url))
 		// Don't return the error (i.e. don't abort the calling workflow) -
 		// we still want to attempt to delete the Slack message.
 	}
@@ -233,14 +234,15 @@ func editMsg(ctx workflow.Context, url, msg string) error {
 func msgIDsForCommentURL(ctx workflow.Context, url, action string) ([]string, error) {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		logger.Error(ctx, "failed to load PR comment's Slack IDs", err, slog.String("url", url))
+		logger.From(ctx).Error("failed to load PR comment's Slack IDs",
+			slog.Any("error", err), slog.String("url", url))
 		return nil, err
 	}
 
 	parts := strings.Split(ids, "/")
 	if len(parts) < 2 {
 		msg := fmt.Sprintf("can't %s Slack message - missing/bad IDs", action)
-		logger.Warn(ctx, msg, slog.String("bitbucket_url", url), slog.String("slack_ids", ids))
+		logger.From(ctx).Warn(msg, slog.String("bitbucket_url", url), slog.String("slack_ids", ids))
 		return nil, nil
 	}
 

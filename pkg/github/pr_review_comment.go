@@ -21,25 +21,25 @@ func (c Config) prReviewCommentWorkflow(ctx workflow.Context, event PullRequestR
 		return c.reviewCommentDeleted(ctx)
 
 	default:
-		logger.Error(ctx, "unrecognized GitHub PR review comment event action", nil, slog.String("action", event.Action))
+		logger.From(ctx).Error("unrecognized GitHub PR review comment event action", slog.String("action", event.Action))
 		return errors.New("unrecognized GitHub PR review comment event action: " + event.Action)
 	}
 }
 
 // A comment on a pull request diff was created.
 func (c Config) reviewCommentCreated(ctx workflow.Context) error {
-	logger.Warn(ctx, "GitHub PR review comment created - event handler not implemented yet")
+	logger.From(ctx).Warn("GitHub PR review comment created - event handler not implemented yet")
 	return nil
 }
 
 // The content of a comment on a pull request diff was changed.
 func (c Config) reviewCommentEdited(ctx workflow.Context) error {
-	logger.Warn(ctx, "GitHub PR review comment edited - event handler not implemented yet")
+	logger.From(ctx).Warn("GitHub PR review comment edited - event handler not implemented yet")
 	return nil
 }
 
 // A comment on a pull request diff was deleted.
 func (c Config) reviewCommentDeleted(ctx workflow.Context) error {
-	logger.Warn(ctx, "GitHub PR review comment deleted - event handler not implemented yet")
+	logger.From(ctx).Warn("GitHub PR review comment deleted - event handler not implemented yet")
 	return nil
 }

@@ -24,7 +24,7 @@ import (
 func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (string, bool) {
 	channelID, err := data.SwitchURLAndID(htmlURL(pr.Links))
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve PR's Slack channel ID", err,
+		logger.From(ctx).Error("failed to retrieve PR's Slack channel ID", slog.Any("error", err),
 			slog.String("event_type", eventType), slog.String("pr_url", htmlURL(pr.Links)))
 		return "", false
 	}
@@ -36,8 +36,8 @@ func lookupChannel(ctx workflow.Context, eventType string, pr PullRequest) (stri
 func lookupSlackFileID(ctx workflow.Context, comment *Comment) (string, bool) {
 	fileID, err := data.SwitchURLAndID(htmlURL(comment.Links) + "/slack_file_id")
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve PR comment's Slack file ID", err,
-			slog.String("pr_url", htmlURL(comment.Links)))
+		logger.From(ctx).Error("failed to retrieve PR comment's Slack file ID",
+			slog.Any("error", err), slog.String("pr_url", htmlURL(comment.Links)))
 		return "", false
 	}
 
@@ -75,7 +75,7 @@ func archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 			return nil
 		}
 
-		logger.Error(ctx, "failed to archive Slack channel", err,
+		logger.From(ctx).Error("failed to archive Slack channel", slog.Any("error", err),
 			slog.String("channel_id", channelID), slog.String("pr_url", prURL))
 
 		state = strings.Replace(state, " this PR", "", 1)
@@ -95,17 +95,18 @@ func initPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 	prURL := htmlURL(pr.Links)
 
 	if err := data.StoreBitbucketPR(prURL, pr); err != nil {
-		logger.Error(ctx, "failed to save Bitbucket PR snapshot", err,
+		logger.From(ctx).Error("failed to save Bitbucket PR snapshot", slog.Any("error", err),
 			slog.String("channel_id", channelID), slog.String("pr_url", prURL))
 	}
 
 	if err := data.UpdateBitbucketDiffstat(prURL, diffstat(ctx, event)); err != nil {
-		logger.Error(ctx, "failed to update Bitbucket PR's diffstat", err, slog.String("pr_url", prURL))
+		logger.From(ctx).Error("failed to update Bitbucket PR's diffstat",
+			slog.Any("error", err), slog.String("pr_url", prURL))
 	}
 
 	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
 	if email == "" {
-		logger.Error(ctx, "initializing Bitbucket PR data without author's email", nil, slog.String("pr_url", prURL))
+		logger.From(ctx).Error("initializing Bitbucket PR data without author's email", slog.String("pr_url", prURL))
 	}
 
 	reviewers := []string{}
@@ -116,12 +117,12 @@ func initPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 	}
 
 	if err := data.InitTurns(prURL, email, reviewers); err != nil {
-		logger.Error(ctx, "failed to initialize Bitbucket PR turn-taking state", err,
-			slog.String("channel_id", channelID), slog.String("pr_url", prURL))
+		logger.From(ctx).Error("failed to initialize Bitbucket PR turn-taking state",
+			slog.Any("error", err), slog.String("channel_id", channelID), slog.String("pr_url", prURL))
 	}
 
 	if err := data.MapURLAndID(prURL, channelID); err != nil {
-		logger.Error(ctx, "failed to save PR URL / Slack channel mapping", err,
+		logger.From(ctx).Error("failed to save PR URL / Slack channel mapping", slog.Any("error", err),
 			slog.String("channel_id", channelID), slog.String("pr_url", prURL))
 	}
 }
@@ -181,7 +182,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 		}
 
 		if err := data.LogSlackChannelCreated(id, name, prURL); err != nil {
-			logger.Error(ctx, "failed to log Slack channel creation", err,
+			logger.From(ctx).Error("failed to log Slack channel creation", slog.Any("error", err),
 				slog.String("channel_id", id), slog.String("pr_url", prURL))
 			// Don't return the error (i.e. don't abort the calling workflow because of logging errors).
 		}
@@ -189,9 +190,8 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 		return id, nil
 	}
 
-	msg := "too many failed attempts to create Slack channel"
-	logger.Error(ctx, msg, nil, slog.String("pr_url", prURL))
-	return "", errors.New(msg)
+	logger.From(ctx).Error("too many failed attempts to create Slack channel", slog.String("pr_url", prURL))
+	return "", errors.New("too many failed attempts to create Slack channel")
 }
 
 func (c Config) renameChannel(ctx workflow.Context, pr PullRequest, channelID string) error {
@@ -209,7 +209,7 @@ func (c Config) renameChannel(ctx workflow.Context, pr PullRequest, channelID st
 		}
 		if err == nil {
 			if logErr := data.LogSlackChannelRenamed(channelID, name); logErr != nil {
-				logger.Error(ctx, "failed to log Slack channel renaming", logErr,
+				logger.From(ctx).Error("failed to log Slack channel renaming", slog.Any("error", logErr),
 					slog.String("channel_id", channelID), slog.String("new_name", name))
 				// Don't return the error (i.e. don't abort the calling workflow because of logging errors).
 			}
@@ -218,7 +218,7 @@ func (c Config) renameChannel(ctx workflow.Context, pr PullRequest, channelID st
 	}
 
 	msg := "too many failed attempts to rename Slack channel"
-	logger.Error(ctx, msg, nil, slog.String("pr_url", htmlURL(pr.Links)), slog.String("channel_id", channelID))
+	logger.From(ctx).Error(msg, slog.String("pr_url", htmlURL(pr.Links)), slog.String("channel_id", channelID))
 	return errors.New(msg)
 }
 
@@ -262,7 +262,8 @@ func (c Config) linkifyID(ctx workflow.Context, id string) string {
 func buildURL(ctx workflow.Context, base, id string) string {
 	u, err := url.JoinPath(base, id)
 	if err != nil {
-		logger.Warn(ctx, "failed to join URL paths", err, slog.String("base_url", base), slog.String("key_id", id))
+		logger.From(ctx).Warn("failed to join URL paths", slog.Any("error", err),
+			slog.String("base_url", base), slog.String("key_id", id))
 		return ""
 	}
 	return u

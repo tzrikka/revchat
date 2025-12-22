@@ -41,7 +41,8 @@ func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, commit, user
 	for _, p := range paths {
 		owners, err := c.getOwners(p)
 		if err != nil {
-			logger.Error(ctx, "failed to check CODEOWNERS path pattern", err, slog.String("file_path", p))
+			logger.From(ctx).Error("failed to check CODEOWNERS path pattern",
+				slog.Any("error", err), slog.String("file_path", p))
 			return 0
 		}
 		if slices.Contains(owners, userName) {
@@ -67,7 +68,8 @@ func GotAllRequiredApprovals(ctx workflow.Context, workspace, repo, branch, comm
 	for _, p := range paths {
 		owners, err := c.getOwners(p)
 		if err != nil {
-			logger.Error(ctx, "failed to check CODEOWNERS path pattern", err, slog.String("file_path", p))
+			logger.From(ctx).Error("failed to check CODEOWNERS path pattern",
+				slog.Any("error", err), slog.String("file_path", p))
 			return false
 		}
 		if !c.allApproved(ctx, approvers, owners, true) {
@@ -90,7 +92,8 @@ func OwnersPerPath(ctx workflow.Context, workspace, repo, branch, commit string,
 	for _, p := range paths {
 		os, err := c.getOwners(p)
 		if err != nil {
-			logger.Error(ctx, "failed to check CODEOWNERS path pattern", err, slog.String("file_path", p))
+			logger.From(ctx).Error("failed to check CODEOWNERS path pattern",
+				slog.Any("error", err), slog.String("file_path", p))
 			return nil, nil
 		}
 		owners[p] = os
@@ -216,7 +219,7 @@ func (c *CodeOwners) expandMember(ctx workflow.Context, name string) ([]string, 
 
 	members, found := c.Groups[name]
 	if !found {
-		logger.Error(ctx, "failed to expand group in CODEOWNERS", nil, slog.String("group_name", name))
+		logger.From(ctx).Error("failed to expand group in CODEOWNERS", slog.String("group_name", name))
 		return nil, 0
 	}
 
@@ -256,7 +259,7 @@ func (c *CodeOwners) allApproved(ctx workflow.Context, approvers, owners []strin
 		// Approvals from (at least one individual user in each) CODEOWNERS group.
 		members, found := c.Groups[name]
 		if !found {
-			logger.Error(ctx, "group not found in CODEOWNERS", nil, slog.String("group_name", name))
+			logger.From(ctx).Error("group not found in CODEOWNERS", slog.String("group_name", name))
 			return false
 		}
 

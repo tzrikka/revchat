@@ -98,7 +98,8 @@ func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, s
 	slackID := strings.TrimSuffix(strings.TrimPrefix(slackRef, "<@"), ">")
 	user, err := data.SelectUserBySlackID(slackID)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by Slack ID", err, slog.String("user_id", slackID))
+		logger.From(ctx).Error("failed to load user by Slack ID",
+			slog.Any("error", err), slog.String("user_id", slackID))
 		return ""
 	}
 

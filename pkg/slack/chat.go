@@ -14,7 +14,7 @@ import (
 
 func DeleteMessage(ctx workflow.Context, channelID, timestamp string) error {
 	if err := slack.ChatDelete(ctx, channelID, timestamp); err != nil {
-		logger.Error(ctx, "failed to delete Slack message", err,
+		logger.From(ctx).Error("failed to delete Slack message", slog.Any("error", err),
 			slog.String("channel_id", channelID), slog.String("timestamp", timestamp))
 		return err
 	}
@@ -27,7 +27,7 @@ func PostEphemeralMessage(ctx workflow.Context, channelID, userID, msg string) e
 		if e := err.Error(); strings.Contains(e, "channel_not_found") || strings.Contains(e, "not_in_channel") {
 			_, err = PostMessage(ctx, userID, fmt.Sprintf("Couldn't send you this message in <#%s>:\n\n%s", channelID, msg))
 		} else {
-			logger.Error(ctx, "failed to post Slack ephemeral message", err,
+			logger.From(ctx).Error("failed to post Slack ephemeral message", slog.Any("error", err),
 				slog.String("channel_id", channelID), slog.String("user_id", userID))
 		}
 		return err
@@ -57,7 +57,7 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 			url, _ := data.SwitchURLAndID(channelID)
 			data.FullPRCleanup(ctx, channelID, url)
 		}
-		logger.Error(ctx, "failed to post Slack message", err,
+		logger.From(ctx).Error("failed to post Slack message", slog.Any("error", err),
 			slog.String("channel_id", channelID), slog.String("thread_ts", timestamp))
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 func UpdateMessage(ctx workflow.Context, channelID, timestamp, msg string) error {
 	req := slack.ChatUpdateRequest{Channel: channelID, TS: timestamp, Text: msg}
 	if err := slack.ChatUpdate(ctx, req); err != nil {
-		logger.Error(ctx, "failed to update Slack message", err,
+		logger.From(ctx).Error("failed to update Slack message", slog.Any("error", err),
 			slog.String("channel_id", channelID), slog.String("timestamp", timestamp))
 		return err
 	}

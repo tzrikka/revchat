@@ -51,38 +51,16 @@ func fatalErrorCtx(ctx context.Context, msg string, err error, attrs ...slog.Att
 	os.Exit(1)
 }
 
-func Debug(ctx workflow.Context, msg string, keyvals ...any) {
-	if ctx == nil {
-		slog.Debug(msg, keyvals...)
-		return
-	}
-	workflow.GetLogger(ctx).Debug(msg, keyvals...)
+type Logger interface {
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
 }
 
-func Info(ctx workflow.Context, msg string, keyvals ...any) {
+func From(ctx workflow.Context) Logger {
 	if ctx == nil {
-		slog.Info(msg, keyvals...)
-		return
+		return slog.Default()
 	}
-	workflow.GetLogger(ctx).Info(msg, keyvals...)
-}
-
-func Warn(ctx workflow.Context, msg string, keyvals ...any) {
-	if ctx == nil {
-		slog.Warn(msg, keyvals...)
-		return
-	}
-	workflow.GetLogger(ctx).Warn(msg, keyvals...)
-}
-
-func Error(ctx workflow.Context, msg string, err error, keyvals ...any) {
-	if err != nil {
-		keyvals = append(keyvals, slog.Any("error", err))
-	}
-
-	if ctx == nil {
-		slog.Error(msg, keyvals...)
-		return
-	}
-	workflow.GetLogger(ctx).Error(msg, keyvals...)
+	return workflow.GetLogger(ctx)
 }

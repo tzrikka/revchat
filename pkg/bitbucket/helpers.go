@@ -17,7 +17,8 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 
 	prev, err := data.LoadBitbucketPR(url)
 	if err != nil {
-		logger.Error(ctx, "failed to load Bitbucket PR snapshot", err, slog.String("pr_url", url))
+		logger.From(ctx).Error("failed to load Bitbucket PR snapshot",
+			slog.Any("error", err), slog.String("pr_url", url))
 		return nil, err
 	}
 
@@ -27,7 +28,8 @@ func switchSnapshot(ctx workflow.Context, url string, snapshot PullRequest) (*Pu
 
 	pr := new(PullRequest)
 	if err := mapToStruct(prev, pr); err != nil {
-		logger.Error(ctx, "previous snapshot of Bitbucket PR is invalid", err, slog.String("pr_url", url))
+		logger.From(ctx).Error("previous snapshot of Bitbucket PR is invalid",
+			slog.Any("error", err), slog.String("pr_url", url))
 		return nil, err
 	}
 

@@ -45,7 +45,8 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by Slack ID", err, slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to load user by Slack ID",
+			slog.Any("error", err), slog.String("user_id", userID))
 		// Don't return the error (i.e. abort the calling workflow) - use the Slack API as a fallback.
 	}
 	if user.Email != "" {
@@ -54,13 +55,14 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 
 	info, err := slack.UsersInfo(ctx, userID)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack user info", err, slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to retrieve Slack user info",
+			slog.Any("error", err), slog.String("user_id", userID))
 		return ""
 	}
 
 	if info.IsBot {
 		if err := data.UpsertUser("bot", "", "", userID, "", ""); err != nil {
-			logger.Error(ctx, "failed to save Slack bot ID mapping", err,
+			logger.From(ctx).Error("failed to save Slack bot ID mapping", slog.Any("error", err),
 				slog.String("user_id", userID), slog.String("email", "bot"))
 		}
 		return "bot"
@@ -68,13 +70,13 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 
 	email := strings.ToLower(info.Profile.Email)
 	if email == "" {
-		logger.Error(ctx, "Slack user has no email address", nil,
+		logger.From(ctx).Error("Slack user has no email address",
 			slog.String("user_id", userID), slog.String("real_name", info.RealName))
 		return ""
 	}
 
 	if err := data.UpsertUser(email, "", "", userID, info.RealName, ""); err != nil {
-		logger.Error(ctx, "failed to save Slack user details", err,
+		logger.From(ctx).Error("failed to save Slack user details", slog.Any("error", err),
 			slog.String("user_id", userID), slog.String("email", email))
 		// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
 	}
@@ -93,7 +95,8 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by Slack ID", err, slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to load user by Slack ID",
+			slog.Any("error", err), slog.String("user_id", userID))
 		// Don't abort - try to use the Slack API as a fallback.
 	}
 	if user.RealName != "" {
@@ -102,7 +105,8 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 
 	info, err := slack.UsersInfo(ctx, userID)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack user info", err, slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to retrieve Slack user info",
+			slog.Any("error", err), slog.String("user_id", userID))
 		return ""
 	}
 
@@ -113,7 +117,7 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 
 	realName := info.RealName
 	if err := data.UpsertUser(email, "", "", userID, realName, ""); err != nil {
-		logger.Error(ctx, "failed to save Slack user details", err,
+		logger.From(ctx).Error("failed to save Slack user details", slog.Any("error", err),
 			slog.String("user_id", userID), slog.String("real_name", realName))
 		// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
 	}
@@ -136,7 +140,8 @@ func SlackIDToDisplayName(ctx workflow.Context, userID string) string {
 
 	info, err := slack.UsersInfo(ctx, userID)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack user info", err, slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to retrieve Slack user info",
+			slog.Any("error", err), slog.String("user_id", userID))
 		return ""
 	}
 
@@ -159,7 +164,8 @@ func SlackIDToIcon(ctx workflow.Context, userID string) string {
 
 	info, err := slack.UsersInfo(ctx, userID)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack user info", err, slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to retrieve Slack user info",
+			slog.Any("error", err), slog.String("user_id", userID))
 		return ""
 	}
 
@@ -178,23 +184,25 @@ func EmailToSlackID(ctx workflow.Context, email string) string {
 
 	user, err := data.SelectUserByEmail(email)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by email", err, slog.String("email", email))
+		logger.From(ctx).Error("failed to load user by email",
+			slog.Any("error", err), slog.String("email", email))
 		// Don't abort - try to use the Slack API as a fallback.
 	}
 	if user.SlackID != "" {
 		return user.SlackID
 	} else if user.Email == email {
-		logger.Debug(ctx, "user in DB without Slack ID", slog.String("email", email))
+		logger.From(ctx).Debug("user in DB without Slack ID", slog.String("email", email))
 	}
 
 	slackUser, err := slack.UsersLookupByEmail(ctx, email)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack user info", err, slog.String("email", email))
+		logger.From(ctx).Error("failed to retrieve Slack user info",
+			slog.Any("error", err), slog.String("email", email))
 		return ""
 	}
 
 	if err := data.UpsertUser(email, "", "", slackUser.ID, slackUser.RealName, ""); err != nil {
-		logger.Error(ctx, "failed to save Slack user details", err,
+		logger.From(ctx).Error("failed to save Slack user details", slog.Any("error", err),
 			slog.String("user_id", slackUser.ID), slog.String("email", email))
 		// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
 	}

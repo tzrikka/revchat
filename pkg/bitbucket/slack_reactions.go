@@ -16,13 +16,14 @@ import (
 func addOKReaction(ctx workflow.Context, url string) {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve PR comment's Slack IDs", err, slog.String("bitbucket_url", url))
+		logger.From(ctx).Error("failed to retrieve PR comment's Slack IDs",
+			slog.Any("error", err), slog.String("bitbucket_url", url))
 		return
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		logger.Warn(ctx, "can't add reaction to Slack message - missing/bad IDs",
+		logger.From(ctx).Warn("can't add reaction to Slack message - missing/bad IDs",
 			slog.String("bitbucket_url", url), slog.String("slack_ids", ids))
 		return
 	}
@@ -35,13 +36,14 @@ func addOKReaction(ctx workflow.Context, url string) {
 func removeOKReaction(ctx workflow.Context, url string) {
 	ids, err := data.SwitchURLAndID(url)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve PR comment's Slack IDs", err, slog.String("bitbucket_url", url))
+		logger.From(ctx).Error("failed to retrieve PR comment's Slack IDs",
+			slog.Any("error", err), slog.String("bitbucket_url", url))
 		return
 	}
 
 	id := strings.Split(ids, "/")
 	if len(id) < 2 {
-		logger.Error(ctx, "can't remove reaction from Slack message - missing/bad IDs", nil,
+		logger.From(ctx).Error("can't remove reaction from Slack message - missing/bad IDs",
 			slog.String("bitbucket_url", url), slog.String("slack_ids", ids))
 		return
 	}

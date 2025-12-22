@@ -23,7 +23,7 @@ func slackBaseURL(ctx workflow.Context) string {
 
 	resp, err := slack.AuthTest(ctx)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack auth info", err)
+		logger.From(ctx).Error("failed to retrieve Slack auth info", slog.Any("error", err))
 		return ""
 	}
 
@@ -38,13 +38,14 @@ func slackChannelIDToName(ctx workflow.Context, id string) string {
 
 	channel, err := slack.ConversationsInfo(ctx, id, false, false)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack channel info", err, slog.String("channel_id", id))
+		logger.From(ctx).Error("failed to retrieve Slack channel info",
+			slog.Any("error", err), slog.String("channel_id", id))
 		return ""
 	}
 
 	name, ok := channel["name"].(string)
 	if !ok {
-		logger.Error(ctx, "Slack channel 'name' field missing or not a string", nil, slog.String("channel_id", id))
+		logger.From(ctx).Error("Slack channel 'name' field missing or not a string", slog.String("channel_id", id))
 		return ""
 	}
 

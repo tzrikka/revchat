@@ -52,7 +52,7 @@ func destinationDetails(pr map[string]any) (workspace, repo, branch, commit stri
 func selfTriggeredMemberEvent(ctx workflow.Context, auth []eventAuth, event MemberEvent) bool {
 	for _, a := range auth {
 		if a.IsBot && (a.UserID == event.User || a.UserID == event.Inviter) {
-			logger.Debug(ctx, "ignoring self-triggered Slack event")
+			logger.From(ctx).Debug("ignoring self-triggered Slack event")
 			return true
 		}
 	}
@@ -62,7 +62,7 @@ func selfTriggeredMemberEvent(ctx workflow.Context, auth []eventAuth, event Memb
 func selfTriggeredEvent(ctx workflow.Context, auth []eventAuth, userID string) bool {
 	for _, a := range auth {
 		if a.IsBot && a.UserID == userID {
-			logger.Debug(ctx, "ignoring self-triggered Slack event")
+			logger.From(ctx).Debug("ignoring self-triggered Slack event")
 			return true
 		}
 	}
@@ -72,12 +72,13 @@ func selfTriggeredEvent(ctx workflow.Context, auth []eventAuth, userID string) b
 func commentURL(ctx workflow.Context, ids string) (string, error) {
 	url, err := data.SwitchURLAndID(ids)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack message's PR comment URL", err, slog.String("ids", ids))
+		logger.From(ctx).Error("failed to retrieve Slack message's PR comment URL",
+			slog.Any("error", err), slog.String("ids", ids))
 		return "", err
 	}
 
 	if url == "" {
-		logger.Debug(ctx, "Slack message's PR comment URL is empty", slog.String("ids", ids))
+		logger.From(ctx).Debug("Slack message's PR comment URL is empty", slog.String("ids", ids))
 	}
 
 	return url, nil

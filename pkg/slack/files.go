@@ -15,29 +15,33 @@ import (
 func DeleteFile(ctx workflow.Context, ids string) {
 	parts := strings.Split(ids, "/")
 	if len(parts) < 3 {
-		logger.Warn(ctx, "can't delete Slack file - missing/bad IDs", slog.String("slack_ids", ids))
+		logger.From(ctx).Warn("can't delete Slack file - missing/bad IDs", slog.String("slack_ids", ids))
 		return
 	}
 
 	fileID := parts[len(parts)-1]
 	if err := slack.FilesDelete(ctx, fileID); err != nil {
-		logger.Error(ctx, "failed to delete uploaded Slack file", err, slog.String("file_id", fileID))
+		logger.From(ctx).Error("failed to delete uploaded Slack file",
+			slog.Any("error", err), slog.String("file_id", fileID))
 	}
 
 	if err := data.DeleteURLAndIDMapping(ids); err != nil {
-		logger.Error(ctx, "failed to delete Slack file mapping", err, slog.String("ids", ids))
+		logger.From(ctx).Error("failed to delete Slack file mapping",
+			slog.Any("error", err), slog.String("ids", ids))
 	}
 }
 
 func Upload(ctx workflow.Context, content []byte, filename, title, snippetType, mimeType, channelID, threadTS string) (*slack.File, error) {
 	uploadURL, fileID, err := slack.FilesGetUploadURLExternal(ctx, len(content), filename, snippetType, "")
 	if err != nil {
-		logger.Error(ctx, "failed to get Slack URL to upload file", err, slog.String("filename", filename))
+		logger.From(ctx).Error("failed to get Slack URL to upload file",
+			slog.Any("error", err), slog.String("filename", filename))
 		return nil, err
 	}
 
 	if err := slack.TimpaniUploadExternal(ctx, uploadURL, mimeType, content); err != nil {
-		logger.Error(ctx, "failed to upload file to Slack", err, slog.String("filename", filename))
+		logger.From(ctx).Error("failed to upload file to Slack",
+			slog.Any("error", err), slog.String("filename", filename))
 		return nil, err
 	}
 
@@ -47,12 +51,13 @@ func Upload(ctx workflow.Context, content []byte, filename, title, snippetType, 
 		ThreadTS:  threadTS,
 	})
 	if err != nil {
-		logger.Error(ctx, "failed to complete Slack file upload", err, slog.String("filename", filename))
+		logger.From(ctx).Error("failed to complete Slack file upload",
+			slog.Any("error", err), slog.String("filename", filename))
 		return nil, err
 	}
 
 	if len(files) == 0 {
-		logger.Error(ctx, "no files returned after completing Slack file upload", nil, slog.String("file_id", fileID))
+		logger.From(ctx).Error("no files returned after completing Slack file upload", slog.String("file_id", fileID))
 		return nil, errors.New("no files returned after completing Slack file upload")
 	}
 

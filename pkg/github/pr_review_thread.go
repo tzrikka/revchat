@@ -18,19 +18,19 @@ func (c Config) prReviewThreadWorkflow(ctx workflow.Context, event PullRequestRe
 		return c.reviewThreadUnresolved(ctx)
 
 	default:
-		logger.Error(ctx, "unrecognized GitHub PR review thread event action", nil, slog.String("action", event.Action))
+		logger.From(ctx).Error("unrecognized GitHub PR review thread event action", slog.String("action", event.Action))
 		return errors.New("unrecognized GitHub PR review thread event action: " + event.Action)
 	}
 }
 
 // A comment thread on a pull request was marked as resolved.
 func (c Config) reviewThreadResolved(ctx workflow.Context) error {
-	logger.Warn(ctx, "GitHub PR review thread resolved - event handler not implemented yet")
+	logger.From(ctx).Warn("GitHub PR review thread resolved - event handler not implemented yet")
 	return nil
 }
 
 // A previously resolved comment thread on a pull request was marked as unresolved.
 func (c Config) reviewThreadUnresolved(ctx workflow.Context) error {
-	logger.Warn(ctx, "GitHub PR review thread unresolved - event handler not implemented yet")
+	logger.From(ctx).Warn("GitHub PR review thread unresolved - event handler not implemented yet")
 	return nil
 }

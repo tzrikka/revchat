@@ -24,7 +24,8 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 
 	user, err := data.SelectUserByBitbucketID(accountID)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by Bitbucket ID", err, slog.String("account_id", accountID))
+		logger.From(ctx).Error("failed to load user by Bitbucket ID",
+			slog.Any("error", err), slog.String("account_id", accountID))
 		// Don't abort - use the Jira API as a fallback (Bitbucket API does not expose email addresses).
 	}
 
@@ -34,14 +35,15 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 
 	jiraUser, err := jira.UsersGet(ctx, accountID)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Jira user info", err, slog.String("account_id", accountID))
+		logger.From(ctx).Error("failed to retrieve Jira user info",
+			slog.Any("error", err), slog.String("account_id", accountID))
 		return "", err
 	}
 
 	email := strings.ToLower(jiraUser.Email)
 	if err := data.UpsertUser(email, accountID, "", "", "", ""); err != nil {
-		logger.Error(ctx, "failed to save Bitbucket account ID/email mapping", err,
-			slog.String("account_id", accountID), slog.String("email", email))
+		logger.From(ctx).Error("failed to save Bitbucket account ID/email mapping",
+			slog.Any("error", err), slog.String("account_id", accountID), slog.String("email", email))
 		// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
 	}
 
@@ -54,7 +56,8 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 func BitbucketToSlackID(ctx workflow.Context, accountID string, checkOptIn bool) string {
 	user, err := data.SelectUserByBitbucketID(accountID)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by Bitbucket ID", err, slog.String("account_id", accountID))
+		logger.From(ctx).Error("failed to load user by Bitbucket ID",
+			slog.Any("error", err), slog.String("account_id", accountID))
 		return ""
 	}
 
@@ -71,7 +74,8 @@ func BitbucketToSlackID(ctx workflow.Context, accountID string, checkOptIn bool)
 func BitbucketToSlackRef(ctx workflow.Context, accountID, displayName string) string {
 	user, err := data.SelectUserByBitbucketID(accountID)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by Bitbucket ID", err, slog.String("account_id", accountID))
+		logger.From(ctx).Error("failed to load user by Bitbucket ID",
+			slog.Any("error", err), slog.String("account_id", accountID))
 		// Don't return the error (i.e. abort the calling workflow) - use the Bitbucket API as a fallback.
 	}
 
@@ -91,13 +95,14 @@ func BitbucketToSlackRef(ctx workflow.Context, accountID, displayName string) st
 
 	apiUser, err := bitbucket.UsersGet(ctx, accountID, "")
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Bitbucket user info", err, slog.String("account_id", accountID))
+		logger.From(ctx).Error("failed to retrieve Bitbucket user info",
+			slog.Any("error", err), slog.String("account_id", accountID))
 		return accountID // Last resort: return the original Bitbucket account ID.
 	}
 
 	if apiUser.DisplayName != "" {
 		if err := data.UpsertUser("", accountID, "", "", apiUser.DisplayName, ""); err != nil {
-			logger.Error(ctx, "failed to save Bitbucket user display name", err,
+			logger.From(ctx).Error("failed to save Bitbucket user display name", slog.Any("error", err),
 				slog.String("account_id", accountID), slog.String("display_name", apiUser.DisplayName))
 			// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
 		}
@@ -115,7 +120,7 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 
 	user, err := data.SelectUserByEmail(email)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by email", err, slog.String("email", email))
+		logger.From(ctx).Error("failed to load user by email", slog.Any("error", err), slog.String("email", email))
 		// Don't return the error (i.e. abort the calling workflow) - use the Bitbucket API as a fallback.
 	}
 
@@ -125,22 +130,24 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 
 	users, err := jira.UsersSearchActivity(ctx, strings.ToLower(email))
 	if err != nil {
-		logger.Error(ctx, "failed to search Jira user by email", err, slog.String("email", email))
+		logger.From(ctx).Error("failed to search Jira user by email",
+			slog.Any("error", err), slog.String("email", email))
 		return "", err
 	}
 	if len(users) == 0 {
-		logger.Error(ctx, "Bitbucket user not found", nil, slog.String("email", email))
+		logger.From(ctx).Error("Bitbucket user not found", slog.String("email", email))
 		return "", fmt.Errorf("bitbucket user account not found for %q", email)
 	}
 	if len(users) > 1 {
-		logger.Warn(ctx, "multiple Bitbucket users found", slog.String("email", email), slog.Int("count", len(users)))
+		logger.From(ctx).Warn("multiple Bitbucket users found",
+			slog.String("email", email), slog.Int("count", len(users)))
 		return "", fmt.Errorf("multiple (%d) Bitbucket accounts found for %q", len(users), email)
 	}
 
 	id := users[0].AccountID
 	if err := data.UpsertUser(email, id, "", "", "", ""); err != nil {
-		logger.Error(ctx, "failed to save Bitbucket account ID/email mapping", err,
-			slog.String("account_id", id), slog.String("email", email))
+		logger.From(ctx).Error("failed to save Bitbucket account ID/email mapping",
+			slog.Any("error", err), slog.String("account_id", id), slog.String("email", email))
 		// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
 	}
 

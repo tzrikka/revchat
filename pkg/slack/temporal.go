@@ -107,7 +107,7 @@ func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, s
 		ch.Receive(ctx, payload)
 
 		signal := ch.Name()
-		logger.Info(ctx, "received signal", slog.String("signal", signal))
+		logger.From(ctx).Info("received signal", slog.String("signal", signal))
 		metrics.IncrementSignalCounter(ctx, signal)
 
 		// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
@@ -145,7 +145,7 @@ func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
 			break
 		}
 
-		logger.Info(ctx, "received signal while draining", slog.String("signal", signal))
+		logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
 		metrics.IncrementSignalCounter(ctx, signal)
 		signalEvents++
 
@@ -154,7 +154,8 @@ func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
 	}
 
 	if signalEvents > 0 {
-		logger.Info(ctx, "drained signal channel", slog.String("signal", signal), slog.Int("event_count", signalEvents))
+		logger.From(ctx).Info("drained signal channel", slog.String("signal", signal),
+			slog.Int("event_count", signalEvents))
 	}
 	return signalEvents
 }

@@ -47,7 +47,7 @@ func (c Config) pullRequestWorkflow(ctx workflow.Context, event PullRequestEvent
 	case "milestoned", "demilestoned":
 
 	default:
-		logger.Error(ctx, "unrecognized GitHub PR event action", nil, slog.String("action", event.Action))
+		logger.From(ctx).Error("unrecognized GitHub PR event action", slog.String("action", event.Action))
 		return errors.New("unrecognized GitHub PR event action: " + event.Action)
 	}
 

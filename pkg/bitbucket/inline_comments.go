@@ -128,7 +128,7 @@ func spliceSuggestion(ctx workflow.Context, in *Inline, suggestion, srcFile stri
 	srcLines := strings.Split(srcFile, "\n")
 	numLines := len(srcLines)
 	if firstLine < 1 || lastLine < 1 || firstLine > numLines || lastLine > numLines || lenFrom <= 0 || lenTo < 0 {
-		logger.Warn(ctx, "mistake in generating pretty diff")
+		logger.From(ctx).Warn("mistake in generating pretty diff")
 		return nil
 	}
 

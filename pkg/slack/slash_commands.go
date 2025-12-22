@@ -85,7 +85,7 @@ func (c *Config) slashCommandWorkflow(ctx workflow.Context, event SlashCommandEv
 		return remindersSlashCommand(ctx, event)
 	}
 
-	logger.Warn(ctx, "unrecognized Slack slash command",
+	logger.From(ctx).Warn("unrecognized Slack slash command",
 		slog.String("username", event.UserName), slog.String("text", event.Text))
 	postEphemeralError(ctx, event, fmt.Sprintf("unrecognized command - try `%s help`", event.Command))
 	return nil
@@ -145,7 +145,8 @@ func cleanSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		PullRequestID: url[3],
 	})
 	if err != nil {
-		logger.Error(ctx, "failed to get Bitbucket PR", err, slog.String("pr_url", event.UserID))
+		logger.From(ctx).Error("failed to get Bitbucket PR",
+			slog.Any("error", err), slog.String("pr_url", event.UserID))
 		postEphemeralError(ctx, event, "failed to get current PR details from Bitbucket.")
 		return err
 	}
@@ -171,7 +172,7 @@ func cleanSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		PullRequest: pr,
 	})
 	if err != nil {
-		logger.Error(ctx, "failed to update Bitbucket PR", err,
+		logger.From(ctx).Error("failed to update Bitbucket PR", slog.Any("error", err),
 			slog.String("pr_url", event.UserID), slog.String("slack_user_id", event.UserID))
 		postEphemeralError(ctx, event, "failed to update PR reviewers in Bitbucket.")
 		return err
@@ -271,7 +272,7 @@ func followSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		}
 
 		if err := data.FollowUser(event.UserID, userID); err != nil {
-			logger.Error(ctx, "failed to follow user", err,
+			logger.From(ctx).Error("failed to follow user", slog.Any("error", err),
 				slog.String("follower_id", event.UserID), slog.String("followed_id", userID))
 			postEphemeralError(ctx, event, fmt.Sprintf("failed to follow <@%s>.", userID))
 			continue
@@ -307,7 +308,7 @@ func unfollowSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 		}
 
 		if err := data.UnfollowUser(event.UserID, userID); err != nil {
-			logger.Error(ctx, "failed to unfollow user", err,
+			logger.From(ctx).Error("failed to unfollow user", slog.Any("error", err),
 				slog.String("unfollower_id", event.UserID), slog.String("followed_id", userID))
 			postEphemeralError(ctx, event, fmt.Sprintf("failed to unfollow <@%s>.", userID))
 			continue
@@ -418,7 +419,8 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 
 	ok, err := data.Nudge(url, user.Email)
 	if err != nil {
-		logger.Error(ctx, "failed to nudge user", err, slog.String("pr_url", url), slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to nudge user", slog.Any("error", err),
+			slog.String("pr_url", url), slog.String("user_id", userID))
 		postEphemeralError(ctx, event, fmt.Sprintf("internal data error while nudging <@%s>.", userID))
 		return ok // May be true: valid reviewer, but failed to save it.
 	}
@@ -440,7 +442,8 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 
 	info, err := slack.UsersInfo(ctx, event.UserID)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack user info", err, slog.String("user_id", event.UserID))
+		logger.From(ctx).Error("failed to retrieve Slack user info",
+			slog.Any("error", err), slog.String("user_id", event.UserID))
 		postEphemeralError(ctx, event, "failed to retrieve your user info from Slack.")
 		return err
 	}
@@ -457,7 +460,7 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 	case c.BitbucketWorkspace != "":
 		return c.optInBitbucket(ctx, event, user)
 	default:
-		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
+		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
 		postEphemeralError(ctx, event, "internal configuration error.")
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
@@ -466,7 +469,7 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, user data.User) error {
 	linkID, nonce, err := c.createThrippyLink(ctx)
 	if err != nil {
-		logger.Error(ctx, "failed to create Thrippy link for Slack user", err)
+		logger.From(ctx).Error("failed to create Thrippy link for Slack user", slog.Any("error", err))
 		postEphemeralError(ctx, event, "internal authorization failure.")
 		return err
 	}
@@ -474,7 +477,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 	msg := ":point_right: <https://%s/start?id=%s&nonce=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket."
 	msg = fmt.Sprintf(msg, c.ThrippyHTTPAddress, linkID, nonce)
 	if err := PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg); err != nil {
-		logger.Error(ctx, "failed to post ephemeral opt-in message in Slack", err)
+		logger.From(ctx).Error("failed to post ephemeral opt-in message in Slack", slog.Any("error", err))
 		_ = c.deleteThrippyLink(ctx, linkID)
 		return err
 	}
@@ -483,18 +486,19 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event SlashCommandEvent, u
 	if err != nil {
 		_ = c.deleteThrippyLink(ctx, linkID)
 		if err.Error() == ErrLinkAuthzTimeout { // For some reason errors.Is() doesn't work across Temporal.
-			logger.Warn(ctx, "user did not complete Thrippy OAuth flow in time", slog.String("email", user.Email))
+			logger.From(ctx).Warn("user did not complete Thrippy OAuth flow in time", slog.String("email", user.Email))
 			postEphemeralError(ctx, event, "Bitbucket authorization timed out - please try opting in again.")
 			return nil // Not a *server* error as far as we're concerned.
 		} else {
-			logger.Error(ctx, "failed to authorize Bitbucket user", err, slog.String("email", user.Email))
+			logger.From(ctx).Error("failed to authorize Bitbucket user",
+				slog.Any("error", err), slog.String("email", user.Email))
 			postEphemeralError(ctx, event, "failed to authorize you in Bitbucket.")
 			return err
 		}
 	}
 
 	if err := data.UpsertUser(user.Email, "", "", user.SlackID, user.RealName, linkID); err != nil {
-		logger.Error(ctx, "failed to opt-in user", err, slog.String("email", user.Email))
+		logger.From(ctx).Error("failed to opt-in user", slog.Any("error", err), slog.String("email", user.Email))
 		postEphemeralError(ctx, event, "failed to write internal data about you.")
 		_ = c.deleteThrippyLink(ctx, linkID)
 		return err
@@ -521,13 +525,14 @@ func (c *Config) optOutSlashCommand(ctx workflow.Context, event SlashCommandEven
 	}
 
 	if err := data.UpsertUser(user.Email, user.BitbucketID, user.GitHubID, user.SlackID, "", "X"); err != nil {
-		logger.Error(ctx, "failed to opt-out user", err, slog.String("email", user.Email))
+		logger.From(ctx).Error("failed to opt-out user", slog.Any("error", err), slog.String("email", user.Email))
 		postEphemeralError(ctx, event, "failed to write internal data about you.")
 		return err
 	}
 
 	if err := c.deleteThrippyLink(ctx, user.ThrippyLink); err != nil {
-		logger.Error(ctx, "failed to delete Thrippy link for opted-out user", err, slog.String("link_id", user.ThrippyLink))
+		logger.From(ctx).Error("failed to delete Thrippy link for opted-out user",
+			slog.Any("error", err), slog.String("link_id", user.ThrippyLink))
 		// This is an internal error, it doesn't concern or affect the user.
 	}
 
@@ -538,7 +543,7 @@ func (c *Config) optOutSlashCommand(ctx workflow.Context, event SlashCommandEven
 func remindersSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 	matches := remindersPattern.FindStringSubmatch(event.Text)
 	if len(matches) < 3 {
-		logger.Error(ctx, "failed to parse reminders slash command - regex mismatch", nil, slog.String("text", event.Text))
+		logger.From(ctx).Error("failed to parse reminders slash command - regex mismatch", slog.String("text", event.Text))
 		postEphemeralError(ctx, event, "unexpected internal error while parsing command.")
 		return errors.New("failed to parse reminders command - regex mismatch")
 	}
@@ -550,13 +555,13 @@ func remindersSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 
 	kitchenTime, err := normalizeTime(matches[2], amPm)
 	if err != nil {
-		logger.Warn(ctx, "failed to parse time in reminders slash command", slog.Any("error", err))
+		logger.From(ctx).Warn("failed to parse time in reminders slash command", slog.Any("error", err))
 		postEphemeralError(ctx, event, err.Error())
 		return nil // Not a *server* error as far as we're concerned.
 	}
 
 	if kt, _ := time.Parse(time.Kitchen, kitchenTime); kt.Minute() != 0 && kt.Minute() != 30 {
-		logger.Warn(ctx, "uncommon reminder time requested",
+		logger.From(ctx).Warn("uncommon reminder time requested",
 			slog.String("user_id", event.UserID), slog.String("time", kitchenTime))
 		postEphemeralError(ctx, event, "please specify a time on the hour or half-hour.")
 		return nil // Not a *server* error as far as we're concerned.
@@ -568,26 +573,27 @@ func remindersSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 func setReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet bool) error {
 	user, err := slack.UsersInfo(ctx, event.UserID)
 	if err != nil {
-		logger.Error(ctx, "failed to retrieve Slack user info", err, slog.String("user_id", event.UserID))
+		logger.From(ctx).Error("failed to retrieve Slack user info",
+			slog.Any("error", err), slog.String("user_id", event.UserID))
 		postEphemeralError(ctx, event, "failed to retrieve Slack user info.")
 		return err
 	}
 
 	if user.TZ == "" {
-		logger.Warn(ctx, "Slack user has no timezone in their profile", slog.String("user_id", event.UserID))
+		logger.From(ctx).Warn("Slack user has no timezone in their profile", slog.String("user_id", event.UserID))
 		postEphemeralError(ctx, event, "please set a timezone in your Slack profile preferences first.")
 		return nil // Not a *server* error as far as we're concerned.
 	}
 
 	if _, err := time.LoadLocation(user.TZ); err != nil {
-		logger.Warn(ctx, "unrecognized user timezone", slog.Any("error", err),
+		logger.From(ctx).Warn("unrecognized user timezone", slog.Any("error", err),
 			slog.String("user_id", event.UserID), slog.String("tz", user.TZ))
 		postEphemeralError(ctx, event, fmt.Sprintf("your Slack timezone is unrecognized: `%s`", user.TZ))
 		return err
 	}
 
 	if err := data.SetReminder(event.UserID, t, user.TZ); err != nil {
-		logger.Error(ctx, "failed to store user reminder time", err,
+		logger.From(ctx).Error("failed to store user reminder time", slog.Any("error", err),
 			slog.String("user_id", event.UserID), slog.String("time", t), slog.String("zone", user.TZ))
 		postEphemeralError(ctx, event, "failed to write internal data about you.")
 		return err
@@ -610,14 +616,16 @@ func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []st
 
 	emails, err := data.GetCurrentTurn(url[0])
 	if err != nil {
-		logger.Error(ctx, "failed to get current turn for PR", err, slog.String("pr_url", url[0]))
+		logger.From(ctx).Error("failed to get current turn for PR",
+			slog.Any("error", err), slog.String("pr_url", url[0]))
 		postEphemeralError(ctx, event, "failed to read internal data about the PR.")
 		return "", nil, data.User{}, err
 	}
 
 	user, err := data.SelectUserBySlackID(event.UserID)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by Slack ID", err, slog.String("user_id", event.UserID))
+		logger.From(ctx).Error("failed to load user by Slack ID",
+			slog.Any("error", err), slog.String("user_id", event.UserID))
 		postEphemeralError(ctx, event, "failed to read internal data about you.")
 		return "", nil, data.User{}, err
 	}
@@ -644,14 +652,15 @@ func myTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 
 	ok, err := data.Nudge(url, user.Email)
 	if err != nil {
-		logger.Error(ctx, "failed to self-nudge", err, slog.String("pr_url", url), slog.String("email", user.Email))
+		logger.From(ctx).Error("failed to self-nudge", slog.Any("error", err),
+			slog.String("pr_url", url), slog.String("email", user.Email))
 		postEphemeralError(ctx, event, "failed to write internal data about this PR.")
 	}
 	if !ok {
 		msg = ":thinking_face: I didn't think you're supposed to review this PR, thanks for letting me know!\n\n"
 
 		if err := data.AddReviewerToPR(url, user.Email); err != nil {
-			logger.Error(ctx, "failed to add reviewer to PR", err,
+			logger.From(ctx).Error("failed to add reviewer to PR", slog.Any("error", err),
 				slog.String("pr_url", url), slog.String("email", user.Email))
 			postEphemeralError(ctx, event, "failed to write internal data about this.")
 		}
@@ -659,7 +668,8 @@ func myTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error {
 
 	emails, err = data.GetCurrentTurn(url)
 	if err != nil {
-		logger.Error(ctx, "failed to get current turn for PR after switching", err, slog.String("pr_url", url))
+		logger.From(ctx).Error("failed to get current turn for PR after switching",
+			slog.Any("error", err), slog.String("pr_url", url))
 		postEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
 	}
@@ -684,14 +694,16 @@ func notMyTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error 
 	}
 
 	if err := data.SwitchTurn(url, user.Email); err != nil {
-		logger.Error(ctx, "failed to switch PR turn", err, slog.String("pr_url", url), slog.String("email", user.Email))
+		logger.From(ctx).Error("failed to switch PR turn", slog.Any("error", err),
+			slog.String("pr_url", url), slog.String("email", user.Email))
 		postEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}
 
 	newTurn, err := data.GetCurrentTurn(url)
 	if err != nil {
-		logger.Error(ctx, "failed to get current turn for PR after switching", err, slog.String("pr_url", url))
+		logger.From(ctx).Error("failed to get current turn for PR after switching",
+			slog.Any("error", err), slog.String("pr_url", url))
 		postEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
 	}
@@ -708,7 +720,7 @@ func freezeTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) error
 
 	ok, err := data.FreezeTurn(url[0], users.SlackIDToEmail(ctx, event.UserID))
 	if err != nil {
-		logger.Error(ctx, "failed to freeze PR turn", err, slog.String("pr_url", url[0]))
+		logger.From(ctx).Error("failed to freeze PR turn", slog.Any("error", err), slog.String("pr_url", url[0]))
 		postEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}
@@ -728,7 +740,7 @@ func unfreezeTurnSlashCommand(ctx workflow.Context, event SlashCommandEvent) err
 
 	ok, err := data.UnfreezeTurn(url[0])
 	if err != nil {
-		logger.Error(ctx, "failed to unfreeze PR turn", err, slog.String("pr_url", url[0]))
+		logger.From(ctx).Error("failed to unfreeze PR turn", slog.Any("error", err), slog.String("pr_url", url[0]))
 		postEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}
@@ -780,7 +792,7 @@ func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak 
 	for _, email := range emails {
 		u, err := data.SelectUserByEmail(email)
 		if err != nil {
-			logger.Error(ctx, "failed to load user by email", err, slog.String("email", email))
+			logger.From(ctx).Error("failed to load user by email", slog.Any("error", err), slog.String("email", email))
 			msg.WriteString(fmt.Sprintf(" `%s`", email))
 			continue
 		}
@@ -812,13 +824,13 @@ func (c *Config) approveSlashCommand(ctx workflow.Context, event SlashCommandEve
 		req := bitbucket.PullRequestsApproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
 		err = bitbucket.PullRequestsApprove(ctx, req)
 	default:
-		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
+		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
 		postEphemeralError(ctx, event, "internal configuration error.")
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
 
 	if err != nil {
-		logger.Error(ctx, "failed to approve PR", err, slog.String("pr_url", url[0]))
+		logger.From(ctx).Error("failed to approve PR", slog.Any("error", err), slog.String("pr_url", url[0]))
 		postEphemeralError(ctx, event, "failed to approve "+url[0])
 		return err
 	}
@@ -839,13 +851,13 @@ func (c *Config) unapproveSlashCommand(ctx workflow.Context, event SlashCommandE
 		req := bitbucket.PullRequestsUnapproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
 		err = bitbucket.PullRequestsUnapprove(ctx, req)
 	default:
-		logger.Error(ctx, "neither Bitbucket nor GitHub are configured", nil)
+		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
 		postEphemeralError(ctx, event, "internal configuration error.")
 		return errors.New("neither Bitbucket nor GitHub are configured")
 	}
 
 	if err != nil {
-		logger.Error(ctx, "failed to unapprove PR", err, slog.String("pr_url", url[0]))
+		logger.From(ctx).Error("failed to unapprove PR", slog.Any("error", err), slog.String("pr_url", url[0]))
 		postEphemeralError(ctx, event, "failed to unapprove "+url[0])
 		return err
 	}
@@ -858,7 +870,7 @@ func (c *Config) unapproveSlashCommand(ctx workflow.Context, event SlashCommandE
 func userDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (data.User, bool, error) {
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
-		logger.Error(ctx, "failed to load user by Slack ID", err, slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to load user by Slack ID", slog.Any("error", err), slog.String("user_id", userID))
 		postEphemeralError(ctx, event, fmt.Sprintf("failed to read internal data about <@%s>.", userID))
 		return data.User{}, false, err
 	}
@@ -871,7 +883,8 @@ func userDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (
 func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) []string {
 	url, err := data.SwitchURLAndID(event.ChannelID)
 	if err != nil {
-		logger.Error(ctx, "failed to convert Slack channel to PR URL", err, slog.String("channel_id", event.ChannelID))
+		logger.From(ctx).Error("failed to convert Slack channel to PR URL",
+			slog.Any("error", err), slog.String("channel_id", event.ChannelID))
 		postEphemeralError(ctx, event, "failed to read internal data about the PR.")
 		return nil
 	}
@@ -883,7 +896,7 @@ func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) []strin
 
 	match := bitbucketURLPattern.FindStringSubmatch(url)
 	if len(match) != 4 {
-		logger.Error(ctx, "failed to parse Bitbucket PR URL", nil, slog.String("pr_url", url))
+		logger.From(ctx).Error("failed to parse Bitbucket PR URL", slog.String("pr_url", url))
 		postEphemeralError(ctx, event, "this command can only be used inside RevChat channels.")
 		return nil
 	}
