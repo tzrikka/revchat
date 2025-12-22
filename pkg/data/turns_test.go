@@ -383,3 +383,32 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 }
+
+func TestNormalizeEmailAddresses(t *testing.T) {
+	turn := &PRTurn{
+		Author:   "AUTHOR",
+		FrozenBy: "FrozenBy",
+		Reviewers: map[string]bool{
+			"Rev1": true,
+			"rev2": false,
+			"REV3": true,
+		},
+	}
+
+	normalizeEmailAddresses(turn)
+
+	if turn.Author != "author" {
+		t.Fatalf("normalizeEmailAddresses() Author = %q, want %q", turn.Author, "author")
+	}
+	if turn.FrozenBy != "frozenby" {
+		t.Fatalf("normalizeEmailAddresses() FrozenBy = %q, want %q", turn.FrozenBy, "frozenby")
+	}
+	wantReviewers := map[string]bool{
+		"rev1": true,
+		"rev2": false,
+		"rev3": true,
+	}
+	if !reflect.DeepEqual(turn.Reviewers, wantReviewers) {
+		t.Fatalf("normalizeEmailAddresses() Reviewers = %v, want %v", turn.Reviewers, wantReviewers)
+	}
+}

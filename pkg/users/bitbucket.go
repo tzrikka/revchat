@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -37,7 +38,7 @@ func BitbucketToEmail(ctx workflow.Context, accountID string) (string, error) {
 		return "", err
 	}
 
-	email := jiraUser.Email
+	email := strings.ToLower(jiraUser.Email)
 	if err := data.UpsertUser(email, accountID, "", "", "", ""); err != nil {
 		logger.Error(ctx, "failed to save Bitbucket account ID/email mapping", err,
 			slog.String("account_id", accountID), slog.String("email", email))
@@ -122,7 +123,7 @@ func EmailToBitbucketID(ctx workflow.Context, workspace, email string) (string, 
 		return user.BitbucketID, nil
 	}
 
-	users, err := jira.UsersSearchActivity(ctx, email)
+	users, err := jira.UsersSearchActivity(ctx, strings.ToLower(email))
 	if err != nil {
 		logger.Error(ctx, "failed to search Jira user by email", err, slog.String("email", email))
 		return "", err

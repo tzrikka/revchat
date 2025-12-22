@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -55,6 +56,7 @@ func DeleteTurns(url string) error {
 // This function is idempotent: if a reviewer already exists, or is the PR author,
 // it does nothing. It also ignores empty or "bot" email addresses.
 func AddReviewerToPR(url, email string) error {
+	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
 	}
@@ -116,6 +118,7 @@ func GetCurrentTurn(url string) ([]string, error) {
 // This function is idempotent: if the reviewer does not exist, it does nothing.
 // It also ignores empty or "bot" email addresses.
 func RemoveFromTurn(url, email string) error {
+	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
 	}
@@ -187,6 +190,7 @@ func UnfreezeTurn(url string) (bool, error) {
 // If the user is the PR author, it adds all reviewers to the attention state.
 // If the user is a reviewer, it adds the author to the attention state.
 func SwitchTurn(url, email string) error {
+	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
 	}
@@ -222,6 +226,7 @@ func SwitchTurn(url, email string) error {
 // so it becomes their turn to pay attention to that PR if it wasn't already.
 // It returns true if the nudge is valid (the user is in the current turn list).
 func Nudge(url, email string) (bool, error) {
+	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return false, nil
 	}
@@ -281,7 +286,20 @@ func readTurnFile(url string) (*PRTurn, error) {
 		return resetTurn(url)
 	}
 
+	normalizeEmailAddresses(t)
 	return t, nil
+}
+
+func normalizeEmailAddresses(t *PRTurn) {
+	t.Author = strings.ToLower(t.Author)
+	t.FrozenBy = strings.ToLower(t.FrozenBy)
+	for reviewer, state := range t.Reviewers {
+		if strings.ToLower(reviewer) == reviewer {
+			continue
+		}
+		t.Reviewers[strings.ToLower(reviewer)] = state
+		delete(t.Reviewers, reviewer)
+	}
 }
 
 // writeTurnFile expects the caller to hold the appropriate mutex.
@@ -297,6 +315,7 @@ func writeTurnFile(url string, t *PRTurn) error {
 	}
 	defer f.Close()
 
+	normalizeEmailAddresses(t)
 	e := json.NewEncoder(f)
 	e.SetIndent("", "  ")
 	return e.Encode(t)

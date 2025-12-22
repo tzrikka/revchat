@@ -446,7 +446,7 @@ func (c *Config) optInSlashCommand(ctx workflow.Context, event SlashCommandEvent
 	}
 
 	// Ensure the user's basic details are set even if they're unrecognized.
-	user.Email = info.Profile.Email
+	user.Email = strings.ToLower(info.Profile.Email)
 	user.RealName = info.RealName
 	user.SlackID = event.UserID
 	if info.IsBot {

@@ -3,6 +3,7 @@ package users
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
@@ -65,7 +66,7 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 		return "bot"
 	}
 
-	email := info.Profile.Email
+	email := strings.ToLower(info.Profile.Email)
 	if email == "" {
 		logger.Error(ctx, "Slack user has no email address", nil,
 			slog.String("user_id", userID), slog.String("real_name", info.RealName))
@@ -105,7 +106,7 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 		return ""
 	}
 
-	email := info.Profile.Email
+	email := strings.ToLower(info.Profile.Email)
 	if info.IsBot {
 		email = "bot"
 	}

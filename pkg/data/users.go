@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -66,6 +67,8 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 			return err
 		}
 	}
+
+	email = strings.ToLower(email)
 
 	i, err := usersDB.findUserIndex(email, bitbucketID, githubID, slackID, realName)
 	if err != nil {
@@ -207,7 +210,7 @@ func (u *Users) findUserIndex(email, bitbucketID, githubID, slackID, realName st
 }
 
 func SelectUserByEmail(email string) (User, error) {
-	return selectUserBy(indexByEmail, email)
+	return selectUserBy(indexByEmail, strings.ToLower(email))
 }
 
 func SelectUserByBitbucketID(bitbucketID string) (User, error) {
@@ -268,6 +271,7 @@ func selectUserBy(indexType int, id string) (User, error) {
 	}
 
 	entryCopy := usersDB.entries[i]
+	entryCopy.Email = strings.ToLower(entryCopy.Email)
 	return entryCopy, nil
 }
 
@@ -305,6 +309,7 @@ func readUsersFile() (*Users, error) {
 
 	for i, user := range u.entries {
 		if user.Email != "" && user.Email != "bot" {
+			user.Email = strings.ToLower(user.Email)
 			u.emailIndex[user.Email] = i
 		}
 		if user.BitbucketID != "" {
