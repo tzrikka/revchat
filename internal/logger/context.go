@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"time"
 
-	_ "go.temporal.io/sdk/log"
+	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -17,10 +17,14 @@ type ctxKey struct{}
 
 var ctxLoggerKey = ctxKey{}
 
-func InContext(ctx context.Context, l *slog.Logger) context.Context {
+// WithContext returns a derived [context.Context] that points to the
+// specified parent, and has the specified [slog.Logger] attached to it.
+func WithContext(ctx context.Context, l *slog.Logger) context.Context {
 	return context.WithValue(ctx, ctxLoggerKey, l)
 }
 
+// FromContext returns the [slog.Logger] attached to the specified
+// [context.Context], or [slog.Default] if none is attached.
 func FromContext(ctx context.Context) *slog.Logger {
 	l := slog.Default()
 	if ctxLogger, ok := ctx.Value(ctxLoggerKey).(*slog.Logger); ok {
@@ -51,14 +55,10 @@ func fatalErrorCtx(ctx context.Context, msg string, err error, attrs ...slog.Att
 	os.Exit(1)
 }
 
-type Logger interface {
-	Debug(msg string, args ...any)
-	Info(msg string, args ...any)
-	Warn(msg string, args ...any)
-	Error(msg string, args ...any)
-}
-
-func From(ctx workflow.Context) Logger {
+// From returns a Temporal [log.Logger] that wraps a [slog.Logger] which is attached
+// to the specified Temporal [workflow.Context]. If the context is nil, it returns
+// [slog.Default] as a fallback, which still satisfies the [log.Logger] interface.
+func From(ctx workflow.Context) log.Logger {
 	if ctx == nil {
 		return slog.Default()
 	}

@@ -22,10 +22,15 @@ const (
 
 	// EventDispatcher is the name and ID of the RevChat event dispatcher workflow.
 	EventDispatcher = "event.dispatcher"
+
+	shutdownSignal = "graceful.shutdown"
 )
 
 type Config struct {
 	taskQueue string
+
+	shutdown string
+	done     chan<- any
 }
 
 // EventDispatcherWorkflow is an always-running singleton workflow that receives Temporal
@@ -38,7 +43,7 @@ type Config struct {
 //
 // [Timpani]: https://pkg.go.dev/github.com/tzrikka/timpani/pkg/listeners
 // [continue-as-new]: https://docs.temporal.io/develop/go/continue-as-new
-func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
+func (c *Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	// https://docs.temporal.io/develop/go/observability#visibility
 	sig := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals, slack.Signals)
 	attr := temporal.NewSearchAttributeKeyKeywordList(SearchAttribute).ValueSet(sig)
@@ -47,6 +52,10 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	}
 
 	selector := workflow.NewSelector(ctx)
+	selector.AddReceive(workflow.GetSignalChannel(ctx, shutdownSignal), func(ch workflow.ReceiveChannel, _ bool) {
+		ch.Receive(ctx, &c.shutdown)
+	})
+
 	bitbucket.RegisterPullRequestSignals(ctx, selector, c.taskQueue)
 	bitbucket.RegisterRepositorySignals(ctx, selector, c.taskQueue)
 	github.RegisterSignals(ctx, selector, c.taskQueue)
@@ -55,16 +64,13 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	for {
 		selector.Select(ctx)
 
-		// https://docs.temporal.io/develop/go/message-passing#wait-for-message-handlers
-		// https://github.com/temporalio/samples-go/tree/main/safe_message_handler
-		if info := workflow.GetInfo(ctx); info.GetContinueAsNewSuggested() {
+		// "Lame duck" mode: wait for all child workflows to finish, and drain all signal
+		// channels, before resetting the workflow history or shutting down the entire worker:
+		//   - https://docs.temporal.io/develop/go/message-passing#wait-for-message-handlers
+		//   - https://github.com/temporalio/samples-go/tree/main/safe_message_handler
+		if info := workflow.GetInfo(ctx); info.GetContinueAsNewSuggested() || c.shutdown != "" {
 			startTime := time.Now()
-			logger.From(ctx).Info("continue-as-new suggested by Temporal server",
-				slog.Int("history_length", info.GetCurrentHistoryLength()),
-				slog.Int("history_size", info.GetCurrentHistorySize()))
 
-			// "Lame duck" mode: wait for all child workflows to finish, and
-			// drain all signal channels, before resetting workflow history.
 			err := workflow.Await(ctx, func() bool {
 				return workflow.AllHandlersFinished(ctx)
 			})
@@ -72,21 +78,24 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 				logger.From(ctx).Error("failed to wait for all handlers to finish", slog.Any("error", err))
 			}
 
-			logger.From(ctx).Info("all child workflow handlers have finished before continue-as-new",
-				slog.Int("history_length", info.GetCurrentHistoryLength()),
-				slog.Int("history_size", info.GetCurrentHistorySize()),
-				slog.String("lead_time", time.Since(startTime).String()))
-
 			for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 5; cyclesSinceLastSignal++ {
 				if c.drainCycle(ctx) {
 					cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
 				}
 			}
 
-			logger.From(ctx).Warn("triggering continue-as-new for dispatcher workflow",
+			msg := "triggering continue-as-new for dispatcher workflow"
+			if c.shutdown != "" {
+				msg += ", and shutting down the worker"
+			}
+			logger.From(ctx).Warn(msg, slog.String("lead_time", time.Since(startTime).String()),
 				slog.Int("history_length", info.GetCurrentHistoryLength()),
-				slog.Int("history_size", info.GetCurrentHistorySize()),
-				slog.String("lead_time", time.Since(startTime).String()))
+				slog.Int("history_size", info.GetCurrentHistorySize()))
+
+			if c.shutdown != "" {
+				c.done <- c.shutdown
+				close(c.done)
+			}
 
 			return workflow.NewContinueAsNewError(ctx, EventDispatcher)
 		}
@@ -94,7 +103,7 @@ func (c Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 }
 
 // drainCycle processes each event source and returns true if any signals were found.
-func (c Config) drainCycle(ctx workflow.Context) bool {
+func (c *Config) drainCycle(ctx workflow.Context) bool {
 	bitbucketPRSignalsFound := bitbucket.DrainPullRequestSignals(ctx, c.taskQueue)
 	bitbucketRepoSignalsFound := bitbucket.DrainRepositorySignals(ctx, c.taskQueue)
 	githubSignalsFound := github.DrainSignals(ctx, c.taskQueue)

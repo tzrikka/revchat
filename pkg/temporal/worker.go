@@ -4,6 +4,10 @@ package temporal
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/api/enums/v1"
@@ -47,19 +51,13 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 
 	slack.CreateSchedule(ctx, c, cmd)
 
-	cfg := Config{taskQueue: tq}
-	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})
-
+	cfg := &Config{taskQueue: tq}
 	opts := client.StartWorkflowOptions{
 		ID:                       EventDispatcher,
 		TaskQueue:                tq,
 		WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
 		WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
 	}
-	if _, err := c.ExecuteWorkflow(ctx, opts, EventDispatcher); err != nil {
-		return fmt.Errorf("failed to start event dispatcher workflow: %w", err)
-	}
-
 	temporal.ActivityOptions = &workflow.ActivityOptions{
 		TaskQueue:           cmd.String("temporal-task-queue-timpani"),
 		StartToCloseTimeout: config.StartToCloseTimeout,
@@ -68,9 +66,35 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 		},
 	}
 
-	if err := w.Run(worker.InterruptCh()); err != nil {
+	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})
+	workflowRun, err := c.ExecuteWorkflow(ctx, opts, EventDispatcher)
+	if err != nil {
+		return fmt.Errorf("failed to start event dispatcher workflow: %w", err)
+	}
+
+	if err := w.Run(interruptCh(ctx, c, workflowRun, cfg)); err != nil {
 		return fmt.Errorf("failed to start Temporal worker: %w", err)
 	}
 
 	return nil
+}
+
+// interruptCh returns a native Go channel, so when the process receives a SIGINT or SIGTERM signal from the OS,
+// it signals [EventDispatcherWorkflow] to start a graceful shutdown, and then ends the Temporal worker process.
+func interruptCh(ctx context.Context, c client.Client, run client.WorkflowRun, cfg *Config) <-chan any {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-ch
+		signal.Stop(ch)
+		logger.FromContext(ctx).Info("received OS signal, shutting down gracefully", slog.String("signal", sig.String()))
+		if err := c.SignalWorkflow(ctx, run.GetID(), run.GetRunID(), shutdownSignal, sig.String()); err != nil {
+			logger.FatalContext(ctx, "failed to send shutdown signal to dispatcher workflow", err)
+		}
+	}()
+
+	done := make(chan any, 1)
+	cfg.done = done
+	return done
 }

@@ -31,7 +31,7 @@ func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, branch, commi
 		Path:      path,
 	})
 	if err != nil {
-		logger.From(ctx).Error("failed to read Bitbucket source file",
+		logger.From(ctx).Warn("failed to read Bitbucket source file",
 			slog.Any("error", err), slog.String("workspace", workspace), slog.String("repo", repo),
 			slog.String("branch", branch), slog.String("commit", commit), slog.String("path", path))
 		return ""
