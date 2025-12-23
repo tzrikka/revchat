@@ -79,8 +79,11 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// interruptCh returns a native Go channel, so when the process receives a SIGINT or SIGTERM signal from the OS,
-// it signals [EventDispatcherWorkflow] to start a graceful shutdown, and then ends the Temporal worker process.
+// interruptCh starts a goroutine to trap SIGINT or SIGTERM signals from the OS. When such a signal
+// is received, the goroutine sends a Temporal signal to the [EventDispatcherWorkflow] to start a
+// graceful shutdown, and when that is done the workflow signals back to the Temporal worker using
+// a native Go channel to respect the OS signal in order to stop or restart the worker process. This
+// function returns that native Go channel, which is passed to the worker's [worker.Worker.Run] call.
 func interruptCh(ctx context.Context, c client.Client, run client.WorkflowRun, cfg *Config) <-chan any {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -90,11 +93,11 @@ func interruptCh(ctx context.Context, c client.Client, run client.WorkflowRun, c
 		signal.Stop(ch)
 		logger.FromContext(ctx).Info("received OS signal, shutting down gracefully", slog.String("signal", sig.String()))
 		if err := c.SignalWorkflow(ctx, run.GetID(), run.GetRunID(), shutdownSignal, sig.String()); err != nil {
-			logger.FatalContext(ctx, "failed to send shutdown signal to dispatcher workflow", err)
+			logger.FatalContext(ctx, "failed to send shutdown signal to dispatcher workflow, exiting now", err)
 		}
 	}()
 
 	done := make(chan any, 1)
-	cfg.done = done
+	cfg.shutdownDone = done
 	return done
 }
