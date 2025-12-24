@@ -79,11 +79,11 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// interruptCh starts a goroutine to trap SIGINT or SIGTERM signals from the OS. When such a signal
-// is received, the goroutine sends a Temporal signal to the [EventDispatcherWorkflow] to start a
-// graceful shutdown, and when that is done the workflow signals back to the Temporal worker using
-// a native Go channel to respect the OS signal in order to stop or restart the worker process. This
-// function returns that native Go channel, which is passed to the worker's [worker.Worker.Run] call.
+// interruptCh starts a goroutine to trap SIGINT or SIGTERM signals from the OS. When such a
+// signal is received, the goroutine sends a Temporal signal to the [EventDispatcherWorkflow] to
+// start a graceful shutdown, and when that is done the workflow signals back to the Temporal worker
+// using a native Go channel to comply with the OS signal in order to stop or restart the worker process.
+// This function returns that native Go channel, which is passed to the worker's [worker.Worker.Run] call.
 func interruptCh(ctx context.Context, c client.Client, run client.WorkflowRun, cfg *Config) <-chan any {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
