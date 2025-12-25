@@ -11,6 +11,7 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -24,7 +25,7 @@ func MentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg 
 	msg = strings.Replace(msg, "%s", SlackDisplayName(ctx, user), 1)
 
 	// Failures here are already logged, and never a reason to abort the calling workflows.
-	_, _ = slack.PostReply(ctx, channelID, "", msg)
+	_, _ = activities.PostReply(ctx, channelID, "", msg)
 }
 
 func MentionUserInReply(ctx workflow.Context, parentURL string, user Account, msg string) error {
@@ -36,7 +37,7 @@ func MentionUserInReply(ctx workflow.Context, parentURL string, user Account, ms
 	// Don't use fmt.Sprintf() here to avoid issues with % signs in the text.
 	msg = strings.Replace(msg, "%s", SlackDisplayName(ctx, user), 1)
 
-	_, err = slack.PostReply(ctx, ids[0], ids[1], msg)
+	_, err = activities.PostReply(ctx, ids[0], ids[1], msg)
 	return err
 }
 
@@ -147,10 +148,10 @@ func postAsUser(ctx workflow.Context, msg, channelID, threadTS, fileID string, u
 	if fileID != "" {
 		// Don't use fmt.Sprintf() here to avoid issues with % signs in the text.
 		msg = strings.Replace(ImpersonationToMention(msg), "%s", SlackDisplayName(ctx, user), 1)
-		resp, err = slack.PostReply(ctx, channelID, threadTS, msg)
+		resp, err = activities.PostReply(ctx, channelID, threadTS, msg)
 	} else {
 		displayName, icon := impersonateUser(ctx, user)
-		resp, err = slack.PostReplyAsUser(ctx, channelID, threadTS, displayName, icon, msg)
+		resp, err = activities.PostReplyAsUser(ctx, channelID, threadTS, displayName, icon, msg)
 	}
 
 	if err != nil {
@@ -206,7 +207,7 @@ func DeleteMsg(ctx workflow.Context, url string) error {
 		// we still want to attempt to delete the Slack message.
 	}
 
-	return slack.DeleteMessage(ctx, ids[0], ids[len(ids)-1])
+	return activities.DeleteMessage(ctx, ids[0], ids[len(ids)-1])
 }
 
 func EditMsg(ctx workflow.Context, url, msg string) error {
@@ -215,7 +216,7 @@ func EditMsg(ctx workflow.Context, url, msg string) error {
 		return err
 	}
 
-	return slack.UpdateMessage(ctx, ids[0], ids[len(ids)-1], msg)
+	return activities.UpdateMessage(ctx, ids[0], ids[len(ids)-1], msg)
 }
 
 func msgIDsForCommentURL(ctx workflow.Context, url, action string) ([]string, error) {

@@ -13,7 +13,6 @@ import (
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
-	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
@@ -29,7 +28,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	channelID, err := bitbucket.CreateSlackChannel(ctx, pr, maxLen, prefix, private)
 	if err != nil {
 		if userID := users.BitbucketToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
-			_, _ = slack.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
+			_, _ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
 		}
 		return err
 	}
@@ -49,11 +48,11 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	err = activities.InviteUsersToChannel(ctx, channelID, bitbucket.Invitees(ctx, pr))
 	if err != nil {
 		if userID := users.BitbucketToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
-			_, _ = slack.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
+			_, _ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
 		}
 		// Undo channel creation and PR data initialization.
 		_ = activities.ArchiveChannel(ctx, channelID, prURL)
-		data.FullPRCleanup(ctx, channelID, prURL)
+		data.CleanupPRData(ctx, channelID, prURL)
 		return err
 	}
 
@@ -86,18 +85,18 @@ func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequest
 	}
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
 
-	data.FullPRCleanup(ctx, channelID, prURL)
+	data.CleanupPRData(ctx, channelID, prURL)
 
 	if err := activities.ArchiveChannel(ctx, channelID, prURL); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
-		_, _ = slack.PostMessage(ctx, channelID, ":boom: Failed to archive this channel, even though its PR was "+state)
+		_, _ = activities.PostMessage(ctx, channelID, ":boom: Failed to archive this channel, even though its PR was "+state)
 		return err
 	}
 
 	return nil
 }
 
-// PullRequestUpdatedWorkflow reflects various PR updates in the PR's Slack channel
+// PullRequestUpdatedWorkflow mirrors various PR updates in the PR's Slack channel
 // (such as title/description edits, reviewer changes, commit pushes, and branch retargeting):
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Updated.2
 func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
@@ -231,7 +230,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	return err
 }
 
-// PullRequestReviewedWorkflow reflects PR review results in the PR's Slack channel:
+// PullRequestReviewedWorkflow mirrors PR review results in the PR's Slack channel:
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Approved
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Approval-removed
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Changes-Request-created

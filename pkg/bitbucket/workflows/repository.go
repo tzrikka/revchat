@@ -14,18 +14,18 @@ import (
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/xdg"
 )
 
 // CommitCommentCreatedWorkflow (will) handle (in the future) this event:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Commit-comment-created
 func CommitCommentCreatedWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
-	logger.From(ctx).Warn("Bitbucket commit comment created event - not implemented yet")
+	logger.From(ctx).Debug("Bitbucket commit comment created event - not implemented yet")
 	return nil
 }
 
-// CommitStatusWorkflow reflects build/commit status updates in the corresponding PR's Slack channel:
+// CommitStatusWorkflow mirrors build/commit status updates in the corresponding PR's Slack channel:
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-created
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-updated
 func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
@@ -67,11 +67,11 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 
 	desc, _, _ := strings.Cut(cs.Description, "\n")
 	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, desc)
-	_, err = slack.PostMessage(ctx, channelID, msg)
+	_, err = activities.PostMessage(ctx, channelID, msg)
 
 	// If the channel is archived but we still store data for it, clean it up.
 	if err != nil && strings.Contains(err.Error(), "is_archived") {
-		data.FullPRCleanup(ctx, channelID, prURL)
+		data.CleanupPRData(ctx, channelID, prURL)
 		return nil
 	}
 
@@ -91,7 +91,7 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 	}
 
 	logger.From(ctx).Info("Bitbucket PR is ready to be merged", slog.String("pr_url", prURL))
-	_, err = slack.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
+	_, err = activities.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
 	return err
 }
 

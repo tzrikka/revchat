@@ -203,13 +203,13 @@ func TestNormalizeTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := normalizeTime(tt.timeStr, tt.amPm)
+			got, err := NormalizeTime(tt.timeStr, tt.amPm)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("normalizeTime() error: %v, want %v", err, tt.wantErr)
+				t.Errorf("NormalizeTime() error: %v, want %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("normalizeTime() = %q, want %q", got, tt.want)
+				t.Errorf("NormalizeTime() = %q, want %q", got, tt.want)
 			}
 		})
 	}

@@ -20,7 +20,7 @@ import (
 	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/workflows"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/github"
-	"github.com/tzrikka/revchat/pkg/slack"
+	slack "github.com/tzrikka/revchat/pkg/slack/workflows"
 	"github.com/tzrikka/timpani-api/pkg/temporal"
 )
 

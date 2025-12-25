@@ -15,10 +15,10 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-// CommentCreatedWorkflow reflects the creation of a new PR comment in the PR's Slack channel:
+// CommentCreatedWorkflow mirrors the creation of a new PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-created.1
 func CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
-	// If we're not tracking this PR, there's no need/way to announce this event.
+	// If we're not tracking this PR, there's no need/way to mirror this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
 	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, prURL)
 	if !found {
@@ -57,13 +57,13 @@ func CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEve
 	return err
 }
 
-// CommentUpdatedWorkflow reflects edits of an existing PR comment in the PR's Slack channel:
+// CommentUpdatedWorkflow mirrors an edit of an existing PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
 //
 // Note: these events are not reported by Bitbucket if they occur within a 10-minute window since the creation or
 // last update of the same PR comment. RevChat actively polls Bitbucket to detect these events within these windows.
 func CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
-	// If we're not tracking this PR, there's no need/way to announce this event.
+	// If we're not tracking this PR, there's no need/way to mirror this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
 	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, prURL)
 	if !found {
@@ -107,10 +107,10 @@ func CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEve
 	return bitbucket.EditMsg(ctx, bitbucket.HTMLURL(event.Comment.Links), msg)
 }
 
-// CommentDeletedWorkflow reflects the deletion of a PR comment in the PR's Slack channel:
+// CommentDeletedWorkflow mirrors the deletion of a PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-deleted
 func CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
-	// If we're not tracking this PR, there's no need/way to announce this event.
+	// If we're not tracking this PR, there's no need/way to mirror this event.
 	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
 	if !found {
 		return nil
@@ -125,7 +125,7 @@ func CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEve
 	return bitbucket.DeleteMsg(ctx, bitbucket.HTMLURL(event.Comment.Links))
 }
 
-// CommentResolvedWorkflow reflects the resolution of a PR comment in the PR's Slack channel:
+// CommentResolvedWorkflow mirrors the resolution of a PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-resolved
 func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
@@ -141,7 +141,7 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 	return bitbucket.MentionUserInReply(ctx, url, event.Actor, "%s resolved this comment. :ok:")
 }
 
-// CommentReopenedWorkflow reflects the reopening of a resolved PR comment in the PR's Slack channel:
+// CommentReopenedWorkflow mirrors the reopening of a resolved PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-reopened
 func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.

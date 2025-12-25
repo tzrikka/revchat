@@ -1,0 +1,94 @@
+package workflows
+
+import (
+	"fmt"
+	"log/slog"
+	"slices"
+	"strings"
+	"time"
+
+	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
+)
+
+const (
+	dateTimeLayout = time.DateOnly + " " + time.Kitchen
+)
+
+func RemindersWorkflow(ctx workflow.Context) error {
+	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
+
+	prs := slack.LoadPRTurns(ctx)
+	if len(prs) == 0 {
+		return nil
+	}
+
+	reminders, err := data.ListReminders()
+	if err != nil {
+		return err
+	}
+
+	for userID, r := range reminders {
+		now, reminderTime, err := reminderTimes(ctx, startTime, userID, r)
+		if err != nil {
+			continue
+		}
+
+		// Send a reminder to the user if their reminder time matches
+		// the current time, and there are reminders to be sent to them.
+		if userPRs := prs[userID]; reminderTime.Equal(now) && len(userPRs) > 0 {
+			logger.From(ctx).Info("sending scheduled Slack reminder to user",
+				slog.String("user_id", userID), slog.Int("pr_count", len(userPRs)))
+			slices.Sort(userPRs)
+
+			var msg strings.Builder
+			msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
+			for _, url := range userPRs {
+				msg.WriteString(slack.PRDetails(ctx, url, userID))
+			}
+
+			msg.WriteString("\n\n:information_source: Slash command tips:")
+			msg.WriteString("\n  •  `/revchat status` - updated report at any time")
+			msg.WriteString("\n  •  `/revchat reminder <time in 12h/24h format>` - change time or timezone")
+			msg.WriteString("\n  •  `/revchat who` / `[not] my turn` / `[un]freeze` - only in PR channels")
+			msg.WriteString("\n  •  `/revchat explain` - who needs to approve each file, and have they?")
+
+			_, _ = activities.PostMessage(ctx, userID, msg.String())
+		}
+	}
+
+	return nil
+}
+
+func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder string) (parsed, now time.Time, err error) {
+	// Read and parse the daily reminder time for each user.
+	kitchenTime, tz, found := strings.Cut(reminder, " ")
+	if !found {
+		logger.From(ctx).Error("invalid Slack reminder", slog.String("user_id", userID), slog.String("text", reminder))
+		err = fmt.Errorf("invalid Slack reminder for Slack user %q: %q", userID, reminder)
+		return parsed, now, err
+	}
+
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		logger.From(ctx).Error("invalid timezone in Slack reminder", slog.Any("error", err),
+			slog.String("user_id", userID), slog.String("time", reminder), slog.String("tz", tz))
+		return parsed, now, err
+	}
+
+	now = startTime.In(loc)
+	today := now.Format(time.DateOnly)
+	rt := fmt.Sprintf("%s %s", today, kitchenTime)
+	parsed, err = time.ParseInLocation(dateTimeLayout, rt, loc)
+	if err != nil {
+		logger.From(ctx).Error("invalid time in Slack reminder", slog.Any("error", err),
+			slog.String("user_id", userID), slog.String("date_time", rt))
+		return parsed, now, err
+	}
+
+	return parsed, now, err
+}

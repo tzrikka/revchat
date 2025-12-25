@@ -1,4 +1,4 @@
-package slack
+package activities
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 func DeleteMessage(ctx workflow.Context, channelID, timestamp string) error {
 	if err := slack.ChatDelete(ctx, channelID, timestamp); err != nil {
 		logger.From(ctx).Error("failed to delete Slack message", slog.Any("error", err),
-			slog.String("channel_id", channelID), slog.String("timestamp", timestamp))
+			slog.String("channel_id", channelID), slog.String("msg_ts", timestamp))
 		return err
 	}
 	return nil
@@ -55,7 +55,7 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 		// If the channel is archived but we still store data for it, clean it up.
 		if strings.Contains(err.Error(), "is_archived") {
 			url, _ := data.SwitchURLAndID(channelID)
-			data.FullPRCleanup(ctx, channelID, url)
+			data.CleanupPRData(ctx, channelID, url)
 		}
 		logger.From(ctx).Error("failed to post Slack message", slog.Any("error", err),
 			slog.String("channel_id", channelID), slog.String("thread_ts", timestamp))
@@ -68,7 +68,7 @@ func UpdateMessage(ctx workflow.Context, channelID, timestamp, msg string) error
 	req := slack.ChatUpdateRequest{Channel: channelID, TS: timestamp, Text: msg}
 	if err := slack.ChatUpdate(ctx, req); err != nil {
 		logger.From(ctx).Error("failed to update Slack message", slog.Any("error", err),
-			slog.String("channel_id", channelID), slog.String("timestamp", timestamp))
+			slog.String("channel_id", channelID), slog.String("msg_ts", timestamp))
 		return err
 	}
 	return nil

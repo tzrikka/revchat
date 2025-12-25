@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -20,56 +19,7 @@ import (
 	"github.com/tzrikka/xdg"
 )
 
-const (
-	dateTimeLayout = time.DateOnly + " " + time.Kitchen
-)
-
-func remindersWorkflow(ctx workflow.Context) error {
-	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
-
-	prs := loadPRTurns(ctx)
-	if len(prs) == 0 {
-		return nil
-	}
-
-	reminders, err := data.ListReminders()
-	if err != nil {
-		return err
-	}
-
-	for userID, r := range reminders {
-		now, reminderTime, err := reminderTimes(ctx, startTime, userID, r)
-		if err != nil {
-			continue
-		}
-
-		// Send a reminder to the user if their reminder time matches
-		// the current time, and there are reminders to be sent to them.
-		if userPRs := prs[userID]; reminderTime.Equal(now) && len(userPRs) > 0 {
-			logger.From(ctx).Info("sending scheduled Slack reminder to user",
-				slog.String("user_id", userID), slog.Int("pr_count", len(userPRs)))
-			slices.Sort(userPRs)
-
-			var msg strings.Builder
-			msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
-			for _, url := range userPRs {
-				msg.WriteString(prDetails(ctx, url, userID))
-			}
-
-			msg.WriteString("\n\n:information_source: Slash command tips:")
-			msg.WriteString("\n  •  `/revchat status` - updated report at any time")
-			msg.WriteString("\n  •  `/revchat reminder <time in 12h/24h format>` - change time or timezone")
-			msg.WriteString("\n  •  `/revchat who` / `[not] my turn` / `[un]freeze` - only in PR channels")
-			msg.WriteString("\n  •  `/revchat explain` - who needs to approve each file, and have they?")
-
-			_, _ = PostMessage(ctx, userID, msg.String())
-		}
-	}
-
-	return nil
-}
-
-func loadPRTurns(ctx workflow.Context) map[string][]string {
+func LoadPRTurns(ctx workflow.Context) map[string][]string {
 	// Walk through all stored PR states to find which users need to be reminded.
 	root := filepath.Join(xdg.MustDataHome(), config.DirName)
 	slackUserIDs := map[string][]string{}
@@ -121,43 +71,14 @@ func loadPRTurns(ctx workflow.Context) map[string][]string {
 	return prs
 }
 
-func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder string) (parsed, now time.Time, err error) {
-	// Read and parse the daily reminder time for each user.
-	kitchenTime, tz, found := strings.Cut(reminder, " ")
-	if !found {
-		logger.From(ctx).Error("invalid Slack reminder", slog.String("user_id", userID), slog.String("text", reminder))
-		err = fmt.Errorf("invalid Slack reminder for Slack user %q: %q", userID, reminder)
-		return parsed, now, err
-	}
-
-	loc, err := time.LoadLocation(tz)
-	if err != nil {
-		logger.From(ctx).Error("invalid timezone in Slack reminder", slog.Any("error", err),
-			slog.String("user_id", userID), slog.String("time", reminder), slog.String("tz", tz))
-		return parsed, now, err
-	}
-
-	now = startTime.In(loc)
-	today := now.Format(time.DateOnly)
-	rt := fmt.Sprintf("%s %s", today, kitchenTime)
-	parsed, err = time.ParseInLocation(dateTimeLayout, rt, loc)
-	if err != nil {
-		logger.From(ctx).Error("invalid time in Slack reminder", slog.Any("error", err),
-			slog.String("user_id", userID), slog.String("date_time", rt))
-		return parsed, now, err
-	}
-
-	return parsed, now, err
-}
-
-func prDetails(ctx workflow.Context, url, userID string) string {
+func PRDetails(ctx workflow.Context, url, userID string) string {
 	var summary strings.Builder
 
 	// Title.
 	title := fmt.Sprintf("\n\n  •  *<%s>*", url)
 	pr, err := data.LoadBitbucketPR(url)
 	if err != nil {
-		logger.From(ctx).Error("failed to load Bitbucket PR snapshot for reminder",
+		logger.From(ctx).Error("failed to load PR snapshot for reminder",
 			slog.Any("error", err), slog.String("pr_url", url))
 	} else if t, ok := pr["title"].(string); ok && len(t) > 0 {
 		title = fmt.Sprintf("\n\n  •  <%s|*%s*>", url, t)
@@ -212,10 +133,10 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 		return summary.String()
 	}
 
-	workspace, repo, branch, commit := destinationDetails(pr)
+	workspace, repo, branch, commit := DestinationDetails(pr)
 	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, commit, users.SlackIDToRealName(ctx, userID), paths)
 	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, commit, paths)
-	approvals, names := approversForReminder(ctx, pr)
+	approvals, names := approvers(ctx, pr)
 
 	if owner+highRisk+approvals > 0 {
 		summary.WriteString("\n          ◦   ")
@@ -252,7 +173,7 @@ func prDetails(ctx workflow.Context, url, userID string) string {
 	return summary.String()
 }
 
-func approversForReminder(ctx workflow.Context, pr map[string]any) (int, string) {
+func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
 	participants, ok := pr["participants"].([]any)
 	if !ok {
 		return 0, ""

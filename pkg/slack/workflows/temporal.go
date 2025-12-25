@@ -1,4 +1,4 @@
-package slack
+package workflows
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/metrics"
+	"github.com/tzrikka/revchat/pkg/slack/commands"
 )
 
 type Config struct {
@@ -75,17 +76,17 @@ func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
 	c := newConfig(cmd)
 	c.initThrippyLinks(ctx, cmd.String("thrippy-links-template-id"))
 
-	w.RegisterWorkflowWithOptions(c.appRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})
-	w.RegisterWorkflowWithOptions(c.channelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[1]})
-	w.RegisterWorkflowWithOptions(c.channelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[2]})
-	w.RegisterWorkflowWithOptions(c.memberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[3]})
-	w.RegisterWorkflowWithOptions(c.memberLeftWorkflow, workflow.RegisterOptions{Name: Signals[4]})
-	w.RegisterWorkflowWithOptions(c.messageWorkflow, workflow.RegisterOptions{Name: Signals[5]})
-	w.RegisterWorkflowWithOptions(c.reactionAddedWorkflow, workflow.RegisterOptions{Name: Signals[6]})
-	w.RegisterWorkflowWithOptions(c.reactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[7]})
-	w.RegisterWorkflowWithOptions(c.slashCommandWorkflow, workflow.RegisterOptions{Name: Signals[8]})
+	w.RegisterWorkflowWithOptions(AppRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})
+	w.RegisterWorkflowWithOptions(ChannelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[1]})
+	w.RegisterWorkflowWithOptions(ChannelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[2]})
+	w.RegisterWorkflowWithOptions(MemberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[3]})
+	w.RegisterWorkflowWithOptions(MemberLeftWorkflow, workflow.RegisterOptions{Name: Signals[4]})
+	w.RegisterWorkflowWithOptions(c.MessageWorkflow, workflow.RegisterOptions{Name: Signals[5]})
+	w.RegisterWorkflowWithOptions(ReactionAddedWorkflow, workflow.RegisterOptions{Name: Signals[6]})
+	w.RegisterWorkflowWithOptions(ReactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[7]})
+	w.RegisterWorkflowWithOptions(c.SlashCommandWorkflow, workflow.RegisterOptions{Name: Signals[8]})
 
-	w.RegisterWorkflowWithOptions(remindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
+	w.RegisterWorkflowWithOptions(RemindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
 }
 
 // RegisterSignals routes [Signals] to their registered workflows.
@@ -98,7 +99,7 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 	addReceive[messageEventWrapper](ctx, sel, taskQueue, Signals[5])
 	addReceive[reactionEventWrapper](ctx, sel, taskQueue, Signals[6])
 	addReceive[reactionEventWrapper](ctx, sel, taskQueue, Signals[7])
-	addReceive[SlashCommandEvent](ctx, sel, taskQueue, Signals[8])
+	addReceive[commands.SlashCommandEvent](ctx, sel, taskQueue, Signals[8])
 }
 
 func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, signalName string) {
@@ -131,7 +132,7 @@ func DrainSignals(ctx workflow.Context, taskQueue string) bool {
 	totalEvents += receiveAsync[messageEventWrapper](ctx, taskQueue, Signals[5])
 	totalEvents += receiveAsync[reactionEventWrapper](ctx, taskQueue, Signals[6])
 	totalEvents += receiveAsync[reactionEventWrapper](ctx, taskQueue, Signals[7])
-	totalEvents += receiveAsync[SlashCommandEvent](ctx, taskQueue, Signals[8])
+	totalEvents += receiveAsync[commands.SlashCommandEvent](ctx, taskQueue, Signals[8])
 
 	return totalEvents > 0
 }
@@ -160,7 +161,7 @@ func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
 	return signalEvents
 }
 
-// CreateSchedule starts a scheduled workflow that runs every 30 minutes.
+// CreateSchedule starts a scheduled workflow that runs every 30 minutes, to send daily reminders.
 func CreateSchedule(ctx context.Context, c client.Client, cmd *cli.Command) {
 	_, err := c.ScheduleClient().Create(ctx, client.ScheduleOptions{
 		ID: Schedules[0],

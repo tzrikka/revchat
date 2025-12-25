@@ -8,9 +8,9 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 )
 
-// FullPRCleanup deletes all the data associated with a PR. If there are errors,
+// CleanupPRData deletes all the data associated with a PR. If there are errors,
 // they are logged but ignored, as they do not affect the overall need to clean up.
-func FullPRCleanup(ctx workflow.Context, channelID, prURL string) {
+func CleanupPRData(ctx workflow.Context, channelID, prURL string) {
 	if err := LogSlackChannelArchived(channelID, prURL); err != nil {
 		logger.From(ctx).Error("failed to log Slack channel archived", slog.Any("error", err),
 			slog.String("channel_id", channelID), slog.String("pr_url", prURL))

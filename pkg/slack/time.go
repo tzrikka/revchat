@@ -9,9 +9,9 @@ import (
 
 var timePattern = regexp.MustCompile(`^\d{1,2}(:\d{2})?$`)
 
-// normalizeTime takes a time string and an optional am/pm indicator,
+// NormalizeTime takes a time string and an optional am/pm indicator,
 // and returns the time in a standardized format or an error if invalid.
-func normalizeTime(timeStr, amPm string) (string, error) {
+func NormalizeTime(timeStr, amPm string) (string, error) {
 	if !timePattern.MatchString(timeStr) {
 		return "", fmt.Errorf("invalid time format: %s", timeStr)
 	}

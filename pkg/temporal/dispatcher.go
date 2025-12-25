@@ -12,7 +12,7 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/workflows"
 	"github.com/tzrikka/revchat/pkg/github"
-	"github.com/tzrikka/revchat/pkg/slack"
+	slack "github.com/tzrikka/revchat/pkg/slack/workflows"
 )
 
 const (

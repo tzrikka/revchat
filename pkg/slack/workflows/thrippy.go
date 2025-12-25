@@ -1,4 +1,4 @@
-package slack
+package workflows
 
 import (
 	"context"
@@ -17,6 +17,8 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
 	thrippypb "github.com/tzrikka/thrippy-api/thrippy/v1"
 )
 
@@ -29,7 +31,7 @@ const (
 	pollLinkInterval   = 1 * time.Second
 	waitForLinkTimeout = 1 * time.Minute
 
-	ErrLinkAuthzTimeout = "link not authorized yet" // For some reason [errors.Is] doesn't work across Temporal.
+	errLinkAuthzTimeout = "link not authorized yet" // For some reason [errors.Is] doesn't work across Temporal?
 )
 
 type linkData struct {
@@ -143,7 +145,7 @@ func (c *Config) pollThrippyLinkActivity(ctx context.Context, linkID string) err
 	}
 
 	if len(resp.GetCredentials()) == 0 {
-		return errors.New(ErrLinkAuthzTimeout)
+		return errors.New(errLinkAuthzTimeout)
 	}
 
 	return nil
@@ -244,4 +246,23 @@ func newClientTLSFromFile(caPath, serverNameOverride string, certs []tls.Certifi
 	}
 
 	return credentials.NewTLS(cfg), nil
+}
+
+func thrippyLinkID(ctx workflow.Context, userID, channelID string) (string, error) {
+	if len(userID) > 0 && userID[0] == 'B' {
+		return "", nil // Slack bot, not a real user.
+	}
+
+	user, err := data.SelectUserBySlackID(userID)
+	if err != nil {
+		logger.From(ctx).Error("failed to load user by Slack ID", slog.Any("error", err), slog.String("user_id", userID))
+		return "", err
+	}
+
+	if !data.IsOptedIn(user) {
+		msg := ":warning: Cannot mirror this in the PR, you need to run this slash command: `/revchat opt-in`"
+		return "", activities.PostEphemeralMessage(ctx, channelID, userID, msg)
+	}
+
+	return user.ThrippyLink, nil
 }
