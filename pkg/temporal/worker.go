@@ -32,7 +32,7 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	addr := cmd.String("temporal-address")
 	l.Info("Temporal server address: " + addr)
 
-	c, err := client.Dial(client.Options{
+	cli, err := client.Dial(client.Options{
 		HostPort:  addr,
 		Namespace: cmd.String("temporal-namespace"),
 		Logger:    log.NewStructuredLogger(l),
@@ -40,16 +40,16 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to dial Temporal: %w", err)
 	}
-	defer c.Close()
+	defer cli.Close()
 
 	tq := cmd.String("temporal-task-queue-revchat")
-	w := worker.New(c, tq, worker.Options{})
+	w := worker.New(cli, tq, worker.Options{})
 	bitbucket.RegisterPullRequestWorkflows(cmd, w)
 	bitbucket.RegisterRepositoryWorkflows(w)
 	github.RegisterWorkflows(w, cmd)
 	slack.RegisterWorkflows(ctx, w, cmd)
 
-	slack.CreateSchedule(ctx, c, cmd)
+	slack.CreateSchedule(ctx, cli, cmd)
 
 	cfg := &Config{taskQueue: tq}
 	opts := client.StartWorkflowOptions{
@@ -67,12 +67,15 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})
-	workflowRun, err := c.ExecuteWorkflow(ctx, opts, EventDispatcher)
+	run, err := cli.ExecuteWorkflow(ctx, opts, EventDispatcher)
 	if err != nil {
 		return fmt.Errorf("failed to start event dispatcher workflow: %w", err)
 	}
 
-	if err := w.Run(interruptCh(ctx, c, workflowRun, cfg)); err != nil {
+	cfg.dispatcherWorkflowID = run.GetID()
+	cfg.dispatcherRunID = run.GetRunID()
+
+	if err := w.Run(cfg.interruptCh(ctx, cli)); err != nil {
 		return fmt.Errorf("failed to start Temporal worker: %w", err)
 	}
 
@@ -84,7 +87,7 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 // start a graceful shutdown, and when that is done the workflow signals back to the Temporal worker
 // using a native Go channel to comply with the OS signal in order to stop or restart the worker process.
 // This function returns that native Go channel, which is passed to the worker's [worker.Worker.Run] call.
-func interruptCh(ctx context.Context, c client.Client, run client.WorkflowRun, cfg *Config) <-chan any {
+func (c *Config) interruptCh(ctx context.Context, cli client.Client) <-chan any {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
@@ -92,12 +95,13 @@ func interruptCh(ctx context.Context, c client.Client, run client.WorkflowRun, c
 		sig := <-ch
 		signal.Stop(ch)
 		logger.FromContext(ctx).Info("received OS signal, shutting down gracefully", slog.String("signal", sig.String()))
-		if err := c.SignalWorkflow(ctx, run.GetID(), run.GetRunID(), shutdownSignal, sig.String()); err != nil {
+
+		if err := cli.SignalWorkflow(ctx, c.dispatcherWorkflowID, c.dispatcherRunID, shutdownSignal, sig.String()); err != nil {
 			logger.FatalContext(ctx, "failed to send shutdown signal to dispatcher workflow, exiting now", err)
 		}
 	}()
 
 	done := make(chan any, 1)
-	cfg.shutdownDone = done
+	c.shutdownDone = done
 	return done
 }

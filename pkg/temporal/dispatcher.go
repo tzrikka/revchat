@@ -29,6 +29,9 @@ const (
 type Config struct {
 	taskQueue string
 
+	dispatcherWorkflowID string
+	dispatcherRunID      string
+
 	shutdownSignal string
 	shutdownDone   chan<- any
 }
@@ -64,8 +67,12 @@ func (c *Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 	for {
 		selector.Select(ctx) // This is the core of the dispatcher workflow's event loop.
 
+		info := workflow.GetInfo(ctx)
+		c.dispatcherWorkflowID = info.WorkflowExecution.ID
+		c.dispatcherRunID = info.WorkflowExecution.RunID
+
 		// "Lame duck" mode.
-		if info := workflow.GetInfo(ctx); info.GetContinueAsNewSuggested() || c.shutdownSignal != "" {
+		if info.GetContinueAsNewSuggested() || c.shutdownSignal != "" {
 			c.prepareForReset(ctx, info)
 
 			if c.shutdownSignal != "" {
