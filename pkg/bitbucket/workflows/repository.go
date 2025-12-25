@@ -1,4 +1,4 @@
-package bitbucket
+package workflows
 
 import (
 	"fmt"
@@ -11,18 +11,24 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/xdg"
 )
 
-func commitCommentCreatedWorkflow(ctx workflow.Context, event RepositoryEvent) error {
+// CommitCommentCreatedWorkflow (will) handle (in the future) this event:
+// https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Commit-comment-created
+func CommitCommentCreatedWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
 	logger.From(ctx).Warn("Bitbucket commit comment created event - not implemented yet")
 	return nil
 }
 
-func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
+// CommitStatusWorkflow reflects build/commit status updates in the corresponding PR's Slack channel:
+//   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-created
+//   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-updated
+func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
 	// Commit status --> commit hash --> PR snapshot (JSON map) --> [PullRequest] struct.
 	cs := event.CommitStatus
 	m, err := findPRByCommit(ctx, cs.Commit.Hash)
@@ -37,26 +43,26 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 		return nil
 	}
 
-	pr := new(PullRequest)
-	if err := mapToStruct(m, pr); err != nil {
-		logger.From(ctx).Error("invalid Bitbucket PR", slog.Any("error", err), slog.String("pr_url", prURL(m)))
+	pr := new(bitbucket.PullRequest)
+	if err := bitbucket.MapToStruct(m, pr); err != nil {
+		logger.From(ctx).Error("invalid Bitbucket PR", slog.Any("error", err), slog.String("pr_url", urlFromPR(m)))
 		return err
 	}
 
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := lookupChannel(ctx, event.Type, *pr)
+	prURL := bitbucket.HTMLURL(pr.Links)
+	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, prURL)
 	if !found {
 		return nil
 	}
 
-	url := htmlURL(pr.Links)
-	defer updateChannelBuildsBookmark(ctx, channelID, url)
+	defer bitbucket.UpdateChannelBuildsBookmark(ctx, channelID, prURL)
 
 	status := data.CommitStatus{Name: cs.Name, State: cs.State, Desc: cs.Description, URL: cs.URL}
-	if err := data.UpdateBitbucketBuilds(url, cs.Commit.Hash, cs.Key, status); err != nil {
+	if err := data.UpdateBitbucketBuilds(prURL, cs.Commit.Hash, cs.Key, status); err != nil {
 		logger.From(ctx).Error("failed to update Bitbucket build states", slog.Any("error", err),
-			slog.String("pr_url", url), slog.String("commit_hash", cs.Commit.Hash))
-		// Continue anyway.
+			slog.String("pr_url", prURL), slog.String("commit_hash", cs.Commit.Hash))
+		// Don't abort - it's more important to announce this, even if our internal state is stale.
 	}
 
 	desc, _, _ := strings.Cut(cs.Description, "\n")
@@ -65,13 +71,13 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 
 	// If the channel is archived but we still store data for it, clean it up.
 	if err != nil && strings.Contains(err.Error(), "is_archived") {
-		data.FullPRCleanup(ctx, channelID, url)
+		data.FullPRCleanup(ctx, channelID, prURL)
 		return nil
 	}
 
 	// Other than announcing this specific event, also announce if the PR is ready to be merged
 	// (all builds are successful, the PR has at least 2 approvals, and no pending action items).
-	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(url) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
+	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(prURL) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
 		return err
 	}
 	approvers := 0
@@ -84,20 +90,9 @@ func commitStatusWorkflow(ctx workflow.Context, event RepositoryEvent) error {
 		return err
 	}
 
-	logger.From(ctx).Info("Bitbucket PR is ready to be merged", slog.String("pr_url", url))
+	logger.From(ctx).Info("Bitbucket PR is ready to be merged", slog.String("pr_url", prURL))
 	_, err = slack.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
 	return err
-}
-
-func buildStateEmoji(state string) string {
-	switch state {
-	case "INPROGRESS":
-		return ":hourglass_flowing_sand:"
-	case "SUCCESSFUL":
-		return ":large_green_circle:"
-	default: // "FAILED", "STOPPED".
-		return ":red_circle:"
-	}
 }
 
 func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, err error) {
@@ -114,7 +109,7 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 		url := "https://" + strings.TrimSuffix(path, "_snapshot.json")
 		snapshot, err := data.LoadBitbucketPR(url)
 		if err != nil {
-			logger.From(ctx).Error("failed to load Bitbucket PR snapshot for reminder",
+			logger.From(ctx).Error("failed to load Bitbucket PR snapshot",
 				slog.Any("error", err), slog.String("pr_url", url))
 			return nil // Continue walking.
 		}
@@ -123,10 +118,11 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 		if !ok {
 			return nil
 		}
+
 		if strings.HasPrefix(eventHash, prHash) {
 			if pr != nil {
 				logger.From(ctx).Warn("commit hash collision", slog.String("hash", eventHash),
-					slog.String("existing_pr", prURL(pr)), slog.String("new_pr", prURL(snapshot)))
+					slog.String("existing_pr", urlFromPR(pr)), slog.String("new_pr", urlFromPR(snapshot)))
 				return nil // Continue walking.
 			}
 			pr = snapshot
@@ -155,7 +151,7 @@ func prCommitHash(pr map[string]any) (string, bool) {
 	return hash, true
 }
 
-func prURL(pr map[string]any) string {
+func urlFromPR(pr map[string]any) string {
 	links, ok := pr["links"].(map[string]any)
 	if !ok {
 		return ""
@@ -170,6 +166,17 @@ func prURL(pr map[string]any) string {
 	}
 
 	return href
+}
+
+func buildStateEmoji(state string) string {
+	switch state {
+	case "INPROGRESS":
+		return ":hourglass_flowing_sand:"
+	case "SUCCESSFUL":
+		return ":large_green_circle:"
+	default: // "FAILED", "STOPPED".
+		return ":red_circle:"
+	}
 }
 
 func allBuildsSuccessful(url string) bool {

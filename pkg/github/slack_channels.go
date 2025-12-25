@@ -14,6 +14,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -98,12 +99,12 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	}
 
 	// Channel cosmetics.
-	slack.SetChannelTopic(ctx, channelID, url)
-	slack.SetChannelDescription(ctx, channelID, pr.Title, url)
+	activities.SetChannelTopic(ctx, channelID, url)
+	activities.SetChannelDescription(ctx, channelID, pr.Title, url)
 	c.setChannelBookmarks(ctx, channelID, url, pr)
 	c.postIntroMsg(ctx, channelID, event.Action, pr, event.Sender)
 
-	err = slack.InviteUsersToChannel(ctx, channelID, c.prParticipants(ctx, pr))
+	err = activities.InviteUsersToChannel(ctx, channelID, c.prParticipants(ctx, pr))
 	if err != nil {
 		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
 		c.cleanupPRData(ctx, url)
@@ -122,7 +123,7 @@ func (c Config) createChannel(ctx workflow.Context, pr PullRequest) (string, err
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		id, retry, err := slack.CreateChannel(ctx, name, pr.HTMLURL, c.SlackChannelsArePrivate)
+		id, retry, err := activities.CreateChannel(ctx, name, pr.HTMLURL, c.SlackChannelsArePrivate)
 		if err != nil {
 			if retry {
 				continue

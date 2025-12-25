@@ -1,6 +1,8 @@
-package bitbucket
+package workflows
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestPRCommitHash(t *testing.T) {
 	want := "abc123"
@@ -21,7 +23,7 @@ func TestPRCommitHash(t *testing.T) {
 	}
 }
 
-func TestPRURL(t *testing.T) {
+func TestURLFromPR(t *testing.T) {
 	want := "https://bitbucket.org/example/repo/pull-requests/1"
 	prSnapshot := map[string]any{
 		"links": map[string]any{
@@ -31,8 +33,8 @@ func TestPRURL(t *testing.T) {
 		},
 	}
 
-	got := prURL(prSnapshot)
+	got := urlFromPR(prSnapshot)
 	if got != want {
-		t.Errorf("prURL() = %q, want %q", got, want)
+		t.Errorf("urlFromPR() = %q, want %q", got, want)
 	}
 }

@@ -7,7 +7,7 @@ import (
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Pull-request-events
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Common-entities-for-event-payloads
 type PullRequestEvent struct {
-	Type string `json:"type"` // Defined and used internally by us.
+	Type string `json:"type"` // Populated and used only in RevChat.
 
 	PullRequest PullRequest `json:"pullrequest"`
 	Repository  Repository  `json:"repository"`
@@ -20,7 +20,7 @@ type PullRequestEvent struct {
 
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Repository-events
 type RepositoryEvent struct {
-	Type string `json:"type"` // Defined and used internally by us.
+	Type string `json:"type"` // Populated and used only in RevChat.
 
 	Repository Repository `json:"repository"`
 	Actor      Account    `json:"actor"`

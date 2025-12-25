@@ -11,7 +11,7 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
-func Commits(ctx workflow.Context, event PullRequestEvent) []Commit {
+func Diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.Diffstat {
 	workspace, repo, found := strings.Cut(event.Repository.FullName, "/")
 	if !found {
 		logger.From(ctx).Error("failed to parse Bitbucket workspace and repository name",
@@ -19,7 +19,7 @@ func Commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 		return nil
 	}
 
-	cs, err := bitbucket.PullRequestsListCommits(ctx, bitbucket.PullRequestsListCommitsRequest{
+	ds, err := bitbucket.PullRequestsDiffstat(ctx, bitbucket.PullRequestsDiffstatRequest{
 		PullRequestsRequest: bitbucket.PullRequestsRequest{
 			Workspace:     workspace,
 			RepoSlug:      repo,
@@ -27,11 +27,11 @@ func Commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 		},
 	})
 	if err != nil {
-		logger.From(ctx).Error("failed to list Bitbucket PR's commits", slog.Any("error", err),
+		logger.From(ctx).Error("failed to get Bitbucket PR diffstat", slog.Any("error", err),
 			slog.String("pr_url", HTMLURL(event.PullRequest.Links)), slog.String("workspace", workspace),
 			slog.String("repo", repo), slog.Int("pr_id", event.PullRequest.ID))
 		return nil
 	}
 
-	return cs
+	return ds
 }

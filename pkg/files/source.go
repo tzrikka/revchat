@@ -2,14 +2,12 @@ package files
 
 import (
 	"fmt"
-	"log/slog"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/cache"
-	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/timpani-api/pkg/bitbucket"
+	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
 )
 
 // fileCache is a cache for "CODEOWNERS" and "highrisk.txt" files.
@@ -24,16 +22,8 @@ func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, branch, commi
 		return file
 	}
 
-	file, err := bitbucket.SourceGetFile(ctx, bitbucket.SourceGetRequest{
-		Workspace: workspace,
-		RepoSlug:  repo,
-		Commit:    commit,
-		Path:      path,
-	})
+	file, err := activities.GetSourceFile(ctx, workspace, repo, branch, commit, path)
 	if err != nil {
-		logger.From(ctx).Warn("failed to read Bitbucket source file",
-			slog.Any("error", err), slog.String("workspace", workspace), slog.String("repo", repo),
-			slog.String("branch", branch), slog.String("commit", commit), slog.String("path", path))
 		return ""
 	}
 

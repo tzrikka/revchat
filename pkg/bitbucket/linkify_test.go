@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestConfigLinkifyTitle(t *testing.T) {
+func TestLinkifyTitle(t *testing.T) {
 	tests := []struct {
 		name string
 		text string
@@ -43,9 +43,8 @@ func TestConfigLinkifyTitle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := Config{LinkifyMap: tt.cfg}
-			if got := c.linkifyTitle(nil, tt.text); got != tt.want {
-				t.Errorf("linkifyTitle() = %q, want %q", got, tt.want)
+			if got := LinkifyTitle(nil, tt.cfg, tt.text); got != tt.want {
+				t.Errorf("LinkifyTitle() = %q, want %q", got, tt.want)
 			}
 		})
 	}

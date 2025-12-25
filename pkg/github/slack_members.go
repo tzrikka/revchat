@@ -10,7 +10,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/slack"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -59,7 +59,7 @@ func (c Config) addChannelMember(ctx workflow.Context, channelID string, reviewe
 		return nil
 	}
 
-	err := slack.InviteUsersToChannel(ctx, channelID, []string{slackUserID})
+	err := activities.InviteUsersToChannel(ctx, channelID, []string{slackUserID})
 
 	if reviewer.Login == sender.Login {
 		return err // No need to also DM the user if they added themselves.

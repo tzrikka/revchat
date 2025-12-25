@@ -15,9 +15,14 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
-func setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
+const (
+	maxBookmarkTitleLen = 200
+)
+
+func SetChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
 	files := data.ReadBitbucketDiffstatLength(url)
-	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Reviewers (%d)", len(reviewers(pr, false))), url+"/overview", ":eyes:")
+
+	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Reviewers (%d)", len(accountIDs(pr.Reviewers))), url+"/overview", ":eyes:")
 	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview", ":speech_balloon:")
 	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview", ":white_check_mark:")
 	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview", ":+1:")
@@ -26,16 +31,16 @@ func setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullReq
 	_ = slack.BookmarksAdd(ctx, channelID, "Builds: no results", url+"/overview", ":vertical_traffic_light:")
 }
 
-// updateChannelBookmarks updates the PR's Slack channel bookmarks based on the latest PR event. This
-// is a deferred call that doesn't return an error, because handling the event itself is more important.
-func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channelID string, snapshot *PullRequest) {
-	url := htmlURL(event.PullRequest.Links)
+// UpdateChannelBookmarks updates the bookmarks in the PR's Slack channel, based on the latest PR event.
+// This is a deferred call that doesn't return an error, because handling the event itself is more important.
+func UpdateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channelID string, snapshot *PullRequest) {
+	prURL := HTMLURL(event.PullRequest.Links)
 
 	// PR update events already load the previous snapshot, so reuse it in that case.
 	updateCommits := true
 	if snapshot == nil {
 		updateCommits = false
-		snapshot, _ = switchSnapshot(ctx, url, event.PullRequest)
+		snapshot, _ = SwitchSnapshot(ctx, prURL, event.PullRequest)
 		if snapshot == nil {
 			return
 		}
@@ -43,11 +48,11 @@ func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channe
 
 	bookmarks, err := slack.BookmarksList(ctx, channelID)
 	if err != nil {
-		logger.From(ctx).Error("failed to list Slack channel bookmarks", slog.Any("error", err))
+		logger.From(ctx).Error("failed to list Slack channel's bookmarks", slog.Any("error", err))
 		return
 	}
 
-	if cnt := len(reviewers(event.PullRequest, false)); len(bookmarks) > 0 && len(reviewers(*snapshot, false)) != cnt {
+	if cnt := len(accountIDs(event.PullRequest.Reviewers)); len(bookmarks) > 0 && len(accountIDs(snapshot.Reviewers)) != cnt {
 		title := fmt.Sprintf("Reviewers (%d)", cnt)
 		if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[0].ID, title); err != nil {
 			logger.From(ctx).Error("failed to update Slack channel's reviewers bookmark", slog.Any("error", err))
@@ -85,7 +90,7 @@ func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channe
 	}
 
 	if len(bookmarks) > 5 && updateCommits {
-		title := fmt.Sprintf("Files changed (%d)", data.ReadBitbucketDiffstatLength(url))
+		title := fmt.Sprintf("Files changed (%d)", data.ReadBitbucketDiffstatLength(prURL))
 		if title != bookmarks[5].Title {
 			if err := slack.BookmarksEditTitle(ctx, channelID, bookmarks[5].ID, title); err != nil {
 				logger.From(ctx).Error("failed to update Slack channel's files bookmark", slog.Any("error", err))
@@ -94,26 +99,12 @@ func updateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channe
 	}
 }
 
-func countApprovals(pr PullRequest) int {
-	count := 0
-	for _, p := range pr.Participants {
-		if p.Approved {
-			count++
-		}
-	}
-	return count
-}
-
-const (
-	maxBookmarkTitleLen = 200
-)
-
-// updateChannelBuildsBookmark updates the "Builds" bookmark in the PR's Slack channel based on the latest repo
+// UpdateChannelBuildsBookmark updates the "Builds" bookmark in the PR's Slack channel, based on the latest repository
 // event. This is a deferred call that doesn't return an error, because handling the event itself is more important.
-func updateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
+func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 	bookmarks, err := slack.BookmarksList(ctx, channelID)
 	if err != nil {
-		logger.From(ctx).Error("failed to list Slack channel bookmarks", slog.Any("error", err))
+		logger.From(ctx).Error("failed to list Slack channel's bookmarks", slog.Any("error", err))
 		return
 	}
 	if len(bookmarks) < 7 {
@@ -165,4 +156,14 @@ func buildState(state string) string {
 	default: // "FAILED", "STOPPED".
 		return "[X]"
 	}
+}
+
+func countApprovals(pr PullRequest) int {
+	count := 0
+	for _, p := range pr.Participants {
+		if p.Approved {
+			count++
+		}
+	}
+	return count
 }

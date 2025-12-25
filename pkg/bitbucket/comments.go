@@ -3,18 +3,34 @@ package bitbucket
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
+	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
-// beautifyInlineComment adds an informative prefix to the comment's text.
+// LookupSlackFileID returns all the Slack IDs associated with a PR comment, if they exist.
+func LookupSlackFileID(ctx workflow.Context, comment *Comment) (string, bool) {
+	fileID, err := data.SwitchURLAndID(HTMLURL(comment.Links) + "/slack_file_id")
+	if err != nil {
+		logger.From(ctx).Error("failed to retrieve PR comment's Slack file ID",
+			slog.Any("error", err), slog.String("pr_url", HTMLURL(comment.Links)))
+		return "", false
+	}
+
+	return fileID, fileID != ""
+}
+
+// BeautifyInlineComment adds an informative prefix to the comment's text.
 // If the comment contains a suggestion code block, it removes that block
 // and also generates a diff snippet to attach to the Slack message instead.
-func beautifyInlineComment(ctx workflow.Context, event PullRequestEvent, msg, raw string) (string, []byte) {
-	msg = inlineCommentPrefix(htmlURL(event.Comment.Links), event.Comment.Inline) + msg
+func BeautifyInlineComment(ctx workflow.Context, event PullRequestEvent, msg, raw string) (string, []byte) {
+	msg = inlineCommentPrefix(HTMLURL(event.Comment.Links), event.Comment.Inline) + msg
 	msg = strings.TrimSpace(strings.TrimSuffix(msg, "\u200c"))
 
 	suggestion, ok := extractSuggestionBlock(raw)
@@ -97,6 +113,22 @@ func extractSuggestionBlock(raw string) (string, bool) {
 	}
 
 	return strings.TrimSuffix(s[:i], "\n"), true
+}
+
+var diffURLPattern = regexp.MustCompile(`/([^/]+)/([^/]+)/diff/([^?]+)(\?path=(.*))?$`)
+
+func sourceFile(ctx workflow.Context, diffURL, hash string) string {
+	matches := diffURLPattern.FindStringSubmatch(diffURL)
+	if len(matches) < 6 {
+		logger.From(ctx).Error("failed to parse Bitbucket diff URL", slog.String("diff_url", diffURL))
+		return ""
+	}
+
+	file, err := activities.GetSourceFile(ctx, matches[1], matches[2], "", hash, matches[5])
+	if err != nil {
+		return ""
+	}
+	return file
 }
 
 // spliceSuggestion splices the suggestion into the source

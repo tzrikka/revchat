@@ -17,7 +17,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/bitbucket"
+	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/workflows"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/github"
 	"github.com/tzrikka/revchat/pkg/slack"

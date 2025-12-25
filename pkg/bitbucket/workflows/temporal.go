@@ -1,4 +1,4 @@
-package bitbucket
+package workflows
 
 import (
 	"log/slog"
@@ -10,6 +10,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/metrics"
 )
@@ -33,8 +34,8 @@ func newConfig(cmd *cli.Command) *Config {
 }
 
 type (
-	prWorkflowFunc   func(workflow.Context, PullRequestEvent) error
-	repoWorkflowFunc func(workflow.Context, RepositoryEvent) error
+	prWorkflowFunc   func(workflow.Context, bitbucket.PullRequestEvent) error
+	repoWorkflowFunc func(workflow.Context, bitbucket.RepositoryEvent) error
 )
 
 // PullRequestSignals is a list of signal names that RevChat
@@ -79,20 +80,20 @@ var RepositorySignals = []string{
 func RegisterPullRequestWorkflows(cmd *cli.Command, w worker.Worker) {
 	c := newConfig(cmd)
 	funcs := []prWorkflowFunc{
-		c.prCreatedWorkflow,
-		c.prUpdatedWorkflow,
-		prReviewedWorkflow, // Approved.
-		prReviewedWorkflow, // Unapproved.
-		prReviewedWorkflow, // Changes requested.
-		prReviewedWorkflow, // Changes request removed.
-		prClosedWorkflow,   // Fulfilled, a.k.a. merged.
-		prClosedWorkflow,   // Rejected, a.k.a. declined.
+		c.PullRequestCreatedWorkflow,
+		c.PullRequestUpdatedWorkflow,
+		PullRequestReviewedWorkflow, // Approved.
+		PullRequestReviewedWorkflow, // Unapproved.
+		PullRequestReviewedWorkflow, // Changes requested.
+		PullRequestReviewedWorkflow, // Changes request removed.
+		PullRequestClosedWorkflow,   // Fulfilled, a.k.a. merged.
+		PullRequestClosedWorkflow,   // Rejected, a.k.a. declined.
 
-		prCommentCreatedWorkflow,
-		prCommentUpdatedWorkflow,
-		prCommentDeletedWorkflow,
-		prCommentResolvedWorkflow,
-		prCommentReopenedWorkflow,
+		CommentCreatedWorkflow,
+		CommentUpdatedWorkflow,
+		CommentDeletedWorkflow,
+		CommentResolvedWorkflow,
+		CommentReopenedWorkflow,
 	}
 	for i, f := range funcs {
 		w.RegisterWorkflowWithOptions(f, workflow.RegisterOptions{Name: PullRequestSignals[i]})
@@ -102,10 +103,10 @@ func RegisterPullRequestWorkflows(cmd *cli.Command, w worker.Worker) {
 // RegisterRepositoryWorkflows maps event-handling workflow functions to [RepositorySignals].
 func RegisterRepositoryWorkflows(w worker.Worker) {
 	funcs := []repoWorkflowFunc{
-		commitCommentCreatedWorkflow,
+		CommitCommentCreatedWorkflow,
 
-		commitStatusWorkflow,
-		commitStatusWorkflow,
+		CommitStatusWorkflow,
+		CommitStatusWorkflow,
 	}
 	for i, f := range funcs {
 		w.RegisterWorkflowWithOptions(f, workflow.RegisterOptions{Name: RepositorySignals[i]})
@@ -116,7 +117,7 @@ func RegisterRepositoryWorkflows(w worker.Worker) {
 func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
 	for _, signalName := range PullRequestSignals {
 		sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
-			payload := new(PullRequestEvent)
+			payload := new(bitbucket.PullRequestEvent)
 			ch.Receive(ctx, payload)
 
 			signal := ch.Name()
@@ -147,7 +148,7 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
 	for _, signalName := range RepositorySignals {
 		sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
-			payload := new(RepositoryEvent)
+			payload := new(bitbucket.RepositoryEvent)
 			ch.Receive(ctx, payload)
 
 			signal := ch.Name()
@@ -174,7 +175,7 @@ func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) bool {
 		ch := workflow.GetSignalChannel(ctx, signal)
 		signalEvents := 0
 		for {
-			payload := new(PullRequestEvent)
+			payload := new(bitbucket.PullRequestEvent)
 			if !ch.ReceiveAsync(payload) {
 				break
 			}
@@ -206,7 +207,7 @@ func DrainRepositorySignals(ctx workflow.Context, taskQueue string) bool {
 		ch := workflow.GetSignalChannel(ctx, signal)
 		signalEvents := 0
 		for {
-			payload := new(RepositoryEvent)
+			payload := new(bitbucket.RepositoryEvent)
 			if !ch.ReceiveAsync(payload) {
 				break
 			}
