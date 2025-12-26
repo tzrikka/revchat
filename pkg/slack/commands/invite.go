@@ -28,7 +28,7 @@ func Invite(ctx workflow.Context, event SlashCommandEvent) error {
 		}
 
 		msg := ":wave: <@%s> is inviting you to use RevChat. Please run this slash command:\n\n```%s opt-in```"
-		if _, err := activities.PostMessage(ctx, userID, fmt.Sprintf(msg, event.UserID, event.Command)); err != nil {
+		if err := activities.PostMessage(ctx, userID, fmt.Sprintf(msg, event.UserID, event.Command)); err != nil {
 			PostEphemeralError(ctx, event, fmt.Sprintf("failed to send an invite to <@%s>.", userID))
 			continue
 		}

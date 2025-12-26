@@ -57,7 +57,7 @@ func RemindersWorkflow(ctx workflow.Context) error {
 			msg.WriteString("\n  •  `/revchat who` / `[not] my turn` / `[un]freeze` - only in PR channels")
 			msg.WriteString("\n  •  `/revchat explain` - who needs to approve each file, and have they?")
 
-			_, _ = activities.PostMessage(ctx, userID, msg.String())
+			_ = activities.PostMessage(ctx, userID, msg.String())
 		}
 	}
 

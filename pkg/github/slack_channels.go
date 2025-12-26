@@ -45,7 +45,7 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 	if err := tslack.ConversationsArchive(ctx, channelID); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
 		msg := "Failed to archive this channel, even though its PR was " + state
-		_, _ = activities.PostMessage(ctx, channelID, msg)
+		_ = activities.PostMessage(ctx, channelID, msg)
 
 		return err
 	}
@@ -147,7 +147,7 @@ func (c Config) reportCreationErrorToAuthor(ctx workflow.Context, username, url 
 		return
 	}
 
-	_, _ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+url)
+	_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+url)
 }
 
 func (c Config) setChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {

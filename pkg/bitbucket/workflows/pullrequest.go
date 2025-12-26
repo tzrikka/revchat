@@ -28,7 +28,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	channelID, err := bitbucket.CreateSlackChannel(ctx, pr, maxLen, prefix, private)
 	if err != nil {
 		if userID := users.BitbucketToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
-			_, _ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
+			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
 		}
 		return err
 	}
@@ -48,7 +48,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	err = activities.InviteUsersToChannel(ctx, channelID, bitbucket.Invitees(ctx, pr))
 	if err != nil {
 		if userID := users.BitbucketToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
-			_, _ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
+			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
 		}
 		// Undo channel creation and PR data initialization.
 		_ = activities.ArchiveChannel(ctx, channelID, prURL)
@@ -89,7 +89,7 @@ func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequest
 
 	if err := activities.ArchiveChannel(ctx, channelID, prURL); err != nil {
 		state = strings.Replace(state, " this PR", "", 1)
-		_, _ = activities.PostMessage(ctx, channelID, ":boom: Failed to archive this channel, even though its PR was "+state)
+		_ = activities.PostMessage(ctx, channelID, ":boom: Failed to archive this channel, even though its PR was "+state)
 		return err
 	}
 

@@ -32,11 +32,10 @@ func MemberJoinedWorkflow(ctx workflow.Context, event memberEventWrapper) error 
 	}
 
 	// If not, send them an ephemeral message explaining how to opt-in.
-	msg := ":wave: Hi <@%s>! You have joined a RevChat channel, but you have to opt-in for this to work! Please run "
-	_, err = activities.PostMessage(ctx, e.User, fmt.Sprintf(msg, e.User)+"this slash command:\n\n```/revchat opt-in```")
 	logger.From(ctx).Warn("user joined Slack channel but is not opted-in",
 		slog.String("user_id", e.User), slog.String("channel_id", e.Channel))
-	return err
+	msg := ":wave: Hi <@%s>! You have joined a RevChat channel, but you have to opt-in for this to work! Please run "
+	return activities.PostMessage(ctx, e.User, fmt.Sprintf(msg, e.User)+"this slash command:\n\n```/revchat opt-in```")
 }
 
 // MemberLeftWorkflow is (or rather will be) based on:

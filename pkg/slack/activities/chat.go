@@ -25,7 +25,7 @@ func PostEphemeralMessage(ctx workflow.Context, channelID, userID, msg string) e
 	req := slack.ChatPostEphemeralRequest{Channel: channelID, User: userID, Text: msg}
 	if err := slack.ChatPostEphemeral(ctx, req); err != nil {
 		if e := err.Error(); strings.Contains(e, "channel_not_found") || strings.Contains(e, "not_in_channel") {
-			_, err = PostMessage(ctx, userID, fmt.Sprintf("Couldn't send you this message in <#%s>:\n\n%s", channelID, msg))
+			err = PostMessage(ctx, userID, fmt.Sprintf("Couldn't send you this message in <#%s>:\n\n%s", channelID, msg))
 		} else {
 			logger.From(ctx).Error("failed to post Slack ephemeral message", slog.Any("error", err),
 				slog.String("channel_id", channelID), slog.String("user_id", userID))
@@ -35,8 +35,9 @@ func PostEphemeralMessage(ctx workflow.Context, channelID, userID, msg string) e
 	return nil
 }
 
-func PostMessage(ctx workflow.Context, channelID, msg string) (*slack.ChatPostMessageResponse, error) {
-	return PostReplyAsUser(ctx, channelID, "", "", "", msg)
+func PostMessage(ctx workflow.Context, channelID, msg string) error {
+	_, err := PostReplyAsUser(ctx, channelID, "", "", "", msg)
+	return err
 }
 
 func PostReply(ctx workflow.Context, channelID, timestamp, msg string) (*slack.ChatPostMessageResponse, error) {

@@ -31,7 +31,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent) error {
 		}
 
 		msg := ":pleading_face: <@%s> is asking you to review <#%s> :pray:"
-		if _, err := activities.PostMessage(ctx, userID, fmt.Sprintf(msg, event.UserID, event.ChannelID)); err != nil {
+		if err := activities.PostMessage(ctx, userID, fmt.Sprintf(msg, event.UserID, event.ChannelID)); err != nil {
 			PostEphemeralError(ctx, event, fmt.Sprintf("failed to send a nudge to <@%s>.", userID))
 			continue
 		}

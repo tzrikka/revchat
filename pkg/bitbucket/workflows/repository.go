@@ -67,7 +67,7 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 
 	desc, _, _ := strings.Cut(cs.Description, "\n")
 	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, desc)
-	_, err = activities.PostMessage(ctx, channelID, msg)
+	err = activities.PostMessage(ctx, channelID, msg)
 
 	// If the channel is archived but we still store data for it, clean it up.
 	if err != nil && strings.Contains(err.Error(), "is_archived") {
@@ -91,8 +91,7 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 	}
 
 	logger.From(ctx).Info("Bitbucket PR is ready to be merged", slog.String("pr_url", prURL))
-	_, err = activities.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
-	return err
+	return activities.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
 }
 
 func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, err error) {
