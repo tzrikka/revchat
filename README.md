@@ -5,9 +5,9 @@
 
 RevChat creates a seamless integration between Source Code Management platforms (such as GitHub, GitLab, and Bitbucket) and Instant Messaging platforms (such as Slack and Discord) to streamline code reviews and reduce the time to merge.
 
-It automatically manages a dedicated channel for each pull/merge request, mirrors discussions and events between platforms, and nudges the relevant participants to responded to the latest updates.
+It automatically manages a dedicated channel for each pull/merge request, mirrors discussions and events between platforms, and nudges the relevant participants to respond to the latest updates.
 
-It is a free, secure, and open-source solution that provides:
+It is a free, secure, self-hosted, open-source solution that provides:
 
 - Real-time, relevant, informative, 2-way updates and discussions
 - Easier collaboration and faster execution for teams of any size
@@ -17,6 +17,98 @@ No more:
 - Delays due to unnoticed comments and asynchronous state changes
 - Notification fatigue due to a firehose of details without context
 - Questions like "Whose turn is it?" or "When should I look at this again?"
+
+## Start Using It
+
+First-time user opt-in:
+
+1. Slack left panel > Apps > right-click on `⋮` > Manage > Browse apps
+2. Find the "RevChat" app > select it > click its "Open App" button
+3. Run this slash command in the app's messages tab: `/revchat opt-in`
+4. Optional: `/revchat reminders at <time in 12h or 24h format>`\
+   (the default is 8:00 AM on weekdays, using your timezone)
+
+## Channel Creation
+
+Channel creation:
+
+1. Name: `_pr-id_normalized-title`
+2. RevChat can be configured to use either public or private channels
+3. Full title (with configurable hyperlink IDs, e.g. to reference bugs that the PR fixes)
+4. The PR's conventional URL
+5. Full description (with markdown support)
+6. Real-time synchronization of PR reviewers and channel members
+
+_(Screenshot)_
+
+Note: only opted-in RevChat users are added to the Slack channels.
+
+## Channel Organization
+
+Because all channels have the prefix `_pr`, Slack automatically groups them together, at the top of the "Channels" section:
+
+_(Screenshot)_
+
+## Channel Bookmarks
+
+Each channel also has a variety of auto-updated PR metadata links.
+
+Bitbucket example:
+
+_(Screenshot)_
+
+GitHub example:
+
+_(Screenshot)_
+
+## 2-Way Sync
+
+Example of automatic reactions in the channel to PR events:
+
+1. Synchronization of un/approvals + build/check status updates
+2. Merge readiness announcement (only in Slack), to get the attention of authors/mergers and late reviewers
+3. Auto archiving of closed PRs
+
+_(Screenshot)_
+
+Example of seamless 2-way synchronization of PR comments and Slack message threads:
+
+1. New message in Slack → create automatically in the PR on behalf of the user
+2. Comments and responses in the PR are posted (in the relevant thread) in Slack
+
+_(Screenshot)_
+
+Message from Slack:
+
+_(Screenshot)_
+
+Response in the PR:
+
+_(Screenshot)_
+
+Slack again:
+
+_(Screenshot)_
+
+Note 1: when synchronizing events between the PR and Slack, RevChat converts automatically IDs (e.g. users, bots, message threads) and markdown formats between the systems.
+
+Note 2: when RevChat posts a user-triggered update in Slack (e.g. "@user edited the PR description") it uses a user profile link that **looks like** a user mention (clicking it shows the user's profile), but when a **user** mentions another user in a message or an action, RevChat uses an **actual** user mention. **This way Slack grabs the attention of users when others mention them, but not when it echoes their own actions.**
+
+Example: the user on the left is a clickable Slack profile link, and the user on the right is a real Slack user mention.
+
+_(Screenshot)_
+
+Commit pushes, build/check results, file comments, and inline comments include deep links - so when you see them in Slack you can jump directly into the right place in the PR's web UI to see the context and respond there.
+
+_(2 screenshots)_
+
+Example of a resolved inline comment:
+
+_(Screenshot)_
+
+Lastly, code suggestions have extra styling in Slack:
+
+_(Screenshot)_
 
 ## Daily Reminders
 
@@ -30,6 +122,10 @@ Reminders reflect the status and urgency of PRs:
 - Count of the files that the reminded user owns
 
 Which PRs are listed? Not necessarily all of them! RevChat tries to guess which PRs require your attention. For more details, see the section [Whose Turn Is It Anyway?](#whose-turn-is-it-anyway) below.
+
+Example:
+
+_(Screenshot)_
 
 ## Slash Commands
 
@@ -58,9 +154,9 @@ The `status` command has the same output as daily reminders (see above), but use
 
 The `explain` command analyzes the current code ownership and approvals in a PR channel:
 
-(TODO: screenshot/s)
+_(Screenshot)_
 
-The `clean` command removes all unnecessary reviewers from a PR: those who do not own any files, were not added manually, and did not already approve the PR.
+The `clean` command removes all unnecessary reviewers from a PR: those who do not own any files and did not already approve the PR.
 
 ## Whose Turn Is It Anyway?
 
