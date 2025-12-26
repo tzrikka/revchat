@@ -191,6 +191,9 @@ func slackToBitbucketReferences(ctx workflow.Context, bitbucketWorkspace, text s
 		text = strings.ReplaceAll(text, slackRef, bbRef)
 	}
 
+	// Group mentions: "<!subteam^S123|@name>" --> "@name".
+	text = regexp.MustCompile(`<!subteam\^[A-Z0-9]+\|([^>]+)>`).ReplaceAllString(text, "${1}")
+
 	// Special mentions: "<!...>" --> "@...".
 	text = strings.ReplaceAll(text, "<!here>", "@here")
 	text = strings.ReplaceAll(text, "<!channel>", "@channel")
