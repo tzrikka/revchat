@@ -10,7 +10,6 @@ import (
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
-	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
@@ -74,7 +73,7 @@ func CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEve
 
 	// If the comment previously had an attached diff file, delete it - it's obsolete now.
 	if fileID, found := bitbucket.LookupSlackFileID(ctx, event.Comment); found {
-		slack.DeleteFile(ctx, fileID)
+		activities.DeleteFile(ctx, fileID)
 	}
 
 	msg := markdown.BitbucketToSlack(ctx, event.Comment.Content.Raw, prURL)
@@ -119,7 +118,7 @@ func CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEve
 	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
 
 	if fileID, found := bitbucket.LookupSlackFileID(ctx, event.Comment); found {
-		slack.DeleteFile(ctx, fileID)
+		activities.DeleteFile(ctx, fileID)
 	}
 
 	return bitbucket.DeleteMsg(ctx, bitbucket.HTMLURL(event.Comment.Links))

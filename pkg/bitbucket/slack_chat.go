@@ -10,7 +10,6 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
@@ -121,7 +120,7 @@ func uploadDiff(ctx workflow.Context, diff []byte, url, msg string) (string, str
 	filename := parts[len(parts)-1] + ".diff"
 	title := "Diff " + parts[len(parts)-1]
 
-	file, err := slack.Upload(ctx, diff, filename, title, "diff", "text/x-diff", "", "")
+	file, err := activities.Upload(ctx, diff, filename, title, "diff", "text/x-diff", "", "")
 	if err != nil || file == nil {
 		return msg, "" // File upload failed, return the original message unmodified.
 	}
