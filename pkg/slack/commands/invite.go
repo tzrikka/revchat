@@ -2,8 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -12,24 +10,20 @@ import (
 )
 
 func Invite(ctx workflow.Context, event SlashCommandEvent) error {
-	users := extractAtLeastOneUserID(ctx, event, userIDsPattern)
+	users := extractAtLeastOneUserID(ctx, event)
 	if len(users) == 0 {
-		return nil // Not a server error as far as we're concerned.
+		return nil
 	}
 
-	sent := make(map[string]bool, len(users))
+	done := make([]string, 0, len(users))
 	for _, userID := range users {
-		// Avoid duplicate invitations, and check that the user isn't already opted-in.
-		if sent[userID] {
+		_, optedIn, err := UserDetails(ctx, event, userID)
+		if err != nil {
 			continue
 		}
-
-		_, optedIn, err := UserDetails(ctx, event, userID)
 		if optedIn {
 			msg := fmt.Sprintf(":bell: <@%s> is already opted-in.", userID)
 			_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
-		}
-		if err != nil || optedIn {
 			continue
 		}
 
@@ -38,16 +32,18 @@ func Invite(ctx workflow.Context, event SlashCommandEvent) error {
 			PostEphemeralError(ctx, event, fmt.Sprintf("failed to send an invite to <@%s>.", userID))
 			continue
 		}
-		sent[userID] = true
+
+		done = append(done, userID)
 	}
 
-	if len(sent) == 0 {
+	if len(done) == 0 {
 		return nil
 	}
+
 	msg := "Sent invite"
-	if len(sent) > 1 {
+	if len(done) > 1 {
 		msg += "s"
 	}
-	msg = fmt.Sprintf("%s to: <@%s>", msg, strings.Join(slices.Sorted(maps.Keys(sent)), ">, <@"))
+	msg = fmt.Sprintf("%s to: <@%s>.", msg, strings.Join(done, ">, <@"))
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }

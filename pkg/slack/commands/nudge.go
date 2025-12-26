@@ -3,8 +3,6 @@ package commands
 import (
 	"fmt"
 	"log/slog"
-	"maps"
-	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -20,15 +18,15 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	users := extractAtLeastOneUserID(ctx, event, userIDsPattern)
+	users := extractAtLeastOneUserID(ctx, event)
 	if len(users) == 0 {
-		return nil // Not a server error as far as we're concerned.
+		return nil
 	}
 
-	sent := make(map[string]bool, len(users))
+	done := make([]string, 0, len(users))
 	for _, userID := range users {
 		// Avoid duplicate nudges, and check that the user is eligible to be nudged.
-		if sent[userID] || !checkUserBeforeNudging(ctx, event, url[0], userID) {
+		if !checkUserBeforeNudging(ctx, event, url[0], userID) {
 			continue
 		}
 
@@ -37,17 +35,20 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent) error {
 			PostEphemeralError(ctx, event, fmt.Sprintf("failed to send a nudge to <@%s>.", userID))
 			continue
 		}
-		sent[userID] = true
+
+		done = append(done, userID)
 	}
 
-	if len(sent) == 0 {
+	if len(done) == 0 {
 		return nil
 	}
-	msg := "Sent nudge"
-	if len(sent) > 1 {
+
+	parts := strings.SplitN(event.Text, " ", 2)
+	msg := "Sent " + parts[0] // "Nudge", "ping", or "poke".
+	if len(done) > 1 {
 		msg += "s"
 	}
-	msg = fmt.Sprintf("%s to: <@%s>", msg, strings.Join(slices.Sorted(maps.Keys(sent)), ">, <@"))
+	msg = fmt.Sprintf("%s to: <@%s>.", msg, strings.Join(done, ">, <@"))
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
@@ -58,7 +59,7 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 		return false
 	}
 	if !optedIn {
-		msg := fmt.Sprintf(":no_bell: <@%s> is not opted-in to use RevChat.", userID)
+		msg := fmt.Sprintf(":no_bell: <@%s> isn't opted-in to use RevChat.", userID)
 		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 		return false
 	}
@@ -74,5 +75,6 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 		msg := fmt.Sprintf(":no_good: <@%s> is not a tracked reviewer of this PR.", userID)
 		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
+
 	return ok
 }

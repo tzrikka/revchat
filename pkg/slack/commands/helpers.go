@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -11,43 +12,41 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
+	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 var (
 	bitbucketURLPattern = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
-	userIDsPattern      = regexp.MustCompile(`<(@)(\w+)(\|[^>]*)?>`)
 	userOrTeamIDPattern = regexp.MustCompile(`<(@|!subteam\^)(\w+)(\|[^>]*)?>`)
 )
 
-func expandSubteams(_ workflow.Context, ids []string) []string {
-	if len(ids) == 0 {
-		return nil
-	}
-
-	expanded := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if !strings.HasPrefix(id, "S") {
-			expanded = append(expanded, id)
-			continue
-		}
-	}
-
-	return expanded
-}
-
-func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent, pattern *regexp.Regexp) []string {
-	matches := pattern.FindAllStringSubmatch(event.Text, -1)
+// extractAtLeastOneUserID extracts at least one user or group ID from the slash command text.
+// Groups are expanded into their member IDs. If no IDs are found, a message is sent to the user.
+func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent) []string {
+	matches := userOrTeamIDPattern.FindAllStringSubmatch(event.Text, -1)
 	if len(matches) == 0 {
-		PostEphemeralError(ctx, event, "you need to mention at least one `@user`.")
+		PostEphemeralError(ctx, event, "you need to mention at least one `@user` or `@group`.")
 		return nil
 	}
 
 	var ids []string
 	for _, match := range matches {
-		ids = append(ids, strings.ToUpper(match[2]))
+		if match[1] == "@" {
+			ids = append(ids, strings.ToUpper(match[2]))
+			continue
+		}
+		members, err := slack.UserGroupsUsersList(ctx, strings.ToUpper(match[2]), false)
+		if err != nil {
+			logger.From(ctx).Error("failed to expand Slack user group",
+				slog.Any("error", err), slog.String("subteam_id", match[2]))
+			PostEphemeralError(ctx, event, fmt.Sprintf("failed to expand the user group `<!subteam^%s>`.", match[2]))
+			continue
+		}
+		ids = append(ids, members...)
 	}
 
-	return ids
+	slices.Sort(ids)
+	return slices.Compact(ids)
 }
 
 func PostEphemeralError(ctx workflow.Context, event SlashCommandEvent, msg string) {
@@ -74,7 +73,7 @@ func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) []strin
 
 	match := bitbucketURLPattern.FindStringSubmatch(url)
 	if len(match) != 4 {
-		logger.From(ctx).Error("failed to parse Bitbucket PR URL", slog.String("pr_url", url))
+		logger.From(ctx).Error("failed to parse PR URL", slog.String("pr_url", url))
 		PostEphemeralError(ctx, event, "this command can only be used inside RevChat channels.")
 		return nil
 	}

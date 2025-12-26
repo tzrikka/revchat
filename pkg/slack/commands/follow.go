@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -22,14 +23,19 @@ func Follow(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	users := extractAtLeastOneUserID(ctx, event, userOrTeamIDPattern)
-	for _, userID := range expandSubteams(ctx, users) {
+	users := extractAtLeastOneUserID(ctx, event)
+	if len(users) == 0 {
+		return nil
+	}
+
+	done := make([]string, 0, len(users))
+	for _, userID := range users {
 		_, optedIn, err := UserDetails(ctx, event, userID)
 		if err != nil {
 			continue
 		}
 		if !optedIn {
-			PostEphemeralError(ctx, event, fmt.Sprintf("<@%s> isn't opted-in yet.", userID))
+			PostEphemeralError(ctx, event, fmt.Sprintf(":no_bell: <@%s> isn't opted-in to use RevChat.", userID))
 			continue
 		}
 
@@ -40,11 +46,15 @@ func Follow(ctx workflow.Context, event SlashCommandEvent) error {
 			continue
 		}
 
-		msg := fmt.Sprintf("You will now be added to channels for PRs authored by <@%s>.", userID)
-		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+		done = append(done, userID)
 	}
 
-	return nil
+	if len(done) == 0 {
+		return nil
+	}
+
+	msg := fmt.Sprintf("You will now be added to channels for PRs authored by: <@%s>.", strings.Join(done, ">, <@"))
+	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
 func Unfollow(ctx workflow.Context, event SlashCommandEvent) error {
@@ -58,14 +68,19 @@ func Unfollow(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	users := extractAtLeastOneUserID(ctx, event, userOrTeamIDPattern)
-	for _, userID := range expandSubteams(ctx, users) {
+	users := extractAtLeastOneUserID(ctx, event)
+	if len(users) == 0 {
+		return nil
+	}
+
+	done := make([]string, 0, len(users))
+	for _, userID := range users {
 		_, optedIn, err := UserDetails(ctx, event, userID)
 		if err != nil {
 			continue
 		}
 		if !optedIn {
-			PostEphemeralError(ctx, event, fmt.Sprintf("<@%s> isn't opted-in yet.", userID))
+			PostEphemeralError(ctx, event, fmt.Sprintf(":no_bell: <@%s> isn't opted-in to use RevChat.", userID))
 			continue
 		}
 
@@ -76,9 +91,13 @@ func Unfollow(ctx workflow.Context, event SlashCommandEvent) error {
 			continue
 		}
 
-		msg := fmt.Sprintf("You will no longer be added to channels for PRs authored by <@%s>.", userID)
-		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+		done = append(done, userID)
 	}
 
-	return nil
+	if len(done) == 0 {
+		return nil
+	}
+
+	msg := fmt.Sprintf("You will no longer be added to channels for PRs authored by: <@%s>.", strings.Join(done, ">, <@"))
+	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
