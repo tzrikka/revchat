@@ -120,12 +120,23 @@ var nudgeImageFiles = []string{
 	"workaholics.gif",
 }
 
+// imageURL selects a random nudge image and returns its full URL.
+// This function uses [workflow.SideEffect] to enforce determinism.
 func imageURL(ctx workflow.Context, httpServer string) string {
-	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(nudgeImageFiles))))
-	if err != nil {
-		logger.From(ctx).Error("crypto.rand.Int() failed", slog.Any("error", err))
+	encoded := workflow.SideEffect(ctx, func(ctx workflow.Context) interface{} {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(nudgeImageFiles))))
+		if err != nil {
+			logger.From(ctx).Error("crypto.rand.Int() failed", slog.Any("error", err))
+			return ""
+		}
+		// https://github.com/tzrikka/timpani/blob/main/pkg/http/webhooks/server.go
+		return fmt.Sprintf("https://%s/nudge/%s", httpServer, nudgeImageFiles[n.Int64()])
+	})
+
+	var url string
+	if err := encoded.Get(&url); err != nil {
+		logger.From(ctx).Error("failed to get side effect result", slog.Any("error", err))
 		return ""
 	}
-	// https://github.com/tzrikka/timpani/blob/main/pkg/http/webhooks/server.go
-	return fmt.Sprintf("https://%s/nudge/%s", httpServer, nudgeImageFiles[n.Int64()])
+	return url
 }
