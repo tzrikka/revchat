@@ -9,6 +9,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -48,7 +49,7 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 	resp, err := slack.ChatPostMessage(ctx, slack.ChatPostMessageRequest{
 		Channel:  channelID,
 		ThreadTS: timestamp,
-		Username: name,
+		Username: strings.TrimPrefix(name, "@"),
 		IconURL:  icon,
 		Text:     msg,
 	})
@@ -65,13 +66,16 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 	return resp, nil
 }
 
-func PostMessageWithImage(ctx workflow.Context, channelID, msg, url, altText string) error {
-	if url == "" {
-		return PostMessage(ctx, channelID, msg)
+func PostDMWithImage(ctx workflow.Context, userID, msg, imageURL, altText string) error {
+	if imageURL == "" {
+		_, err := PostReplyAsUser(ctx, userID, "", users.SlackIDToDisplayName(ctx, userID), users.SlackIDToIcon(ctx, userID), msg)
+		return err
 	}
 
 	_, err := slack.ChatPostMessage(ctx, slack.ChatPostMessageRequest{
-		Channel: channelID,
+		Channel:  userID,
+		Username: strings.TrimPrefix(users.SlackIDToDisplayName(ctx, userID), "@"),
+		IconURL:  users.SlackIDToIcon(ctx, userID),
 		Blocks: []map[string]any{
 			{
 				"type": "section",
@@ -82,14 +86,14 @@ func PostMessageWithImage(ctx workflow.Context, channelID, msg, url, altText str
 			},
 			{
 				"type":      "image",
-				"image_url": url,
+				"image_url": imageURL,
 				"alt_text":  altText,
 			},
 		},
 	})
 	if err != nil {
-		logger.From(ctx).Error("failed to post Slack message with image",
-			slog.Any("error", err), slog.String("channel_id", channelID))
+		logger.From(ctx).Error("failed to post Slack DM with image", slog.Any("error", err),
+			slog.String("user_id", userID), slog.String("image_url", imageURL))
 		return err
 	}
 	return nil
