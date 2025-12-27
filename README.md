@@ -18,36 +18,32 @@ No more:
 - Notification fatigue due to a firehose of details without context
 - Questions like "Whose turn is it?" or "When should I look at this again?"
 
-## Start Using It
-
-First-time user opt-in:
+## First-Time User Opt-In
 
 1. Slack left panel > Apps > right-click on `⋮` > Manage > Browse apps
-2. Find the "RevChat" app > select it > click its "Open App" button
+2. Find the RevChat app > select it > click its "Open App" button
 3. Run this slash command in the app's messages tab: `/revchat opt-in`
 4. Optional: `/revchat reminders at <time in 12h or 24h format>`\
    (the default is 8:00 AM on weekdays, using your timezone)
 
 ## Channel Creation
 
-Channel creation:
-
-1. Name: `_pr-id_normalized-title`
+1. Naming pattern: `_pr-<id>_<normalized-and-truncated-title>`
 2. RevChat can be configured to use either public or private channels
-3. Full title (with configurable hyperlink IDs, e.g. to reference bugs that the PR fixes)
-4. The PR's conventional URL
-5. Full description (with markdown support)
+3. Channel topic and description are set to the PR's URL and title, respectively
+4. Optional: hyperlinking of IDs in the title (e.g. to reference bugs that the PR fixes)
+5. Full PR description (with markdown support)
 6. Real-time synchronization of PR reviewers and channel members
 
 _(Screenshot)_
 
-Note: only opted-in RevChat users are added to the Slack channels.
+Note: only opted-in users are added to these Slack channels. Opted-out users are still mentioned in them, but not added to them.
 
 ## Channel Organization
 
-Because all channels have the prefix `_pr`, Slack automatically groups them together, at the top of the "Channels" section:
+Slack's lexicographical sorting of channel names ensures that all RevChat channels are grouped together at the top of the "Channels" section (thanks to their `_pr` prefix) and ordered chronologically (thanks to the ID after the prefix):
 
-_(Screenshot)_
+![Channels list](/images/readme/channels_list.png)
 
 ## Channel Bookmarks
 
@@ -55,7 +51,7 @@ Each channel also has a variety of auto-updated PR metadata links.
 
 Bitbucket example:
 
-_(Screenshot)_
+![Bookmarks in a Bitbucket PR](/images/readme/bookmarks_bitbucket.png)
 
 GitHub example:
 
@@ -63,13 +59,13 @@ _(Screenshot)_
 
 ## 2-Way Sync
 
-Example of automatic reactions in the channel to PR events:
+Example of automatic mirroring of PR events in the Slack channel:
 
 1. Synchronization of un/approvals + build/check status updates
 2. Merge readiness announcement (only in Slack), to get the attention of authors/mergers and late reviewers
 3. Auto archiving of closed PRs
 
-_(Screenshot)_
+![PR event mirroring](/images/readme/sync_pr_events.png)
 
 Example of seamless 2-way synchronization of PR comments and Slack message threads:
 
@@ -100,7 +96,9 @@ _(Screenshot)_
 
 Commit pushes, build/check results, file comments, and inline comments include deep links - so when you see them in Slack you can jump directly into the right place in the PR's web UI to see the context and respond there.
 
-_(2 screenshots)_
+![Deep links 1](/images/readme/deep_links_1.png)
+
+![Deep links 2](/images/readme/deep_links_2.png)
 
 Example of a resolved inline comment:
 
@@ -108,7 +106,7 @@ _(Screenshot)_
 
 Lastly, code suggestions have extra styling in Slack:
 
-_(Screenshot)_
+![Code suggestion](/images/readme/code_suggestion.png)
 
 ## Daily Reminders
 
