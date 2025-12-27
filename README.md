@@ -69,30 +69,24 @@ Example of automatic mirroring of PR events in the Slack channel:
 
 Example of seamless 2-way synchronization of PR comments and Slack message threads:
 
-1. New message in Slack → create automatically in the PR on behalf of the user
-2. Comments and responses in the PR are posted (in the relevant thread) in Slack
-
-_(Screenshot)_
+- New messages in Slack are created automatically in the PR on behalf of the users
+- Likewise, comments and replies in the PR are posted (in the relevant thread) in Slack
 
 Message from Slack:
 
 _(Screenshot)_
 
-Response in the PR:
+Reply in the PR to the synchronized message:
 
 _(Screenshot)_
 
-Slack again:
+Reaction in Slack to the synchronized reply:
 
 _(Screenshot)_
 
-Note 1: when synchronizing events between the PR and Slack, RevChat converts automatically IDs (e.g. users, bots, message threads) and markdown formats between the systems.
+Note 1: when synchronizing events between the PR and Slack, RevChat converts automatically user and message IDs, emojis, and markdown formats between the systems.
 
-Note 2: when RevChat posts a user-triggered update in Slack (e.g. "@user edited the PR description") it uses a user profile link that **looks like** a user mention (clicking it shows the user's profile), but when a **user** mentions another user in a message or an action, RevChat uses an **actual** user mention. **This way Slack grabs the attention of users when others mention them, but not when it echoes their own actions.**
-
-Example: the user on the left is a clickable Slack profile link, and the user on the right is a real Slack user mention.
-
-_(Screenshot)_
+Note 2: when RevChat posts a user-triggered update in Slack (e.g. "@user edited the PR description") it uses a user profile link that **looks like** a user mention (and clicking it shows the user's Slack profile), but when a **user** mentions another user in a message or an action, RevChat uses an **actual** user mention that subject. **This way Slack grabs the attention of users when others refer to them, but not when it echoes their own actions.**
 
 Commit pushes, build/check results, file comments, and inline comments include deep links - so when you see them in Slack you can jump directly into the right place in the PR's web UI to see the context and respond there.
 
@@ -102,7 +96,7 @@ Commit pushes, build/check results, file comments, and inline comments include d
 
 Example of a resolved inline comment:
 
-_(Screenshot)_
+![Resolved comment](/images/readme/resolved_comment.png)
 
 Lastly, code suggestions have extra styling in Slack:
 
