@@ -61,7 +61,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		case "invite":
 			return commands.Invite(ctx, event)
 		case "nudge", "ping", "poke":
-			return commands.Nudge(ctx, event)
+			return commands.Nudge(ctx, event, c.ThrippyHTTPAddress)
 		}
 	}
 	if commands.RemindersSyntax.MatchString(event.Text) {

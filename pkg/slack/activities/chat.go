@@ -65,6 +65,36 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 	return resp, nil
 }
 
+func PostMessageWithImage(ctx workflow.Context, channelID, msg, url, altText string) error {
+	if url == "" {
+		return PostMessage(ctx, channelID, msg)
+	}
+
+	_, err := slack.ChatPostMessage(ctx, slack.ChatPostMessageRequest{
+		Channel: channelID,
+		Blocks: []map[string]any{
+			{
+				"type": "section",
+				"text": map[string]string{
+					"type": "mrkdwn",
+					"text": msg,
+				},
+			},
+			{
+				"type":      "image",
+				"image_url": url,
+				"alt_text":  altText,
+			},
+		},
+	})
+	if err != nil {
+		logger.From(ctx).Error("failed to post Slack message with image",
+			slog.Any("error", err), slog.String("channel_id", channelID))
+		return err
+	}
+	return nil
+}
+
 func UpdateMessage(ctx workflow.Context, channelID, timestamp, msg string) error {
 	req := slack.ChatUpdateRequest{Channel: channelID, TS: timestamp, Text: msg}
 	if err := slack.ChatUpdate(ctx, req); err != nil {
