@@ -1,7 +1,9 @@
 package activities
 
 import (
+	"fmt"
 	"log/slog"
+	"regexp"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -47,6 +49,36 @@ func DeletePullRequestComment(ctx workflow.Context, thrippyLinkID, workspace, re
 	}
 
 	return nil
+}
+
+var commentURLPattern = regexp.MustCompile(`^https://[^/]+/([^/]+)/([^/]+)/pull-requests/(\d+)(.+comment-(\d+))?`)
+
+const expectedSubmatches = 6
+
+func GetPullRequestComment(ctx workflow.Context, thrippyLinkID, commentURL string) (*bitbucket.Comment, error) {
+	url := commentURLPattern.FindStringSubmatch(commentURL)
+	if len(url) != expectedSubmatches {
+		logger.From(ctx).Error("failed to parse Bitbucket PR comment's URL", slog.String("url", commentURL))
+		return nil, fmt.Errorf("invalid Bitbucket PR comment URL: %s", commentURL)
+	}
+
+	resp, err := bitbucket.PullRequestsGetComment(ctx, bitbucket.PullRequestsGetCommentRequest{
+		PullRequestsRequest: bitbucket.PullRequestsRequest{
+			ThrippyLinkID: thrippyLinkID,
+			Workspace:     url[1],
+			RepoSlug:      url[2],
+			PullRequestID: url[3],
+		},
+		CommentID: url[5],
+	})
+	if err != nil {
+		logger.From(ctx).Error("failed to get Bitbucket PR comment", slog.Any("error", err),
+			slog.String("workspace", url[1]), slog.String("repo", url[2]),
+			slog.String("pr_id", url[3]), slog.String("comment_id", url[5]))
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func UpdatePullRequestComment(ctx workflow.Context, thrippyLinkID, workspace, repo, prID, commentID, msg string) error {

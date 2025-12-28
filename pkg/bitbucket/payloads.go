@@ -39,25 +39,7 @@ type Branch struct {
 	SyncStrategies []string        `json:"sync_strategies,omitempty"`
 }
 
-// https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment
-type Comment struct {
-	// Type string `json:"type"` // Always "pullrequest_comment".
-
-	ID     int     `json:"id"`
-	Parent *Parent `json:"parent,omitempty"`
-
-	CreatedOn string `json:"created_on"`
-	UpdatedOn string `json:"updated_on"`
-	Deleted   bool   `json:"deleted"`
-	Pending   bool   `json:"pending"`
-
-	Content Rendered `json:"content"`
-	Inline  *Inline  `json:"inline"`
-	User    Account  `json:"user"`
-	// PullRequest `json:"pullrequest"` // Unnecessary.
-
-	Links map[string]Link `json:"links"`
-}
+type Comment = bitbucket.Comment
 
 type Commit = bitbucket.Commit
 
@@ -81,31 +63,9 @@ type CommitStatus struct {
 	Links map[string]Link `json:"links"`
 }
 
-// https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment
-type Inline struct {
-	Path string `json:"path"`
+type Inline = bitbucket.Inline
 
-	StartFrom *int `json:"start_from"`
-	StartTo   *int `json:"start_to"`
-	From      *int `json:"from"`
-	To        *int `json:"to"`
-
-	ContextLines string `json:"context_lines"`
-	Outdated     bool   `json:"outdated"`
-
-	SrcRev  string `json:"src_rev"`
-	DestRev string `json:"dest_rev"`
-	// BaseRev *string `json:"base_rev"`
-}
-
-type Link struct {
-	HRef string `json:"href"`
-}
-
-type Parent struct {
-	ID    int             `json:"id"`
-	Links map[string]Link `json:"links"`
-}
+type Link = bitbucket.Link
 
 type Participant struct {
 	// Type string `json:"type"` // Always "participant".
@@ -165,14 +125,6 @@ type Reference struct {
 	Branch     Branch     `json:"branch"`
 	Commit     Commit     `json:"commit"`
 	Repository Repository `json:"repository"`
-}
-
-type Rendered struct {
-	// Type string `json:"type"` // Always "rendered".
-
-	Raw    string `json:"raw"`
-	Markup string `json:"markup"`
-	HTML   string `json:"html"`
 }
 
 type Repository struct {

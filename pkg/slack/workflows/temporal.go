@@ -72,7 +72,7 @@ var Schedules = []string{
 }
 
 // RegisterWorkflows maps event-handling workflow functions to [Signals].
-func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
+func RegisterWorkflows(ctx context.Context, cmd *cli.Command, w worker.Worker) {
 	c := newConfig(cmd)
 	c.initThrippyLinks(ctx, cmd.String("thrippy-links-template-id"))
 
@@ -86,6 +86,7 @@ func RegisterWorkflows(ctx context.Context, w worker.Worker, cmd *cli.Command) {
 	w.RegisterWorkflowWithOptions(ReactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[7]})
 	w.RegisterWorkflowWithOptions(c.SlashCommandWorkflow, workflow.RegisterOptions{Name: Signals[8]})
 
+	// Special case: scheduled workflows.
 	w.RegisterWorkflowWithOptions(RemindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
 }
 
@@ -181,7 +182,7 @@ func CreateSchedule(ctx context.Context, c client.Client, cmd *cli.Command) {
 		},
 	})
 	if err != nil {
-		logger.FromContext(ctx).Warn("schedule creation error",
+		logger.FromContext(ctx).Warn("failed to initialize reminders schedule",
 			slog.Any("error", err), slog.String("schedule_id", Schedules[0]))
 	}
 }

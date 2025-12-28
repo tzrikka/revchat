@@ -29,21 +29,21 @@ func LookupSlackFileID(ctx workflow.Context, comment *Comment) (string, bool) {
 // BeautifyInlineComment adds an informative prefix to the comment's text.
 // If the comment contains a suggestion code block, it removes that block
 // and also generates a diff snippet to attach to the Slack message instead.
-func BeautifyInlineComment(ctx workflow.Context, event PullRequestEvent, msg, raw string) (string, []byte) {
-	msg = inlineCommentPrefix(HTMLURL(event.Comment.Links), event.Comment.Inline) + msg
+func BeautifyInlineComment(ctx workflow.Context, comment *Comment, msg string) (string, []byte) {
+	msg = inlineCommentPrefix(HTMLURL(comment.Links), comment.Inline) + msg
 	msg = strings.TrimSpace(strings.TrimSuffix(msg, "\u200c"))
 
-	suggestion, ok := extractSuggestionBlock(raw)
+	suggestion, ok := extractSuggestionBlock(comment.Content.Raw)
 	if !ok {
 		return msg, nil
 	}
 
-	src := sourceFile(ctx, event.Comment.Links["code"].HRef, event.Comment.Inline.SrcRev)
+	src := sourceFile(ctx, comment.Links["code"].HRef, comment.Inline.SrcRev)
 	if src == "" {
 		return msg, nil
 	}
 
-	diff := spliceSuggestion(ctx, event.Comment.Inline, suggestion, src)
+	diff := spliceSuggestion(ctx, comment.Inline, suggestion, src)
 	if diff == nil {
 		return msg, nil
 	}

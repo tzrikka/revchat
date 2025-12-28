@@ -7,15 +7,14 @@
 - Initialize a new Slack channel
   - Construct a normalized version of the PR title
   - Create the Slack channel with the normalized name
-    - If the channel already exists, retry with a numeric counter suffix
   - Set the channel's topic (to the Bitbucket URL)
   - Set the channel's description (to the PR title)
-  - Set the channel's bookmarks (reviewers, comments, tasks, approvals, commits, files)
-  - Post an intro Slack message: mention the PR author and the PR description
-  - Post another message with a list of linkified references from the PR title
-  - For all **opted-in** participants (author + reviewers)
-    - Add to the Slack channel
-    - Send a DM about it
+  - Set the channel's bookmarks
+  - Post an intro Slack message, containing:
+    - Mention of the PR author
+    - PR title, with optional hyperlinking of IDs (e.g. to reference bugs that the PR fixes)
+    - PR description (with markdown support)
+  - Add all the **opted-in** participants (author + reviewers) as members
 
 ### PR Updated
 
@@ -61,7 +60,7 @@
 ### PR Merged
 
 - If the PR doesn't have a Slack channel - abort (ignore this event)
-- Wait 5 seconds (to handle other asynchronous events, e.g. a PR closure comment)
+- Wait a few seconds (to handle other asynchronous events, e.g. a PR closure comment)
 - Clean up all of RevChat's data for this PR
 - Mention the user and the specific action in a Slack message
 - Archive the Slack channel

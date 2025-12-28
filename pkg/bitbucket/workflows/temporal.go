@@ -6,6 +6,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/api/enums/v1"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
@@ -21,15 +22,21 @@ type Config struct {
 	SlackChannelsArePrivate   bool
 
 	LinkifyMap map[string]string
+
+	Opts client.Options
+	TQ   string
 }
 
-func newConfig(cmd *cli.Command) *Config {
+func newConfig(cmd *cli.Command, opts client.Options, taskQueue string) *Config {
 	return &Config{
 		SlackChannelNamePrefix:    cmd.String("slack-channel-name-prefix"),
 		SlackChannelNameMaxLength: cmd.Int("slack-channel-name-max-length"),
 		SlackChannelsArePrivate:   cmd.Bool("slack-private-channels"),
 
 		LinkifyMap: config.KVSliceToMap(cmd.StringSlice("linkification-map")),
+
+		Opts: opts,
+		TQ:   taskQueue,
 	}
 }
 
@@ -76,9 +83,15 @@ var RepositorySignals = []string{
 	"bitbucket.events.repo.commit_status_updated",
 }
 
+// Schedules is a list of workflow names that RevChat runs periodically via
+// Temporal schedules (https://docs.temporal.io/develop/go/schedules).
+var Schedules = []string{
+	"bitbucket.schedules.poll_comment",
+}
+
 // RegisterPullRequestWorkflows maps event-handling workflow functions to [PullRequestSignals].
-func RegisterPullRequestWorkflows(cmd *cli.Command, w worker.Worker) {
-	c := newConfig(cmd)
+func RegisterPullRequestWorkflows(cmd *cli.Command, opts client.Options, taskQueue string, w worker.Worker) {
+	c := newConfig(cmd, opts, taskQueue)
 	funcs := []prWorkflowFunc{
 		c.PullRequestCreatedWorkflow,
 		c.PullRequestUpdatedWorkflow,
@@ -89,15 +102,18 @@ func RegisterPullRequestWorkflows(cmd *cli.Command, w worker.Worker) {
 		PullRequestClosedWorkflow,   // Fulfilled, a.k.a. merged.
 		PullRequestClosedWorkflow,   // Rejected, a.k.a. declined.
 
-		CommentCreatedWorkflow,
-		CommentUpdatedWorkflow,
-		CommentDeletedWorkflow,
+		c.CommentCreatedWorkflow,
+		c.CommentUpdatedWorkflow,
+		c.CommentDeletedWorkflow,
 		CommentResolvedWorkflow,
 		CommentReopenedWorkflow,
 	}
 	for i, f := range funcs {
 		w.RegisterWorkflowWithOptions(f, workflow.RegisterOptions{Name: PullRequestSignals[i]})
 	}
+
+	// Special case: scheduled workflows.
+	w.RegisterWorkflowWithOptions(c.PollCommentWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
 }
 
 // RegisterRepositoryWorkflows maps event-handling workflow functions to [RepositorySignals].

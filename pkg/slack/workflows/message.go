@@ -105,7 +105,7 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 	return bot.UserID
 }
 
-var commentURLPattern = regexp.MustCompile(`^https://[^/]+/(.+?)/(.+?)/pull-requests/(\d+)(.+comment-(\d+))?`)
+var commentURLPattern = regexp.MustCompile(`^https://[^/]+/([^/]+)/([^/]+)/pull-requests/(\d+)(.+comment-(\d+))?`)
 
 const expectedSubmatches = 6
 
@@ -115,12 +115,12 @@ func urlParts(ctx workflow.Context, ids string) ([]string, error) {
 		return nil, err
 	}
 
-	sub := commentURLPattern.FindStringSubmatch(url)
-	if len(sub) != expectedSubmatches {
-		msg := "failed to parse Slack message's PR comment URL"
-		logger.From(ctx).Error(msg, slog.String("slack_ids", ids), slog.String("comment_url", url))
+	parts := commentURLPattern.FindStringSubmatch(url)
+	if len(parts) != expectedSubmatches {
+		logger.From(ctx).Error("failed to parse Slack message's PR comment URL",
+			slog.String("slack_ids", ids), slog.String("comment_url", url))
 		return nil, fmt.Errorf("invalid Bitbucket PR URL: %s", url)
 	}
 
-	return sub, nil
+	return parts, nil
 }

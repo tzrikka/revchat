@@ -32,11 +32,12 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	addr := cmd.String("temporal-address")
 	l.Info("Temporal server address: " + addr)
 
-	cli, err := client.Dial(client.Options{
+	copts := client.Options{
 		HostPort:  addr,
 		Namespace: cmd.String("temporal-namespace"),
 		Logger:    log.NewStructuredLogger(l),
-	})
+	}
+	cli, err := client.Dial(copts)
 	if err != nil {
 		return fmt.Errorf("failed to dial Temporal: %w", err)
 	}
@@ -44,15 +45,15 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 
 	tq := cmd.String("temporal-task-queue-revchat")
 	w := worker.New(cli, tq, worker.Options{})
-	bitbucket.RegisterPullRequestWorkflows(cmd, w)
+	bitbucket.RegisterPullRequestWorkflows(cmd, copts, tq, w)
 	bitbucket.RegisterRepositoryWorkflows(w)
-	github.RegisterWorkflows(w, cmd)
-	slack.RegisterWorkflows(ctx, w, cmd)
+	github.RegisterWorkflows(cmd, w)
+	slack.RegisterWorkflows(ctx, cmd, w)
 
 	slack.CreateSchedule(ctx, cli, cmd)
 
 	cfg := &Config{taskQueue: tq}
-	opts := client.StartWorkflowOptions{
+	wopts := client.StartWorkflowOptions{
 		ID:                       EventDispatcher,
 		TaskQueue:                tq,
 		WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
@@ -67,7 +68,7 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})
-	run, err := cli.ExecuteWorkflow(ctx, opts, EventDispatcher)
+	run, err := cli.ExecuteWorkflow(ctx, wopts, EventDispatcher)
 	if err != nil {
 		return fmt.Errorf("failed to start event dispatcher workflow: %w", err)
 	}

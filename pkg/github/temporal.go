@@ -47,7 +47,7 @@ var Signals = []string{
 }
 
 // RegisterWorkflows maps event-handling workflow functions to [Signals].
-func RegisterWorkflows(w worker.Worker, cmd *cli.Command) {
+func RegisterWorkflows(cmd *cli.Command, w worker.Worker) {
 	c := newConfig(cmd)
 	w.RegisterWorkflowWithOptions(c.pullRequestWorkflow, workflow.RegisterOptions{Name: Signals[0]})
 	w.RegisterWorkflowWithOptions(c.prReviewWorkflow, workflow.RegisterOptions{Name: Signals[1]})
