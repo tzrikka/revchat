@@ -46,10 +46,9 @@ func (c *Config) MessageWorkflow(ctx workflow.Context, event messageEventWrapper
 		return c.changeMessage(ctx, event.InnerEvent, userID)
 	case "message_deleted":
 		return c.deleteMessage(ctx, event.InnerEvent, userID)
+	default:
+		return nil
 	}
-
-	logger.From(ctx).Warn("unhandled Slack message event", slog.Any("event", event.InnerEvent))
-	return nil
 }
 
 // extractUserID determines the user ID of the user/app that triggered a Slack message event.
