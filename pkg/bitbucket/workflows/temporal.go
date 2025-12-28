@@ -1,8 +1,11 @@
 package workflows
 
 import (
+	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/api/enums/v1"
@@ -142,7 +145,10 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 			metrics.IncrementSignalCounter(ctx, signal)
 
 			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
-			opts := workflow.ChildWorkflowOptions{TaskQueue: taskQueue}
+			opts := workflow.ChildWorkflowOptions{
+				TaskQueue:  taskQueue,
+				WorkflowID: prChildWorkflowID(ctx, payload),
+			}
 			if payload.Type != "created" {
 				opts.ParentClosePolicy = enums.PARENT_CLOSE_POLICY_ABANDON
 			}
@@ -160,6 +166,23 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 	}
 }
 
+func prChildWorkflowID(ctx workflow.Context, event *bitbucket.PullRequestEvent) string {
+	id := event.PullRequest.Links["html"].HRef
+	if event.Comment != nil {
+		id = event.Comment.Links["html"].HRef
+	}
+	id = strings.TrimPrefix(id, "https://bitbucket.org/")
+
+	var ts int64
+	encoded := workflow.SideEffect(ctx, func(_ workflow.Context) any {
+		return time.Now().UnixMilli()
+	})
+	if err := encoded.Get(&ts); err != nil {
+		return "" // This should never happen, but just in case: let Temporal use its own default.
+	}
+	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
+}
+
 // RegisterRepositorySignals routes [RepositorySignals] to their registered workflows.
 func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
 	for _, signalName := range RepositorySignals {
@@ -175,11 +198,28 @@ func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, task
 			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
 			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 				ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
+				WorkflowID:        repoChildWorkflowID(ctx, payload),
 				TaskQueue:         taskQueue,
 			})
 			_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).GetChildWorkflowExecution().Get(ctx, nil)
 		})
 	}
+}
+
+func repoChildWorkflowID(ctx workflow.Context, event *bitbucket.RepositoryEvent) string {
+	id := fmt.Sprintf("%s_%s", event.Repository.FullName, event.Actor.AccountID)
+	if event.CommitStatus != nil {
+		id = strings.TrimPrefix(event.CommitStatus.Commit.Links["html"].HRef, "https://bitbucket.org/")
+	}
+
+	var ts int64
+	encoded := workflow.SideEffect(ctx, func(_ workflow.Context) any {
+		return time.Now().UnixMilli()
+	})
+	if err := encoded.Get(&ts); err != nil {
+		return "" // This should never happen, but just in case: let Temporal use its own default.
+	}
+	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
 }
 
 // DrainPullRequestSignals drains all pending [PullRequestSignals] channels,

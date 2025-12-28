@@ -2,7 +2,10 @@ package workflows
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -115,10 +118,59 @@ func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, s
 		// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
 		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
+			WorkflowID:        childWorkflowID(ctx, signal, payload),
 			TaskQueue:         taskQueue,
 		})
 		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).GetChildWorkflowExecution().Get(ctx, nil)
 	})
+}
+
+func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) string {
+	id := ""
+	switch signal {
+	case Signals[1], Signals[2]:
+		if event, ok := any(payload).(*archiveEventWrapper); ok {
+			id = event.InnerEvent.Channel
+		}
+	case Signals[3], Signals[4]:
+		if event, ok := any(payload).(*memberEventWrapper); ok {
+			id = fmt.Sprintf("%s_%s", event.InnerEvent.Channel, event.InnerEvent.User)
+		}
+	case Signals[5]:
+		if event, ok := any(payload).(*messageEventWrapper); ok {
+			subtype := "created"
+			if event.InnerEvent.Subtype != "" {
+				subtype = event.InnerEvent.Subtype
+			}
+			id = fmt.Sprintf("%s_%s_%s", subtype, event.InnerEvent.Channel, event.InnerEvent.TS)
+		}
+	case Signals[6], Signals[7]:
+		if event, ok := any(payload).(*reactionEventWrapper); ok {
+			e := event.InnerEvent
+			id = fmt.Sprintf("%s_%s", e.Item.Channel, e.Item.TS)
+		}
+	case Signals[8]:
+		if event, ok := any(payload).(*commands.SlashCommandEvent); ok {
+			cmd := ""
+			if text := strings.TrimSpace(event.Text); text != "" {
+				cmd = strings.SplitN(text, " ", 2)[0] + "_"
+			}
+			id = fmt.Sprintf("%s%s_%s", cmd, event.ChannelID, event.UserID)
+		}
+	}
+
+	if id == "" {
+		return "" // Fallback in case of unexpected payloads: let Temporal use its own default.
+	}
+
+	var ts int64
+	encoded := workflow.SideEffect(ctx, func(_ workflow.Context) any {
+		return time.Now().UnixMilli()
+	})
+	if err := encoded.Get(&ts); err != nil {
+		return "" // This should never happen, but just in case: let Temporal use its own default.
+	}
+	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
 }
 
 // DrainSignals drains all pending [Signals] channels, and waits

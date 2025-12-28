@@ -228,6 +228,7 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 	// Common parameters for the schedule, whether we create or update it.
 	sched := &client.Schedule{
 		Action: &client.ScheduleWorkflowAction{
+			ID:        trimURLPrefix(commentURL),
 			Workflow:  Schedules[0],
 			Args:      []any{linkID, commentURL, checksum},
 			TaskQueue: c.TQ,
@@ -246,7 +247,7 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 	}
 
 	// Try to update an existing schedule first.
-	handle := cli.ScheduleClient().GetHandle(ctx, commentURL)
+	handle := cli.ScheduleClient().GetHandle(ctx, trimURLPrefix(commentURL))
 	if _, err := handle.Describe(ctx); err == nil {
 		err = handle.Update(ctx, client.ScheduleUpdateOptions{
 			DoUpdate: func(input client.ScheduleUpdateInput) (*client.ScheduleUpdate, error) {
@@ -262,7 +263,7 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 
 	// If updating failed (regardless of whether that schedule exists or not), create a new schedule.
 	_, err = cli.ScheduleClient().Create(ctx, client.ScheduleOptions{
-		ID:            commentURL,
+		ID:            trimURLPrefix(commentURL),
 		Spec:          *sched.Spec,
 		Action:        sched.Action,
 		Overlap:       sched.Policy.Overlap,
@@ -276,6 +277,10 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 
 	l.Info("started new Bitbucket PR comment polling schedule", slog.String("comment_url", commentURL))
 	return nil
+}
+
+func trimURLPrefix(commentURL string) string {
+	return strings.TrimPrefix(commentURL, "https://bitbucket.org/")
 }
 
 // PollCommentWorkflow checks a specific PR comment to detect and mirror edits made within Bitbucket's
