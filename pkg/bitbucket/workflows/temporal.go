@@ -26,8 +26,8 @@ type Config struct {
 
 	LinkifyMap map[string]string
 
-	Opts client.Options
-	TQ   string
+	Opts      client.Options
+	TaskQueue string
 }
 
 func newConfig(cmd *cli.Command, opts client.Options, taskQueue string) *Config {
@@ -38,8 +38,8 @@ func newConfig(cmd *cli.Command, opts client.Options, taskQueue string) *Config 
 
 		LinkifyMap: config.KVSliceToMap(cmd.StringSlice("linkification-map")),
 
-		Opts: opts,
-		TQ:   taskQueue,
+		Opts:      opts,
+		TaskQueue: taskQueue,
 	}
 }
 
@@ -133,7 +133,7 @@ func RegisterRepositoryWorkflows(w worker.Worker) {
 }
 
 // RegisterPullRequestSignals routes [PullRequestSignals] to their registered workflows.
-func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
+func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector) {
 	for _, signalName := range PullRequestSignals {
 		sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
 			payload := new(bitbucket.PullRequestEvent)
@@ -145,10 +145,7 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 			metrics.IncrementSignalCounter(ctx, signal)
 
 			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
-			opts := workflow.ChildWorkflowOptions{
-				TaskQueue:  taskQueue,
-				WorkflowID: prChildWorkflowID(ctx, payload),
-			}
+			opts := workflow.ChildWorkflowOptions{WorkflowID: prChildWorkflowID(ctx, payload)}
 			if payload.Type != "created" {
 				opts.ParentClosePolicy = enums.PARENT_CLOSE_POLICY_ABANDON
 			}
@@ -164,6 +161,96 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector, tas
 			}
 		})
 	}
+}
+
+// RegisterRepositorySignals routes [RepositorySignals] to their registered workflows.
+func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector) {
+	for _, signalName := range RepositorySignals {
+		sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
+			payload := new(bitbucket.RepositoryEvent)
+			ch.Receive(ctx, payload)
+
+			signal := ch.Name()
+			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
+			logger.From(ctx).Info("received signal", slog.String("signal", signal))
+			metrics.IncrementSignalCounter(ctx, signal)
+
+			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
+			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+				WorkflowID:        repoChildWorkflowID(ctx, payload),
+				ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
+			})
+			_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).GetChildWorkflowExecution().Get(ctx, nil)
+		})
+	}
+}
+
+// DrainPullRequestSignals drains all pending [PullRequestSignals] channels,
+// and waits for their corresponding workflow executions to complete in order.
+// This is called in preparation for resetting the dispatcher workflow's history.
+func DrainPullRequestSignals(ctx workflow.Context) bool {
+	totalEvents := 0
+	for _, signal := range PullRequestSignals {
+		ch := workflow.GetSignalChannel(ctx, signal)
+		signalEvents := 0
+		for {
+			payload := new(bitbucket.PullRequestEvent)
+			if !ch.ReceiveAsync(payload) {
+				break
+			}
+
+			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
+			logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
+			metrics.IncrementSignalCounter(ctx, signal)
+			signalEvents++
+
+			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+				WorkflowID: prChildWorkflowID(ctx, payload),
+			})
+			_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
+		}
+
+		if signalEvents > 0 {
+			logger.From(ctx).Info("drained signal channel",
+				slog.String("signal", signal), slog.Int("event_count", signalEvents))
+		}
+		totalEvents += signalEvents
+	}
+	return totalEvents > 0
+}
+
+// DrainRepositorySignals drains all pending [RepositorySignals] channels,
+// and waits for their corresponding workflow executions to complete in order.
+// This is called in preparation for resetting the dispatcher workflow's history.
+func DrainRepositorySignals(ctx workflow.Context) bool {
+	totalEvents := 0
+	for _, signal := range RepositorySignals {
+		ch := workflow.GetSignalChannel(ctx, signal)
+		signalEvents := 0
+		for {
+			payload := new(bitbucket.RepositoryEvent)
+			if !ch.ReceiveAsync(payload) {
+				break
+			}
+
+			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
+			logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
+			metrics.IncrementSignalCounter(ctx, signal)
+			signalEvents++
+
+			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+				WorkflowID: repoChildWorkflowID(ctx, payload),
+			})
+			_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
+		}
+
+		if signalEvents > 0 {
+			logger.From(ctx).Info("drained signal channel",
+				slog.String("signal", signal), slog.Int("event_count", signalEvents))
+		}
+		totalEvents += signalEvents
+	}
+	return totalEvents > 0
 }
 
 func prChildWorkflowID(ctx workflow.Context, event *bitbucket.PullRequestEvent) string {
@@ -183,29 +270,6 @@ func prChildWorkflowID(ctx workflow.Context, event *bitbucket.PullRequestEvent) 
 	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
 }
 
-// RegisterRepositorySignals routes [RepositorySignals] to their registered workflows.
-func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
-	for _, signalName := range RepositorySignals {
-		sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
-			payload := new(bitbucket.RepositoryEvent)
-			ch.Receive(ctx, payload)
-
-			signal := ch.Name()
-			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
-			logger.From(ctx).Info("received signal", slog.String("signal", signal))
-			metrics.IncrementSignalCounter(ctx, signal)
-
-			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
-			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-				ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
-				WorkflowID:        repoChildWorkflowID(ctx, payload),
-				TaskQueue:         taskQueue,
-			})
-			_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).GetChildWorkflowExecution().Get(ctx, nil)
-		})
-	}
-}
-
 func repoChildWorkflowID(ctx workflow.Context, event *bitbucket.RepositoryEvent) string {
 	id := fmt.Sprintf("%s_%s", event.Repository.FullName, event.Actor.AccountID)
 	if event.CommitStatus != nil {
@@ -220,68 +284,4 @@ func repoChildWorkflowID(ctx workflow.Context, event *bitbucket.RepositoryEvent)
 		return "" // This should never happen, but just in case: let Temporal use its own default.
 	}
 	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
-}
-
-// DrainPullRequestSignals drains all pending [PullRequestSignals] channels,
-// and waits for their corresponding workflow executions to complete in order.
-// This is called in preparation for resetting the dispatcher workflow's history.
-func DrainPullRequestSignals(ctx workflow.Context, taskQueue string) bool {
-	totalEvents := 0
-	for _, signal := range PullRequestSignals {
-		ch := workflow.GetSignalChannel(ctx, signal)
-		signalEvents := 0
-		for {
-			payload := new(bitbucket.PullRequestEvent)
-			if !ch.ReceiveAsync(payload) {
-				break
-			}
-
-			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
-			logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
-			metrics.IncrementSignalCounter(ctx, signal)
-			signalEvents++
-
-			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-			_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
-		}
-
-		if signalEvents > 0 {
-			logger.From(ctx).Info("drained signal channel",
-				slog.String("signal", signal), slog.Int("event_count", signalEvents))
-		}
-		totalEvents += signalEvents
-	}
-	return totalEvents > 0
-}
-
-// DrainRepositorySignals drains all pending [RepositorySignals] channels,
-// and waits for their corresponding workflow executions to complete in order.
-// This is called in preparation for resetting the dispatcher workflow's history.
-func DrainRepositorySignals(ctx workflow.Context, taskQueue string) bool {
-	totalEvents := 0
-	for _, signal := range RepositorySignals {
-		ch := workflow.GetSignalChannel(ctx, signal)
-		signalEvents := 0
-		for {
-			payload := new(bitbucket.RepositoryEvent)
-			if !ch.ReceiveAsync(payload) {
-				break
-			}
-
-			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
-			logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
-			metrics.IncrementSignalCounter(ctx, signal)
-			signalEvents++
-
-			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-			_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
-		}
-
-		if signalEvents > 0 {
-			logger.From(ctx).Info("drained signal channel",
-				slog.String("signal", signal), slog.Int("event_count", signalEvents))
-		}
-		totalEvents += signalEvents
-	}
-	return totalEvents > 0
 }

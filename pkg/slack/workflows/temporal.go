@@ -94,19 +94,19 @@ func RegisterWorkflows(ctx context.Context, cmd *cli.Command, w worker.Worker) {
 }
 
 // RegisterSignals routes [Signals] to their registered workflows.
-func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
-	addReceive[map[string]any](ctx, sel, taskQueue, Signals[0])
-	addReceive[archiveEventWrapper](ctx, sel, taskQueue, Signals[1])
-	addReceive[archiveEventWrapper](ctx, sel, taskQueue, Signals[2])
-	addReceive[memberEventWrapper](ctx, sel, taskQueue, Signals[3])
-	addReceive[memberEventWrapper](ctx, sel, taskQueue, Signals[4])
-	addReceive[messageEventWrapper](ctx, sel, taskQueue, Signals[5])
-	addReceive[reactionEventWrapper](ctx, sel, taskQueue, Signals[6])
-	addReceive[reactionEventWrapper](ctx, sel, taskQueue, Signals[7])
-	addReceive[commands.SlashCommandEvent](ctx, sel, taskQueue, Signals[8])
+func RegisterSignals(ctx workflow.Context, sel workflow.Selector) {
+	addReceive[map[string]any](ctx, sel, Signals[0])
+	addReceive[archiveEventWrapper](ctx, sel, Signals[1])
+	addReceive[archiveEventWrapper](ctx, sel, Signals[2])
+	addReceive[memberEventWrapper](ctx, sel, Signals[3])
+	addReceive[memberEventWrapper](ctx, sel, Signals[4])
+	addReceive[messageEventWrapper](ctx, sel, Signals[5])
+	addReceive[reactionEventWrapper](ctx, sel, Signals[6])
+	addReceive[reactionEventWrapper](ctx, sel, Signals[7])
+	addReceive[commands.SlashCommandEvent](ctx, sel, Signals[8])
 }
 
-func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, signalName string) {
+func addReceive[T any](ctx workflow.Context, sel workflow.Selector, signalName string) {
 	sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
 		payload := new(T)
 		ch.Receive(ctx, payload)
@@ -117,12 +117,53 @@ func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, s
 
 		// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
 		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
 			WorkflowID:        childWorkflowID(ctx, signal, payload),
-			TaskQueue:         taskQueue,
+			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
 		})
 		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).GetChildWorkflowExecution().Get(ctx, nil)
 	})
+}
+
+// DrainSignals drains all pending [Signals] channels, and waits
+// for their corresponding workflow executions to complete in order.
+// This is called in preparation for resetting the dispatcher workflow's history.
+func DrainSignals(ctx workflow.Context) bool {
+	totalEvents := receiveAsync[map[string]any](ctx, Signals[0])
+	totalEvents += receiveAsync[archiveEventWrapper](ctx, Signals[1])
+	totalEvents += receiveAsync[archiveEventWrapper](ctx, Signals[2])
+	totalEvents += receiveAsync[memberEventWrapper](ctx, Signals[3])
+	totalEvents += receiveAsync[memberEventWrapper](ctx, Signals[4])
+	totalEvents += receiveAsync[messageEventWrapper](ctx, Signals[5])
+	totalEvents += receiveAsync[reactionEventWrapper](ctx, Signals[6])
+	totalEvents += receiveAsync[reactionEventWrapper](ctx, Signals[7])
+	totalEvents += receiveAsync[commands.SlashCommandEvent](ctx, Signals[8])
+	return totalEvents > 0
+}
+
+func receiveAsync[T any](ctx workflow.Context, signal string) int {
+	ch := workflow.GetSignalChannel(ctx, signal)
+	signalEvents := 0
+	for {
+		payload := new(T)
+		if !ch.ReceiveAsync(payload) {
+			break
+		}
+
+		logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
+		metrics.IncrementSignalCounter(ctx, signal)
+		signalEvents++
+
+		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+			WorkflowID: childWorkflowID(ctx, signal, payload),
+		})
+		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
+	}
+
+	if signalEvents > 0 {
+		logger.From(ctx).Info("drained signal channel", slog.String("signal", signal),
+			slog.Int("event_count", signalEvents))
+	}
+	return signalEvents
 }
 
 func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) string {
@@ -173,49 +214,8 @@ func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) str
 	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
 }
 
-// DrainSignals drains all pending [Signals] channels, and waits
-// for their corresponding workflow executions to complete in order.
-// This is called in preparation for resetting the dispatcher workflow's history.
-func DrainSignals(ctx workflow.Context, taskQueue string) bool {
-	totalEvents := receiveAsync[map[string]any](ctx, taskQueue, Signals[0])
-	totalEvents += receiveAsync[archiveEventWrapper](ctx, taskQueue, Signals[1])
-	totalEvents += receiveAsync[archiveEventWrapper](ctx, taskQueue, Signals[2])
-	totalEvents += receiveAsync[memberEventWrapper](ctx, taskQueue, Signals[3])
-	totalEvents += receiveAsync[memberEventWrapper](ctx, taskQueue, Signals[4])
-	totalEvents += receiveAsync[messageEventWrapper](ctx, taskQueue, Signals[5])
-	totalEvents += receiveAsync[reactionEventWrapper](ctx, taskQueue, Signals[6])
-	totalEvents += receiveAsync[reactionEventWrapper](ctx, taskQueue, Signals[7])
-	totalEvents += receiveAsync[commands.SlashCommandEvent](ctx, taskQueue, Signals[8])
-
-	return totalEvents > 0
-}
-
-func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
-	ch := workflow.GetSignalChannel(ctx, signal)
-	signalEvents := 0
-	for {
-		payload := new(T)
-		if !ch.ReceiveAsync(payload) {
-			break
-		}
-
-		logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
-		metrics.IncrementSignalCounter(ctx, signal)
-		signalEvents++
-
-		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
-		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
-	}
-
-	if signalEvents > 0 {
-		logger.From(ctx).Info("drained signal channel", slog.String("signal", signal),
-			slog.Int("event_count", signalEvents))
-	}
-	return signalEvents
-}
-
 // CreateSchedule starts a scheduled workflow that runs every 30 minutes, to send daily reminders.
-func CreateSchedule(ctx context.Context, c client.Client, cmd *cli.Command) {
+func CreateSchedule(ctx context.Context, c client.Client, taskQueue string) {
 	_, err := c.ScheduleClient().Create(ctx, client.ScheduleOptions{
 		ID: Schedules[0],
 		Spec: client.ScheduleSpec{
@@ -230,7 +230,7 @@ func CreateSchedule(ctx context.Context, c client.Client, cmd *cli.Command) {
 		},
 		Action: &client.ScheduleWorkflowAction{
 			Workflow:  Schedules[0],
-			TaskQueue: cmd.String("temporal-task-queue-revchat"),
+			TaskQueue: taskQueue,
 		},
 	})
 	if err != nil {

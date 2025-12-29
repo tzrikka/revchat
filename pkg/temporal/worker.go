@@ -43,19 +43,19 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	}
 	defer cli.Close()
 
-	tq := cmd.String("temporal-task-queue-revchat")
-	w := worker.New(cli, tq, worker.Options{})
-	bitbucket.RegisterPullRequestWorkflows(cmd, copts, tq, w)
+	taskQueue := cmd.String("temporal-task-queue-revchat")
+	w := worker.New(cli, taskQueue, worker.Options{})
+	bitbucket.RegisterPullRequestWorkflows(cmd, copts, taskQueue, w)
 	bitbucket.RegisterRepositoryWorkflows(w)
 	github.RegisterWorkflows(cmd, w)
 	slack.RegisterWorkflows(ctx, cmd, w)
 
-	slack.CreateSchedule(ctx, cli, cmd)
+	slack.CreateSchedule(ctx, cli, taskQueue)
 
-	cfg := &Config{taskQueue: tq}
+	cfg := new(Config)
 	wopts := client.StartWorkflowOptions{
 		ID:                       EventDispatcher,
-		TaskQueue:                tq,
+		TaskQueue:                taskQueue,
 		WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
 		WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
 	}

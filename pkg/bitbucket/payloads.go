@@ -55,6 +55,7 @@ type CommitStatus struct {
 
 	Refname *string `json:"refname"`
 	Commit  *Commit `json:"commit,omitempty"`
+
 	// Repository *Repository `json:"repository,omitempty"` // Unnecessary.
 
 	CreatedOn string `json:"created_on"`
@@ -98,6 +99,7 @@ type PullRequest struct {
 
 	// Summary     Rendered            `json:"summary"`  // Unnecessary.
 	// Rendered    map[string]Rendered `json:"rendered"` // Unnecessary.
+
 	Source      Reference `json:"source"`
 	Destination Reference `json:"destination"`
 

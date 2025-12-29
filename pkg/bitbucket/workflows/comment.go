@@ -231,7 +231,7 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 			ID:        trimURLPrefix(commentURL),
 			Workflow:  Schedules[0],
 			Args:      []any{linkID, commentURL, checksum},
-			TaskQueue: c.TQ,
+			TaskQueue: c.TaskQueue,
 		},
 		Spec: &client.ScheduleSpec{
 			Intervals: []client.ScheduleIntervalSpec{
