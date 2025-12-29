@@ -41,7 +41,7 @@ Note: only opted-in users are added to these Slack channels. Opted-out users are
 
 ## Channel Organization
 
-Slack's lexicographical sorting of channel names ensures that all RevChat channels are grouped together at the top of the "Channels" section (thanks to their `_pr` prefix) and ordered chronologically (thanks to the ID after the prefix):
+Slack's lexicographical sorting of channel names ensures that all RevChat channels are grouped together at the top of the "Channels" section (thanks to their `_pr` prefix) and ordered relatively chronologically (thanks to the ID after the prefix):
 
 ![Channels list](/images/readme/channels_list.png)
 
