@@ -21,8 +21,7 @@ func MemberJoinedWorkflow(ctx workflow.Context, event memberEventWrapper) error 
 
 	user, err := data.SelectUserBySlackID(e.User)
 	if err != nil {
-		logger.From(ctx).Error("failed to load user by Slack ID",
-			slog.Any("error", err), slog.String("user_id", e.User))
+		logger.From(ctx).Error("failed to load user by Slack ID", slog.Any("error", err), slog.String("user_id", e.User))
 		return err
 	}
 

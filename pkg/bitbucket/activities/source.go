@@ -10,12 +10,7 @@ import (
 )
 
 func GetSourceFile(ctx workflow.Context, workspace, repo, branch, commit, path string) (string, error) {
-	file, err := bitbucket.SourceGetFile(ctx, bitbucket.SourceGetRequest{
-		Workspace: workspace,
-		RepoSlug:  repo,
-		Commit:    commit,
-		Path:      path,
-	})
+	file, err := bitbucket.SourceGetFile(ctx, "", workspace, repo, commit, path)
 	if err != nil {
 		logger.From(ctx).Warn("failed to read Bitbucket source file",
 			slog.Any("error", err), slog.String("workspace", workspace), slog.String("repo", repo),

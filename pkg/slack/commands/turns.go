@@ -28,11 +28,8 @@ func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []st
 		return "", nil, data.User{}, err
 	}
 
-	user, err := data.SelectUserBySlackID(event.UserID)
+	user, _, err := UserDetails(ctx, event, event.UserID)
 	if err != nil {
-		logger.From(ctx).Error("failed to load user by Slack ID",
-			slog.Any("error", err), slog.String("user_id", event.UserID))
-		PostEphemeralError(ctx, event, "failed to read internal data about you.")
 		return "", nil, data.User{}, err
 	}
 
@@ -45,7 +42,7 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 	if url == "" {
-		return nil
+		return nil // Not a server error as far as we're concerned.
 	}
 
 	// If this is a no-op, inform the user.
@@ -90,7 +87,7 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 	if url == "" {
-		return nil
+		return nil // Not a server error as far as we're concerned.
 	}
 
 	// If this is a no-op, inform the user.
@@ -164,7 +161,7 @@ func WhoseTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 	if url == "" {
-		return nil
+		return nil // Not a server error as far as we're concerned.
 	}
 
 	msg := whoseTurnText(ctx, emails, user, "")

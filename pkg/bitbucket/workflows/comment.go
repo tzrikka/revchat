@@ -199,7 +199,7 @@ func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentUR
 	user, err := data.SelectUserByBitbucketID(accountID)
 	if err != nil {
 		// user.ThrippyLink == "", which is still usable for our purposes.
-		logger.From(ctx).Error("unexpected but not critical: failed to load user by Bitbucket ID",
+		logger.From(ctx).Warn("unexpected but not critical: failed to load user by Bitbucket ID",
 			slog.Any("error", err), slog.String("user_id", accountID))
 	}
 

@@ -16,11 +16,14 @@ func Approve(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace s
 		return nil
 	}
 
-	var err error
+	user, _, err := UserDetails(ctx, event, event.UserID)
+	if err != nil {
+		return err
+	}
+
 	switch {
 	case bitbucketWorkspace != "":
-		req := bitbucket.PullRequestsApproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
-		err = bitbucket.PullRequestsApprove(ctx, req)
+		err = bitbucket.PullRequestsApprove(ctx, user.ThrippyLink, url[1], url[2], url[3])
 	default:
 		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
 		PostEphemeralError(ctx, event, "internal configuration error.")
@@ -28,7 +31,8 @@ func Approve(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace s
 	}
 
 	if err != nil {
-		logger.From(ctx).Error("failed to approve PR", slog.Any("error", err), slog.String("pr_url", url[0]))
+		logger.From(ctx).Error("failed to approve PR", slog.Any("error", err), slog.String("pr_url", url[0]),
+			slog.String("slack_user_id", event.UserID), slog.String("thrippy_link_id", user.ThrippyLink))
 		PostEphemeralError(ctx, event, "failed to approve "+url[0])
 		return err
 	}
@@ -44,10 +48,14 @@ func Unapprove(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace
 		return nil
 	}
 
+	user, _, err := UserDetails(ctx, event, event.UserID)
+	if err != nil {
+		return err
+	}
+
 	switch {
 	case bitbucketWorkspace != "":
-		req := bitbucket.PullRequestsUnapproveRequest{Workspace: url[1], RepoSlug: url[2], PullRequestID: url[3]}
-		err = bitbucket.PullRequestsUnapprove(ctx, req)
+		err = bitbucket.PullRequestsUnapprove(ctx, user.ThrippyLink, url[1], url[2], url[3])
 	default:
 		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
 		PostEphemeralError(ctx, event, "internal configuration error.")
@@ -55,7 +63,8 @@ func Unapprove(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace
 	}
 
 	if err != nil {
-		logger.From(ctx).Error("failed to unapprove PR", slog.Any("error", err), slog.String("pr_url", url[0]))
+		logger.From(ctx).Error("failed to unapprove PR", slog.Any("error", err), slog.String("pr_url", url[0]),
+			slog.String("slack_user_id", event.UserID), slog.String("thrippy_link_id", user.ThrippyLink))
 		PostEphemeralError(ctx, event, "failed to unapprove "+url[0])
 		return err
 	}

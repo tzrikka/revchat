@@ -108,7 +108,11 @@ func UserDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (
 	user, err := data.SelectUserBySlackID(userID)
 	if err != nil {
 		logger.From(ctx).Error("failed to load user by Slack ID", slog.Any("error", err), slog.String("user_id", userID))
-		PostEphemeralError(ctx, event, fmt.Sprintf("failed to read internal data about <@%s>.", userID))
+		msg := "failed to read internal data about you."
+		if userID != event.UserID {
+			msg = fmt.Sprintf("failed to read internal data about <@%s>.", userID)
+		}
+		PostEphemeralError(ctx, event, msg)
 		return data.User{}, false, err
 	}
 
