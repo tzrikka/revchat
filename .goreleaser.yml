@@ -1,0 +1,12 @@
+version: 2
+
+builds:
+  - main: ./cmd/revchat
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
