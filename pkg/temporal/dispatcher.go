@@ -72,15 +72,21 @@ func (c *Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 		c.dispatcherRunID = info.WorkflowExecution.RunID
 
 		// "Lame duck" mode.
-		if info.GetContinueAsNewSuggested() || c.shutdownSignal != "" {
+		continueAsNewSuggested := info.GetContinueAsNewSuggested()
+		if continueAsNewSuggested || c.shutdownSignal != "" {
 			c.prepareForReset(ctx, info)
+		}
 
-			if c.shutdownSignal != "" {
-				c.shutdownDone <- c.shutdownSignal
-				close(c.shutdownDone)
-			}
-
+		switch {
+		case continueAsNewSuggested:
 			return workflow.NewContinueAsNewError(ctx, EventDispatcher)
+
+		case c.shutdownSignal != "":
+			encoded := workflow.SideEffect(ctx, func(ctx workflow.Context) any {
+				c.shutdownDone <- "done"
+				return ""
+			})
+			_ = encoded.Get(&c.shutdownSignal)
 		}
 	}
 }
@@ -105,7 +111,7 @@ func (c *Config) prepareForReset(ctx workflow.Context, info *workflow.Info) {
 
 	msg := "triggering continue-as-new for dispatcher workflow"
 	if c.shutdownSignal != "" {
-		msg += ", and shutting down the worker"
+		msg = "shutting down worker process as requested by OS signal"
 	}
 	logger.From(ctx).Warn(msg, slog.String("lead_time", time.Since(startTime).String()),
 		slog.Int("history_length", info.GetCurrentHistoryLength()),

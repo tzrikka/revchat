@@ -94,7 +94,6 @@ func (c *Config) interruptCh(ctx context.Context, cli client.Client) <-chan any 
 
 	go func() {
 		sig := <-ch
-		signal.Stop(ch)
 		logger.FromContext(ctx).Info("received OS signal, shutting down gracefully", slog.String("signal", sig.String()))
 
 		if err := cli.SignalWorkflow(ctx, c.dispatcherWorkflowID, c.dispatcherRunID, shutdownSignal, sig.String()); err != nil {
