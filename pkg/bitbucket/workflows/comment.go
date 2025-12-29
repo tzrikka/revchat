@@ -306,7 +306,7 @@ func (c Config) PollCommentWorkflow(ctx workflow.Context, linkID, commentURL, ol
 	if checksum(comment.Content.Raw) != oldChecksum {
 		logger.From(ctx).Info("Bitbucket PR comment text changed, updating Slack message and polling schedule",
 			slog.String("comment_url", commentURL))
-		c.updateCommentInWorkflow(ctx, comment)
+		return c.updateCommentInWorkflow(ctx, comment)
 	}
 
 	return nil

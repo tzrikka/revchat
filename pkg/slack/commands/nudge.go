@@ -28,7 +28,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 	parts := strings.SplitN(event.Text, " ", 2) // parts[0] = "nudge", "ping", or "poke".
 	if len(users) == 1 && users[0] == event.UserID {
 		msg := ":confused: Why are you trying to %s yourself? Treating this as a `%s my turn` command..."
-		activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, fmt.Sprintf(msg, parts[0], event.Command))
+		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, fmt.Sprintf(msg, parts[0], event.Command))
 		return MyTurn(ctx, event)
 	}
 
@@ -53,7 +53,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 		return nil
 	}
 
-	msg := "Sent " + parts[0] // "Nudge", "ping", or "poke".
+	msg := "Sent " + parts[0] // "nudge", "ping", or "poke".
 	if len(done) > 1 {
 		msg += "s"
 	}
