@@ -27,8 +27,6 @@ const (
 )
 
 type Config struct {
-	taskQueue string
-
 	dispatcherWorkflowID string
 	dispatcherRunID      string
 
@@ -59,10 +57,10 @@ func (c *Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 		ch.Receive(ctx, &c.shutdownSignal)
 	})
 
-	bitbucket.RegisterPullRequestSignals(ctx, selector, c.taskQueue)
-	bitbucket.RegisterRepositorySignals(ctx, selector, c.taskQueue)
-	github.RegisterSignals(ctx, selector, c.taskQueue)
-	slack.RegisterSignals(ctx, selector, c.taskQueue)
+	bitbucket.RegisterPullRequestSignals(ctx, selector)
+	bitbucket.RegisterRepositorySignals(ctx, selector)
+	github.RegisterSignals(ctx, selector)
+	slack.RegisterSignals(ctx, selector)
 
 	for {
 		selector.Select(ctx) // This is the core of the dispatcher workflow's event loop.
@@ -104,7 +102,7 @@ func (c *Config) prepareForReset(ctx workflow.Context, info *workflow.Info) {
 	}
 
 	for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 5; cyclesSinceLastSignal++ {
-		if c.drainCycle(ctx) {
+		if drainCycle(ctx) {
 			cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
 		}
 	}
@@ -119,11 +117,11 @@ func (c *Config) prepareForReset(ctx workflow.Context, info *workflow.Info) {
 }
 
 // drainCycle processes each event source and returns true if any signals were found.
-func (c *Config) drainCycle(ctx workflow.Context) bool {
-	bitbucketPRSignalsFound := bitbucket.DrainPullRequestSignals(ctx, c.taskQueue)
-	bitbucketRepoSignalsFound := bitbucket.DrainRepositorySignals(ctx, c.taskQueue)
-	githubSignalsFound := github.DrainSignals(ctx, c.taskQueue)
-	slackSignalsFound := slack.DrainSignals(ctx, c.taskQueue)
+func drainCycle(ctx workflow.Context) bool {
+	bitbucketPRSignalsFound := bitbucket.DrainPullRequestSignals(ctx)
+	bitbucketRepoSignalsFound := bitbucket.DrainRepositorySignals(ctx)
+	githubSignalsFound := github.DrainSignals(ctx)
+	slackSignalsFound := slack.DrainSignals(ctx)
 
 	return bitbucketPRSignalsFound || bitbucketRepoSignalsFound || githubSignalsFound || slackSignalsFound
 }

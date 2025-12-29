@@ -281,7 +281,7 @@ func repoChildWorkflowID(ctx workflow.Context, event *bitbucket.RepositoryEvent)
 		return time.Now().UnixMilli()
 	})
 	if err := encoded.Get(&ts); err != nil {
-		return "" // This should never happen, but just in case: let Temporal use its own default.
+		return id // This should never happen, but just in case: let Temporal use its own default.
 	}
 	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
 }

@@ -1,7 +1,12 @@
 package github
 
 import (
+	"fmt"
 	"log/slog"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/api/enums/v1"
@@ -57,7 +62,7 @@ func RegisterWorkflows(cmd *cli.Command, w worker.Worker) {
 }
 
 // RegisterSignals routes [Signals] to their registered workflows.
-func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue string) {
+func RegisterSignals(ctx workflow.Context, sel workflow.Selector) {
 	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[0]), func(ch workflow.ReceiveChannel, _ bool) {
 		payload := new(PullRequestEvent)
 		ch.Receive(ctx, payload)
@@ -67,7 +72,9 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		metrics.IncrementSignalCounter(ctx, signal)
 
 		// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
-		opts := workflow.ChildWorkflowOptions{TaskQueue: taskQueue}
+		opts := workflow.ChildWorkflowOptions{
+			WorkflowID: childWorkflowID(ctx, signal, payload),
+		}
 		if payload.Action != "opened" {
 			opts.ParentClosePolicy = enums.PARENT_CLOSE_POLICY_ABANDON
 		}
@@ -83,13 +90,13 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector, taskQueue stri
 		}
 	})
 
-	addReceive[PullRequestReviewEvent](ctx, sel, taskQueue, Signals[1])
-	addReceive[PullRequestReviewCommentEvent](ctx, sel, taskQueue, Signals[2])
-	addReceive[PullRequestReviewThreadEvent](ctx, sel, taskQueue, Signals[3])
-	addReceive[IssueCommentEvent](ctx, sel, taskQueue, Signals[4])
+	addReceive[PullRequestReviewEvent](ctx, sel, Signals[1])
+	addReceive[PullRequestReviewCommentEvent](ctx, sel, Signals[2])
+	addReceive[PullRequestReviewThreadEvent](ctx, sel, Signals[3])
+	addReceive[IssueCommentEvent](ctx, sel, Signals[4])
 }
 
-func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, signalName string) {
+func addReceive[T any](ctx workflow.Context, sel workflow.Selector, signalName string) {
 	sel.AddReceive(workflow.GetSignalChannel(ctx, signalName), func(ch workflow.ReceiveChannel, _ bool) {
 		payload := new(T)
 		ch.Receive(ctx, payload)
@@ -99,8 +106,8 @@ func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, s
 		metrics.IncrementSignalCounter(ctx, signal)
 
 		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+			WorkflowID:        childWorkflowID(ctx, signal, payload),
 			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
-			TaskQueue:         taskQueue,
 		})
 		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).GetChildWorkflowExecution().Get(ctx, nil)
 	})
@@ -109,17 +116,17 @@ func addReceive[T any](ctx workflow.Context, sel workflow.Selector, taskQueue, s
 // DrainSignals drains all pending [Signals] channels, and waits
 // for their corresponding workflow executions to complete in order.
 // This is called in preparation for resetting the dispatcher workflow's history.
-func DrainSignals(ctx workflow.Context, taskQueue string) bool {
-	totalEvents := receiveAsync[PullRequestEvent](ctx, taskQueue, Signals[0])
-	totalEvents += receiveAsync[PullRequestReviewEvent](ctx, taskQueue, Signals[1])
-	totalEvents += receiveAsync[PullRequestReviewCommentEvent](ctx, taskQueue, Signals[2])
-	totalEvents += receiveAsync[PullRequestReviewThreadEvent](ctx, taskQueue, Signals[3])
-	totalEvents += receiveAsync[IssueCommentEvent](ctx, taskQueue, Signals[4])
+func DrainSignals(ctx workflow.Context) bool {
+	totalEvents := receiveAsync[PullRequestEvent](ctx, Signals[0])
+	totalEvents += receiveAsync[PullRequestReviewEvent](ctx, Signals[1])
+	totalEvents += receiveAsync[PullRequestReviewCommentEvent](ctx, Signals[2])
+	totalEvents += receiveAsync[PullRequestReviewThreadEvent](ctx, Signals[3])
+	totalEvents += receiveAsync[IssueCommentEvent](ctx, Signals[4])
 
 	return totalEvents > 0
 }
 
-func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
+func receiveAsync[T any](ctx workflow.Context, signal string) int {
 	ch := workflow.GetSignalChannel(ctx, signal)
 	signalEvents := 0
 	for {
@@ -132,7 +139,9 @@ func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
 		metrics.IncrementSignalCounter(ctx, signal)
 		signalEvents++
 
-		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{TaskQueue: taskQueue})
+		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+			WorkflowID: childWorkflowID(ctx, signal, payload),
+		})
 		_ = workflow.ExecuteChildWorkflow(ctx, signal, payload).Get(ctx, nil)
 	}
 
@@ -141,4 +150,58 @@ func receiveAsync[T any](ctx workflow.Context, taskQueue, signal string) int {
 			slog.Int("event_count", signalEvents))
 	}
 	return signalEvents
+}
+
+func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) string {
+	id := ""
+	switch signal {
+	case Signals[0]:
+		if event, ok := any(payload).(*PullRequestEvent); ok {
+			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.PullRequest.HTMLURL))
+		}
+	case Signals[1]:
+		if event, ok := any(payload).(*PullRequestReviewEvent); ok {
+			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Review.HTMLURL))
+		}
+	case Signals[2]:
+		if event, ok := any(payload).(*PullRequestReviewCommentEvent); ok {
+			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Comment.HTMLURL))
+		}
+	case Signals[3]:
+		if event, ok := any(payload).(*PullRequestReviewThreadEvent); ok {
+			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix("TODO"))
+		}
+	case Signals[4]:
+		if event, ok := any(payload).(*IssueCommentEvent); ok {
+			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Comment.HTMLURL))
+		}
+	default:
+		return "" // Fallback in case of unexpected signals: let Temporal use its own default.
+	}
+
+	var ts int64
+	encoded := workflow.SideEffect(ctx, func(_ workflow.Context) any {
+		return time.Now().UnixMilli()
+	})
+	if err := encoded.Get(&ts); err != nil {
+		return id // This should never happen, but just in case.
+	}
+	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
+}
+
+func trimURLPrefix(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	suffix := u.Path
+	if u.RawQuery != "" {
+		suffix += "?" + u.RawQuery
+	}
+	if u.Fragment != "" {
+		suffix += "#" + u.Fragment
+	}
+
+	return strings.TrimPrefix(suffix, "/")
 }
