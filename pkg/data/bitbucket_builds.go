@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"log/slog"
 	"os"
 
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/logger"
 )
 
 type PRStatus struct {
@@ -38,12 +41,15 @@ func ReadBitbucketBuilds(ctx workflow.Context, url string) *PRStatus {
 	return pr
 }
 
-func UpdateBitbucketBuilds(ctx workflow.Context, url, commitHash, key string, cs CommitStatus) error {
+func UpdateBitbucketBuilds(ctx workflow.Context, url, commitHash, key string, cs CommitStatus) {
 	mu := prStatusMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
-	return executeLocalActivity(ctx, updateBitbucketBuildsActivity, nil, url, commitHash, key, cs)
+	if err := executeLocalActivity(ctx, updateBitbucketBuildsActivity, nil, url, commitHash, key, cs); err != nil {
+		logger.From(ctx).Error("failed to update Bitbucket build states", slog.Any("error", err),
+			slog.String("pr_url", url), slog.String("commit_hash", commitHash))
+	}
 }
 
 func DeleteBitbucketBuilds(url string) error {

@@ -59,11 +59,7 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 	defer bitbucket.UpdateChannelBuildsBookmark(ctx, channelID, prURL)
 
 	status := data.CommitStatus{Name: cs.Name, State: cs.State, Desc: cs.Description, URL: cs.URL}
-	if err := data.UpdateBitbucketBuilds(ctx, prURL, cs.Commit.Hash, cs.Key, status); err != nil {
-		logger.From(ctx).Error("failed to update Bitbucket build states", slog.Any("error", err),
-			slog.String("pr_url", prURL), slog.String("commit_hash", cs.Commit.Hash))
-		// Don't abort - it's more important to announce this, even if our internal state is stale.
-	}
+	data.UpdateBitbucketBuilds(ctx, prURL, cs.Commit.Hash, cs.Key, status)
 
 	desc, _, _ := strings.Cut(cs.Description, "\n")
 	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, desc)
