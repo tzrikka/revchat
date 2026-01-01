@@ -70,7 +70,7 @@ func UpsertUser(ctx workflow.Context, email, realName, bitbucketID, githubID, sl
 	defer usersMutex.Unlock()
 
 	if ctx == nil { // For unit tests.
-		return upsertUserActivity(context.TODO(), email, realName, bitbucketID, githubID, slackID, thrippyLink)
+		return upsertUserActivity(context.Background(), email, realName, bitbucketID, githubID, slackID, thrippyLink)
 	}
 
 	err := executeLocalActivity(ctx, upsertUserActivity, nil, email, realName, bitbucketID, githubID, slackID, thrippyLink)

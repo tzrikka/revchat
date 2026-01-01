@@ -12,7 +12,7 @@ func TestReadWriteJSON(t *testing.T) {
 
 	filename := "test.json"
 
-	got, err := readJSON(filename)
+	got, err := readJSONActivity(t.Context(), filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,15 +21,15 @@ func TestReadWriteJSON(t *testing.T) {
 	}
 
 	want := map[string]string{"key": "value"}
-	if err := writeJSON(filename, want); err != nil {
+	if err := writeJSONActivity(t.Context(), filename, want); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err = readJSON(filename)
+	got, err = readJSONActivity(t.Context(), filename)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("readJSON() = %v, want %v", got, want)
+		t.Fatalf("readJSONActivity() = %v, want %v", got, want)
 	}
 }

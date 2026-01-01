@@ -79,7 +79,7 @@ func extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 
 // convertBotIDToUserID uses cached API calls to convert Slack bot IDs to a user IDs.
 func convertBotIDToUserID(ctx workflow.Context, botID string) string {
-	userID, err := data.GetSlackBotUserID(botID)
+	userID, err := data.GetSlackBotUserID(ctx, botID)
 	if err != nil {
 		logger.From(ctx).Error("failed to load Slack bot's user ID", slog.Any("error", err), slog.String("bot_id", botID))
 		return ""
@@ -97,7 +97,7 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 
 	logger.From(ctx).Debug("retrieved bot info from Slack",
 		slog.String("bot_id", botID), slog.String("user_id", bot.UserID), slog.String("name", bot.Name))
-	if err := data.SetSlackBotUserID(botID, bot.UserID); err != nil {
+	if err := data.SetSlackBotUserID(ctx, botID, bot.UserID); err != nil {
 		logger.From(ctx).Error("failed to save Slack bot's user ID", slog.Any("error", err), slog.String("bot_id", botID))
 	}
 

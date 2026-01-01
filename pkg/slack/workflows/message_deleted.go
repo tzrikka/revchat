@@ -39,7 +39,7 @@ func deleteMessageBitbucket(ctx workflow.Context, event MessageEvent, userID str
 		return err
 	}
 
-	if err := data.DeleteURLAndIDMapping(url[0]); err != nil {
+	if err := data.DeleteURLAndIDMapping(ctx, url[0]); err != nil {
 		logger.From(ctx).Error("failed to delete URL/Slack mappings",
 			slog.Any("error", err), slog.String("comment_url", url[0]))
 		// Don't abort - we still want to attempt to delete the PR comment.

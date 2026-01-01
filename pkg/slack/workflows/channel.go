@@ -24,7 +24,7 @@ func ChannelArchivedWorkflow(ctx workflow.Context, event archiveEventWrapper) er
 	logger.From(ctx).Info("Slack channel archived by someone else",
 		slog.String("channel_id", channelID), slog.String("user", event.InnerEvent.User))
 
-	url, err := data.SwitchURLAndID(channelID)
+	url, err := data.SwitchURLAndID(ctx, channelID)
 	if err != nil {
 		logger.From(ctx).Error("failed to convert Slack channel to PR URL",
 			slog.Any("error", err), slog.String("channel_id", channelID))

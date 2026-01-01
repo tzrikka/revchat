@@ -19,7 +19,7 @@ func LookupSlackChannel(ctx workflow.Context, eventType, prURL string) (string, 
 		return "", false
 	}
 
-	channelID, err := data.SwitchURLAndID(prURL)
+	channelID, err := data.SwitchURLAndID(ctx, prURL)
 	if err != nil {
 		logger.From(ctx).Error("failed to retrieve PR's Slack channel ID", slog.Any("error", err),
 			slog.String("event_type", eventType), slog.String("pr_url", prURL))

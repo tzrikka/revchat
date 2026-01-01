@@ -35,7 +35,7 @@ func CleanupPRData(ctx workflow.Context, channelID, prURL string) {
 		logger.From(ctx).Error("failed to delete Bitbucket PR turn-taking state",
 			slog.Any("error", err), slog.String("pr_url", prURL))
 	}
-	if err := DeleteURLAndIDMapping(prURL); err != nil {
+	if err := DeleteURLAndIDMapping(ctx, prURL); err != nil {
 		logger.From(ctx).Error("failed to delete PR URL / Slack channel mappings",
 			slog.Any("error", err), slog.String("pr_url", prURL))
 	}

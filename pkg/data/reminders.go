@@ -1,50 +1,64 @@
 package data
 
 import (
+	"context"
 	"fmt"
 	"sync"
+
+	"go.temporal.io/sdk/workflow"
 )
 
 const (
 	remindersFile = "reminders.json"
 )
 
-func SetReminder(userID, kitchenTime, tz string) error {
-	m, err := readRemindersFile()
+var remindersMutex sync.RWMutex
+
+func SetReminder(ctx workflow.Context, userID, kitchenTime, tz string) error {
+	m, err := ListReminders(ctx)
 	if err != nil {
 		return err
 	}
 
 	m[userID] = fmt.Sprintf("%s %s", kitchenTime, tz)
-	return writeRemindersFile(m)
+
+	remindersMutex.Lock()
+	defer remindersMutex.Unlock()
+
+	if ctx == nil { // For unit testing.
+		return writeJSONActivity(context.Background(), remindersFile, m)
+	}
+	return executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
 }
 
-func DeleteReminder(userID string) error {
-	m, err := readRemindersFile()
+func DeleteReminder(ctx workflow.Context, userID string) error {
+	m, err := ListReminders(ctx)
 	if err != nil {
 		return err
 	}
 
 	delete(m, userID)
-	return writeRemindersFile(m)
-}
 
-func ListReminders() (map[string]string, error) {
-	return readRemindersFile()
-}
-
-var remindersMutex sync.RWMutex
-
-func readRemindersFile() (map[string]string, error) {
-	remindersMutex.RLock()
-	defer remindersMutex.RUnlock()
-
-	return readJSON(remindersFile)
-}
-
-func writeRemindersFile(m map[string]string) error {
 	remindersMutex.Lock()
 	defer remindersMutex.Unlock()
 
-	return writeJSON(remindersFile, m)
+	if ctx == nil { // For unit testing.
+		return writeJSONActivity(context.Background(), remindersFile, m)
+	}
+	return executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
+}
+
+func ListReminders(ctx workflow.Context) (map[string]string, error) {
+	remindersMutex.RLock()
+	defer remindersMutex.RUnlock()
+
+	if ctx == nil { // For unit testing.
+		return readJSONActivity(context.Background(), remindersFile)
+	}
+
+	file := map[string]string{}
+	if err := executeLocalActivity(ctx, readJSONActivity, &file, remindersFile); err != nil {
+		return nil, err
+	}
+	return file, nil
 }

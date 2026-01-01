@@ -56,7 +56,7 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 	if err != nil {
 		// If the channel is archived but we still store data for it, clean it up.
 		if strings.Contains(err.Error(), "is_archived") {
-			url, _ := data.SwitchURLAndID(channelID)
+			url, _ := data.SwitchURLAndID(ctx, channelID)
 			data.CleanupPRData(ctx, channelID, url)
 		}
 		logger.From(ctx).Error("failed to post Slack message", slog.Any("error", err),

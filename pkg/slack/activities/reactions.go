@@ -14,7 +14,7 @@ import (
 // AddOKReaction adds the ":ok:" emoji as a reaction to the
 // Slack message identified by the given PR comment URL.
 func AddOKReaction(ctx workflow.Context, url string) {
-	ids, err := data.SwitchURLAndID(url)
+	ids, err := data.SwitchURLAndID(ctx, url)
 	if err != nil {
 		logger.From(ctx).Error("failed to retrieve PR comment's Slack IDs",
 			slog.Any("error", err), slog.String("comment_url", url))
@@ -34,7 +34,7 @@ func AddOKReaction(ctx workflow.Context, url string) {
 // RemoveOKReaction removes the ":ok:" emoji from the Slack bot's reactions
 // in the Slack message identified by the given PR comment URL.
 func RemoveOKReaction(ctx workflow.Context, url string) {
-	ids, err := data.SwitchURLAndID(url)
+	ids, err := data.SwitchURLAndID(ctx, url)
 	if err != nil {
 		logger.From(ctx).Error("failed to retrieve PR comment's Slack IDs",
 			slog.Any("error", err), slog.String("comment_url", url))

@@ -20,7 +20,7 @@ func TestReminders(t *testing.T) {
 	reminder2 := fmt.Sprintf("%s %s", kt2, tz2)
 
 	// Before mapping.
-	got, err := ListReminders()
+	got, err := ListReminders(nil)
 	if err != nil {
 		t.Fatalf("ListReminders() error = %v", err)
 	}
@@ -29,12 +29,12 @@ func TestReminders(t *testing.T) {
 	}
 
 	// Set a reminder.
-	if err := SetReminder(uid1, kt1, tz1); err != nil {
+	if err := SetReminder(nil, uid1, kt1, tz1); err != nil {
 		t.Fatalf("SetReminder() error = %v", err)
 	}
 
 	// After mapping.
-	got, err = ListReminders()
+	got, err = ListReminders(nil)
 	if err != nil {
 		t.Fatalf("ListReminders() error = %v", err)
 	}
@@ -47,10 +47,10 @@ func TestReminders(t *testing.T) {
 	}
 
 	// Modify mapping.
-	if err := SetReminder(uid1, kt2, tz2); err != nil {
+	if err := SetReminder(nil, uid1, kt2, tz2); err != nil {
 		t.Fatalf("SetReminder() error = %v", err)
 	}
-	got, err = ListReminders()
+	got, err = ListReminders(nil)
 	if err != nil {
 		t.Fatalf("ListReminders() error = %v", err)
 	}
@@ -63,12 +63,12 @@ func TestReminders(t *testing.T) {
 	}
 
 	// Remove mapping.
-	if err := DeleteReminder(uid1); err != nil {
+	if err := DeleteReminder(nil, uid1); err != nil {
 		t.Fatalf("DeleteReminder() error = %v", err)
 	}
 
 	// After removal.
-	got, err = ListReminders()
+	got, err = ListReminders(nil)
 	if err != nil {
 		t.Fatalf("ListReminders() error = %v", err)
 	}

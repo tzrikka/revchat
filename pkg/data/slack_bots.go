@@ -1,35 +1,48 @@
 package data
 
 import (
+	"context"
 	"sync"
+
+	"go.temporal.io/sdk/workflow"
 )
 
 const (
 	slackBotsFile = "slack_bots.json"
 )
 
-func SetSlackBotUserID(botID, userID string) error {
-	m, err := readSlackBotsFile()
+var slackBotsMutex sync.RWMutex
+
+func SetSlackBotUserID(ctx workflow.Context, botID, userID string) error {
+	m, err := readSlackBotsFile(ctx)
 	if err != nil {
 		return err
 	}
 
 	m[botID] = userID
-	return writeSlackBotsFile(m)
+
+	slackBotsMutex.Lock()
+	defer slackBotsMutex.Unlock()
+
+	return executeLocalActivity(ctx, writeJSONActivity, nil, slackBotsFile, m)
 }
 
-func DeleteSlackBotIDs(botID string) error {
-	m, err := readSlackBotsFile()
+func DeleteSlackBotIDs(ctx workflow.Context, botID string) error {
+	m, err := readSlackBotsFile(ctx)
 	if err != nil {
 		return err
 	}
 
 	delete(m, botID)
-	return writeSlackBotsFile(m)
+
+	slackBotsMutex.Lock()
+	defer slackBotsMutex.Unlock()
+
+	return executeLocalActivity(ctx, writeJSONActivity, nil, slackBotsFile, m)
 }
 
-func GetSlackBotUserID(botID string) (string, error) {
-	m, err := readSlackBotsFile()
+func GetSlackBotUserID(ctx workflow.Context, botID string) (string, error) {
+	m, err := readSlackBotsFile(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -37,18 +50,17 @@ func GetSlackBotUserID(botID string) (string, error) {
 	return m[botID], nil
 }
 
-var slackBotsMutex sync.RWMutex
-
-func readSlackBotsFile() (map[string]string, error) {
+func readSlackBotsFile(ctx workflow.Context) (map[string]string, error) {
 	slackBotsMutex.RLock()
 	defer slackBotsMutex.RUnlock()
 
-	return readJSON(slackBotsFile)
-}
+	if ctx == nil { // For unit testing.
+		return readJSONActivity(context.Background(), slackBotsFile)
+	}
 
-func writeSlackBotsFile(m map[string]string) error {
-	slackBotsMutex.Lock()
-	defer slackBotsMutex.Unlock()
-
-	return writeJSON(slackBotsFile, m)
+	file := map[string]string{}
+	if err := executeLocalActivity(ctx, readJSONActivity, &file, slackBotsFile); err != nil {
+		return nil, err
+	}
+	return file, nil
 }

@@ -13,7 +13,7 @@ func TestURLsIDs(t *testing.T) {
 	channel := "channel"
 
 	// Before mapping.
-	got, err := SwitchURLAndID(url)
+	got, err := SwitchURLAndID(nil, url)
 	if err != nil {
 		t.Fatalf("SwitchURLAndID() error = %v", err)
 	}
@@ -23,12 +23,12 @@ func TestURLsIDs(t *testing.T) {
 	}
 
 	// Map PR URL to Slack channel.
-	if err := MapURLAndID(url, channel); err != nil {
+	if err := MapURLAndID(nil, url, channel); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
 
 	// After mapping.
-	got, err = SwitchURLAndID(url)
+	got, err = SwitchURLAndID(nil, url)
 	if err != nil {
 		t.Fatalf("SwitchURLAndID() error = %v", err)
 	}
@@ -38,12 +38,12 @@ func TestURLsIDs(t *testing.T) {
 	}
 
 	// Remove mapping.
-	if err := DeleteURLAndIDMapping("url"); err != nil {
+	if err := DeleteURLAndIDMapping(nil, "url"); err != nil {
 		t.Fatalf("DeleteURLAndIDMapping() error = %v", err)
 	}
 
 	// After removal.
-	got, err = SwitchURLAndID(url)
+	got, err = SwitchURLAndID(nil, url)
 	if err != nil {
 		t.Fatalf("SwitchURLAndID() error = %v", err)
 	}
@@ -59,34 +59,34 @@ func TestURLsIDsThreadDeletion(t *testing.T) {
 	pathCache = map[string]string{} // Reset global state.
 
 	// Initialization.
-	if err := MapURLAndID("url1", "channel1"); err != nil {
+	if err := MapURLAndID(nil, "url1", "channel1"); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
-	if err := MapURLAndID("url1/comment1", "channel1/msg1"); err != nil {
+	if err := MapURLAndID(nil, "url1/comment1", "channel1/msg1"); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
-	if err := MapURLAndID("url1/comment2", "channel1/msg2"); err != nil {
+	if err := MapURLAndID(nil, "url1/comment2", "channel1/msg2"); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
-	if err := MapURLAndID("url1/comment3", "channel1/msg2/thread1"); err != nil {
+	if err := MapURLAndID(nil, "url1/comment3", "channel1/msg2/thread1"); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
 
-	if err := MapURLAndID("url2", "channel2"); err != nil {
+	if err := MapURLAndID(nil, "url2", "channel2"); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
-	if err := MapURLAndID("url2/comment1", "channel2/msg1"); err != nil {
+	if err := MapURLAndID(nil, "url2/comment1", "channel2/msg1"); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
-	if err := MapURLAndID("url2/comment2", "channel2/msg2"); err != nil {
+	if err := MapURLAndID(nil, "url2/comment2", "channel2/msg2"); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
-	if err := MapURLAndID("url2/comment3", "channel2/msg2/thread1"); err != nil {
+	if err := MapURLAndID(nil, "url2/comment3", "channel2/msg2/thread1"); err != nil {
 		t.Fatalf("MapURLAndID() error = %v", err)
 	}
 
 	// Remove "url1" and "channel1" mappings.
-	if err := DeleteURLAndIDMapping("url1"); err != nil {
+	if err := DeleteURLAndIDMapping(nil, "url1"); err != nil {
 		t.Fatalf("DeleteURLAndIDMapping() error = %v", err)
 	}
 
@@ -121,7 +121,7 @@ func TestURLsIDsThreadDeletion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SwitchURLAndID(tt.param)
+			got, err := SwitchURLAndID(nil, tt.param)
 			if err != nil {
 				t.Errorf("SwitchURLAndID() error = %v", err)
 				return

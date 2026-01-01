@@ -84,7 +84,7 @@ func SetReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 		return err
 	}
 
-	if err := data.SetReminder(event.UserID, t, user.TZ); err != nil {
+	if err := data.SetReminder(ctx, event.UserID, t, user.TZ); err != nil {
 		logger.From(ctx).Error("failed to store user reminder time", slog.Any("error", err),
 			slog.String("user_id", event.UserID), slog.String("time", t), slog.String("zone", user.TZ))
 		PostEphemeralError(ctx, event, "failed to write internal data about you.")

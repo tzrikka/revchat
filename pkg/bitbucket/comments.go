@@ -16,7 +16,7 @@ import (
 
 // LookupSlackFileID returns all the Slack IDs associated with a PR comment, if they exist.
 func LookupSlackFileID(ctx workflow.Context, comment *Comment) (string, bool) {
-	fileID, err := data.SwitchURLAndID(HTMLURL(comment.Links) + "/slack_file_id")
+	fileID, err := data.SwitchURLAndID(ctx, HTMLURL(comment.Links)+"/slack_file_id")
 	if err != nil {
 		logger.From(ctx).Error("failed to retrieve PR comment's Slack file ID",
 			slog.Any("error", err), slog.String("pr_url", HTMLURL(comment.Links)))

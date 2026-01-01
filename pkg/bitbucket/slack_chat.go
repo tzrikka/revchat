@@ -90,7 +90,7 @@ func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPre
 	}
 
 	id := idPrefix + ts
-	if err := data.MapURLAndID(url, id); err != nil {
+	if err := data.MapURLAndID(ctx, url, id); err != nil {
 		logger.From(ctx).Error("failed to save PR comment URL / Slack IDs mapping",
 			slog.Any("error", err), slog.String("bitbucket_url", url), slog.String("slack_id", id))
 		// Don't return the error - the message is already posted in Slack, so we
@@ -102,7 +102,7 @@ func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPre
 	}
 
 	// Also remember to delete diff files later, if we update or delete the message.
-	if err := data.MapURLAndID(url+"/slack_file_id", fmt.Sprintf("%s/%s", id, fileID)); err != nil {
+	if err := data.MapURLAndID(ctx, url+"/slack_file_id", fmt.Sprintf("%s/%s", id, fileID)); err != nil {
 		logger.From(ctx).Error("failed to save Slack file mapping", slog.Any("error", err),
 			slog.String("bitbucket_url", url), slog.String("slack_id", id), slog.String("file_id", fileID))
 		// Don't return the error - the message is already posted in Slack, so we
@@ -199,7 +199,7 @@ func DeleteMsg(ctx workflow.Context, url string) error {
 		return err
 	}
 
-	if err := data.DeleteURLAndIDMapping(url); err != nil {
+	if err := data.DeleteURLAndIDMapping(ctx, url); err != nil {
 		logger.From(ctx).Error("failed to delete URL/Slack mappings",
 			slog.Any("error", err), slog.String("comment_url", url))
 		// Don't return the error (i.e. don't abort the calling workflow) -
@@ -219,7 +219,7 @@ func EditMsg(ctx workflow.Context, url, msg string) error {
 }
 
 func msgIDsForCommentURL(ctx workflow.Context, url, action string) ([]string, error) {
-	ids, err := data.SwitchURLAndID(url)
+	ids, err := data.SwitchURLAndID(ctx, url)
 	if err != nil {
 		logger.From(ctx).Error("failed to load PR comment's Slack IDs",
 			slog.Any("error", err), slog.String("url", url))

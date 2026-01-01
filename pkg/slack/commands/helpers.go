@@ -58,7 +58,7 @@ func PostEphemeralError(ctx workflow.Context, event SlashCommandEvent, msg strin
 // This also ensures that the slash command is being run inside a RevChat channel, and
 // indirectly that the user is opted-in since these channels are accessible only to them.
 func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) []string {
-	url, err := data.SwitchURLAndID(event.ChannelID)
+	url, err := data.SwitchURLAndID(ctx, event.ChannelID)
 	if err != nil {
 		logger.From(ctx).Error("failed to convert Slack channel to PR URL",
 			slog.Any("error", err), slog.String("channel_id", event.ChannelID))

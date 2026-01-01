@@ -10,7 +10,7 @@ import (
 )
 
 func commentURL(ctx workflow.Context, ids string) (string, error) {
-	url, err := data.SwitchURLAndID(ids)
+	url, err := data.SwitchURLAndID(ctx, ids)
 	if err != nil {
 		logger.From(ctx).Error("failed to retrieve Slack message's PR comment URL",
 			slog.Any("error", err), slog.String("slack_ids", ids))

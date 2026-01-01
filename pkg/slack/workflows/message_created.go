@@ -57,7 +57,7 @@ func (c *Config) createMessageBitbucket(ctx workflow.Context, event MessageEvent
 	}
 
 	ids = fmt.Sprintf("%s/%s", ids, event.TS)
-	if err := data.MapURLAndID(newCommentURL, ids); err != nil {
+	if err := data.MapURLAndID(ctx, newCommentURL, ids); err != nil {
 		logger.From(ctx).Error("failed to save PR comment URL / Slack IDs mapping", slog.Any("error", err),
 			slog.String("slack_ids", ids), slog.String("comment_url", newCommentURL))
 		// Don't return the error - the message is already created in Bitbucket, so

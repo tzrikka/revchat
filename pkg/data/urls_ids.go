@@ -1,31 +1,41 @@
 package data
 
 import (
+	"context"
 	"strings"
 	"sync"
+
+	"go.temporal.io/sdk/workflow"
 )
 
 const (
 	urlsIDsFile = "urls_ids.json"
 )
 
-// MapURLAndID saves a 2-way mapping between a PR URL
-// and its dedicated chat channel or thread IDs.
-func MapURLAndID(url, id string) error {
-	m, err := readURLsIDsFile()
+var urlsIDsMutex sync.RWMutex
+
+// MapURLAndID saves a 2-way mapping between a PR URL and its dedicated chat channel or thread IDs.
+func MapURLAndID(ctx workflow.Context, url, id string) error {
+	m, err := readURLsIDsFile(ctx)
 	if err != nil {
 		return err
 	}
 
 	m[url] = id
 	m[id] = url
-	return writeURLsIDsFile(m)
+
+	urlsIDsMutex.Lock()
+	defer urlsIDsMutex.Unlock()
+
+	if ctx == nil { // For unit testing.
+		return writeJSONActivity(context.Background(), urlsIDsFile, m)
+	}
+	return executeLocalActivity(ctx, writeJSONActivity, nil, urlsIDsFile, m)
 }
 
-// SwitchURLAndID converts a PR URL to its mapped
-// chat channel or thread IDs, and vice versa.
-func SwitchURLAndID(key string) (string, error) {
-	m, err := readURLsIDsFile()
+// SwitchURLAndID converts a PR URL to its mapped chat channel or thread IDs, and vice versa.
+func SwitchURLAndID(ctx workflow.Context, key string) (string, error) {
+	m, err := readURLsIDsFile(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -35,8 +45,8 @@ func SwitchURLAndID(key string) (string, error) {
 
 // DeleteURLAndIDMapping deletes the 2-way mapping between PR URLs and chat channel and thread
 // IDs when they become obsolete (i.e. when the PR is merged, closed, or marked as a draft).
-func DeleteURLAndIDMapping(key string) error {
-	m, err := readURLsIDsFile()
+func DeleteURLAndIDMapping(ctx workflow.Context, key string) error {
+	m, err := readURLsIDsFile(ctx)
 	if err != nil {
 		return err
 	}
@@ -55,21 +65,26 @@ func DeleteURLAndIDMapping(key string) error {
 		delete(m, k)
 	}
 
-	return writeURLsIDsFile(m)
-}
-
-var urlsIDsMutex sync.RWMutex
-
-func readURLsIDsFile() (map[string]string, error) {
-	urlsIDsMutex.RLock()
-	defer urlsIDsMutex.RUnlock()
-
-	return readJSON(urlsIDsFile)
-}
-
-func writeURLsIDsFile(m map[string]string) error {
 	urlsIDsMutex.Lock()
 	defer urlsIDsMutex.Unlock()
 
-	return writeJSON(urlsIDsFile, m)
+	if ctx == nil { // For unit testing.
+		return writeJSONActivity(context.Background(), urlsIDsFile, m)
+	}
+	return executeLocalActivity(ctx, writeJSONActivity, nil, urlsIDsFile, m)
+}
+
+func readURLsIDsFile(ctx workflow.Context) (map[string]string, error) {
+	urlsIDsMutex.RLock()
+	defer urlsIDsMutex.RUnlock()
+
+	if ctx == nil { // For unit testing.
+		return readJSONActivity(context.Background(), urlsIDsFile)
+	}
+
+	file := map[string]string{}
+	if err := executeLocalActivity(ctx, readJSONActivity, &file, urlsIDsFile); err != nil {
+		return nil, err
+	}
+	return file, nil
 }

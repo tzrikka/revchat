@@ -27,7 +27,7 @@ func RemindersWorkflow(ctx workflow.Context) error {
 		return nil
 	}
 
-	reminders, err := data.ListReminders()
+	reminders, err := data.ListReminders(ctx)
 	if err != nil {
 		return err
 	}

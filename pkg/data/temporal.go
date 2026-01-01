@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -37,7 +38,7 @@ func executeLocalActivity(ctx workflow.Context, activity, result any, args ...an
 	return workflow.ExecuteLocalActivity(ctx, activity, args...).Get(ctx, result)
 }
 
-func readJSON(filename string) (map[string]string, error) {
+func readJSONActivity(ctx context.Context, filename string) (map[string]string, error) {
 	path, err := cachedDataPath(filename, "")
 	if err != nil {
 		return nil, err
@@ -66,7 +67,7 @@ func readJSON(filename string) (map[string]string, error) {
 	return m, nil
 }
 
-func writeJSON(filename string, m map[string]string) error {
+func writeJSONActivity(_ context.Context, filename string, m map[string]string) error {
 	path, err := cachedDataPath(filename, "")
 	if err != nil {
 		return err
