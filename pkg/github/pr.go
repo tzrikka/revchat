@@ -109,7 +109,7 @@ func (c Config) prReadyForReview(ctx workflow.Context, event PullRequestEvent) e
 // https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/requesting-a-pull-request-review
 func (c Config) prReviewRequests(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	if _, found := lookupChannel(ctx, event.Action, event.PullRequest); !found {
+	if _, found := lookupChannel(ctx, event.PullRequest); !found {
 		return nil
 	}
 
@@ -120,7 +120,7 @@ func (c Config) prReviewRequests(ctx workflow.Context, event PullRequestEvent) e
 func (c Config) prEdited(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	pr := event.PullRequest
-	channelID, found := lookupChannel(ctx, event.Action, pr)
+	channelID, found := lookupChannel(ctx, pr)
 	if !found {
 		return nil
 	}
@@ -162,7 +162,7 @@ func (c Config) prEdited(ctx workflow.Context, event PullRequestEvent) error {
 func (c Config) prSynchronized(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	pr := event.PullRequest
-	channelID, found := lookupChannel(ctx, event.Action, pr)
+	channelID, found := lookupChannel(ctx, pr)
 	if !found {
 		return nil
 	}

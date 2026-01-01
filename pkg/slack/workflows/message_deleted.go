@@ -3,7 +3,6 @@ package workflows
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -28,28 +27,23 @@ func deleteMessageBitbucket(ctx workflow.Context, event MessageEvent, userID str
 		return nil
 	}
 
+	// Need to impersonate in Bitbucket the user who deleted the Slack message.
+	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
+	if err != nil || linkID == "" {
+		return err
+	}
+
 	ids := fmt.Sprintf("%s/%s", event.Channel, event.DeletedTS)
 	if event.PreviousMessage.ThreadTS != "" && event.PreviousMessage.ThreadTS != event.DeletedTS {
 		ids = fmt.Sprintf("%s/%s/%s", event.Channel, event.PreviousMessage.ThreadTS, event.DeletedTS)
 	}
 
-	// If we're not tracking this PR, there's no need/way to mirror this event.
 	url, err := urlParts(ctx, ids)
-	if err != nil || url == nil {
+	if err != nil {
 		return err
 	}
 
-	if err := data.DeleteURLAndIDMapping(ctx, url[0]); err != nil {
-		logger.From(ctx).Error("failed to delete URL/Slack mappings",
-			slog.Any("error", err), slog.String("comment_url", url[0]))
-		// Don't abort - we still want to attempt to delete the PR comment.
-	}
-
-	// Need to impersonate in Bitbucket the user who sent the Slack message.
-	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
-	if err != nil || linkID == "" {
-		return err
-	}
+	data.DeleteURLAndIDMapping(ctx, url[0])
 
 	return activities.DeletePullRequestComment(ctx, linkID, url[1], url[2], url[3], url[5])
 }

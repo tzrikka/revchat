@@ -27,20 +27,19 @@ func (c *Config) editMessageBitbucket(ctx workflow.Context, event MessageEvent, 
 		return nil
 	}
 
+	// Need to impersonate in Bitbucket the user who edited the Slack message.
+	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
+	if err != nil || linkID == "" {
+		return err
+	}
+
 	ids := fmt.Sprintf("%s/%s", event.Channel, event.Message.TS)
 	if event.Message.ThreadTS != "" && event.Message.ThreadTS != event.Message.TS {
 		ids = fmt.Sprintf("%s/%s/%s", event.Channel, event.Message.ThreadTS, event.Message.TS)
 	}
 
-	// If we're not tracking this PR, there's no need/way to mirror this event.
 	url, err := urlParts(ctx, ids)
-	if err != nil || url == nil {
-		return err
-	}
-
-	// Need to impersonate in Bitbucket the user who sent the Slack message.
-	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
-	if err != nil || linkID == "" {
+	if err != nil {
 		return err
 	}
 

@@ -2,10 +2,13 @@ package data
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"sync"
 
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/logger"
 )
 
 const (
@@ -14,7 +17,8 @@ const (
 
 var urlsIDsMutex sync.RWMutex
 
-// MapURLAndID saves a 2-way mapping between a PR URL and its dedicated chat channel or thread IDs.
+// MapURLAndID saves a 2-way mapping between PR and PR comment URLs and their corresponding Slack channel and
+// thread IDs. An error in mapping a new Slack channel is critical, but an error in mapping Slack messages isn't.
 func MapURLAndID(ctx workflow.Context, url, id string) error {
 	m, err := readURLsIDsFile(ctx)
 	if err != nil {
@@ -24,16 +28,10 @@ func MapURLAndID(ctx workflow.Context, url, id string) error {
 	m[url] = id
 	m[id] = url
 
-	urlsIDsMutex.Lock()
-	defer urlsIDsMutex.Unlock()
-
-	if ctx == nil { // For unit testing.
-		return writeJSONActivity(context.Background(), urlsIDsFile, m)
-	}
-	return executeLocalActivity(ctx, writeJSONActivity, nil, urlsIDsFile, m)
+	return writeURLsIDsFile(ctx, m)
 }
 
-// SwitchURLAndID converts a PR URL to its mapped chat channel or thread IDs, and vice versa.
+// SwitchURLAndID converts the URL of a PR or PR comment into the corresponding channel or thread IDs, and vice versa.
 func SwitchURLAndID(ctx workflow.Context, key string) (string, error) {
 	m, err := readURLsIDsFile(ctx)
 	if err != nil {
@@ -43,12 +41,12 @@ func SwitchURLAndID(ctx workflow.Context, key string) (string, error) {
 	return m[key], nil
 }
 
-// DeleteURLAndIDMapping deletes the 2-way mapping between PR URLs and chat channel and thread
-// IDs when they become obsolete (i.e. when the PR is merged, closed, or marked as a draft).
-func DeleteURLAndIDMapping(ctx workflow.Context, key string) error {
+// DeleteURLAndIDMapping deletes the 2-way mapping between PR and PR comment URLs and their corresponding Slack channel and
+// thread IDs when they become obsolete. Errors here are notable but not critical, so they are logged but not returned.
+func DeleteURLAndIDMapping(ctx workflow.Context, key string) {
 	m, err := readURLsIDsFile(ctx)
 	if err != nil {
-		return err
+		return
 	}
 
 	delete(m, m[key])
@@ -69,9 +67,9 @@ func DeleteURLAndIDMapping(ctx workflow.Context, key string) error {
 	defer urlsIDsMutex.Unlock()
 
 	if ctx == nil { // For unit testing.
-		return writeJSONActivity(context.Background(), urlsIDsFile, m)
+		_ = writeJSONActivity(context.Background(), urlsIDsFile, m)
 	}
-	return executeLocalActivity(ctx, writeJSONActivity, nil, urlsIDsFile, m)
+	_ = executeLocalActivity(ctx, writeJSONActivity, nil, urlsIDsFile, m)
 }
 
 func readURLsIDsFile(ctx workflow.Context) (map[string]string, error) {
@@ -84,7 +82,26 @@ func readURLsIDsFile(ctx workflow.Context) (map[string]string, error) {
 
 	file := map[string]string{}
 	if err := executeLocalActivity(ctx, readJSONActivity, &file, urlsIDsFile); err != nil {
+		logger.From(ctx).Error("failed to read mapping of PR URLs and Slack IDs", slog.Any("error", err))
 		return nil, err
 	}
+
 	return file, nil
+}
+
+func writeURLsIDsFile(ctx workflow.Context, m map[string]string) error {
+	urlsIDsMutex.Lock()
+	defer urlsIDsMutex.Unlock()
+
+	if ctx == nil { // For unit testing.
+		return writeJSONActivity(context.Background(), urlsIDsFile, m)
+	}
+
+	err := executeLocalActivity(ctx, writeJSONActivity, nil, urlsIDsFile, m)
+	if err != nil {
+		logger.From(ctx).Error("failed to write mapping of PR URLs and Slack IDs", slog.Any("error", err))
+		return err
+	}
+
+	return nil
 }

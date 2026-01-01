@@ -21,7 +21,7 @@ import (
 
 func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
-	channelID, found := lookupChannel(ctx, event.Action, event.PullRequest)
+	channelID, found := lookupChannel(ctx, event.PullRequest)
 	if !found {
 		return nil
 	}
@@ -30,7 +30,7 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 5*time.Second)
 
-	c.cleanupPRData(ctx, event.PullRequest.HTMLURL)
+	data.DeleteURLAndIDMapping(ctx, event.PullRequest.HTMLURL)
 
 	state := event.Action + " this PR"
 	if event.Action == "closed" && event.PullRequest.Merged {
@@ -53,30 +53,14 @@ func (c Config) archiveChannel(ctx workflow.Context, event PullRequestEvent) err
 	return nil
 }
 
-// lookupChannel returns the ID of a channel associated
-// with a PR, if the PR is active and the channel is found.
-func lookupChannel(ctx workflow.Context, action string, pr PullRequest) (string, bool) {
+// lookupChannel returns the ID of a channel associated with a PR, if the PR is active and the channel is found.
+func lookupChannel(ctx workflow.Context, pr PullRequest) (string, bool) {
 	if pr.Draft {
 		return "", false
 	}
 
-	channelID, err := data.SwitchURLAndID(ctx, pr.HTMLURL)
-	if err != nil {
-		logger.From(ctx).Error("failed to retrieve PR's Slack channel ID", slog.Any("error", err),
-			slog.String("action", action), slog.String("pr_url", pr.HTMLURL))
-		return "", false
-	}
-
+	channelID, _ := data.SwitchURLAndID(ctx, pr.HTMLURL)
 	return channelID, channelID != ""
-}
-
-// cleanupPRData deletes all data associated with a PR. If there are errors,
-// they are logged but ignored, as they do not affect the overall workflow.
-func (c Config) cleanupPRData(ctx workflow.Context, url string) {
-	if err := data.DeleteURLAndIDMapping(ctx, url); err != nil {
-		logger.From(ctx).Error("failed to delete PR URL / Slack channel mappings",
-			slog.Any("error", err), slog.String("pr_url", url))
-	}
 }
 
 func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error {
@@ -89,12 +73,9 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 		return err
 	}
 
-	// Map the PR to the Slack channel ID, for 2-way event syncs.
 	if err := data.MapURLAndID(ctx, url, channelID); err != nil {
-		logger.From(ctx).Error("failed to save PR URL / Slack channel mapping",
-			slog.Any("error", err), slog.String("channel_id", channelID), slog.String("pr_url", url))
 		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
-		c.cleanupPRData(ctx, url)
+		data.DeleteURLAndIDMapping(ctx, url)
 		return err
 	}
 
@@ -107,7 +88,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	err = activities.InviteUsersToChannel(ctx, channelID, c.prParticipants(ctx, pr))
 	if err != nil {
 		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
-		c.cleanupPRData(ctx, url)
+		data.DeleteURLAndIDMapping(ctx, url)
 		return err
 	}
 

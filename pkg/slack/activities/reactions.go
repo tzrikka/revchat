@@ -16,8 +16,6 @@ import (
 func AddOKReaction(ctx workflow.Context, url string) {
 	ids, err := data.SwitchURLAndID(ctx, url)
 	if err != nil {
-		logger.From(ctx).Error("failed to retrieve PR comment's Slack IDs",
-			slog.Any("error", err), slog.String("comment_url", url))
 		return
 	}
 
@@ -36,8 +34,6 @@ func AddOKReaction(ctx workflow.Context, url string) {
 func RemoveOKReaction(ctx workflow.Context, url string) {
 	ids, err := data.SwitchURLAndID(ctx, url)
 	if err != nil {
-		logger.From(ctx).Error("failed to retrieve PR comment's Slack IDs",
-			slog.Any("error", err), slog.String("comment_url", url))
 		return
 	}
 

@@ -17,19 +17,18 @@ func ChannelArchivedWorkflow(ctx workflow.Context, event archiveEventWrapper) er
 	if selfTriggeredEvent(ctx, event.Authorizations, event.InnerEvent.User) {
 		return nil
 	}
+	if !isRevChatChannel(ctx, event.InnerEvent.Channel) {
+		return nil
+	}
 
-	// Channel archived by someone other than RevChat. The most common reason is
-	// that the last member has left the channel, so Slackbot auto-archived it.
+	// RevChat channel archived by someone other than RevChat. The most common reason
+	// is that the last member has left the channel, so Slackbot auto-archived it.
 	channelID := event.InnerEvent.Channel
-	logger.From(ctx).Info("Slack channel archived by someone else",
+	logger.From(ctx).Info("RevChat channel archived by someone else",
 		slog.String("channel_id", channelID), slog.String("user", event.InnerEvent.User))
 
-	url, err := data.SwitchURLAndID(ctx, channelID)
-	if err != nil {
-		logger.From(ctx).Error("failed to convert Slack channel to PR URL",
-			slog.Any("error", err), slog.String("channel_id", channelID))
-		return err
-	}
+	// Even if we fail to find the URL, we still want to clean up whatever we can.
+	url, _ := data.SwitchURLAndID(ctx, channelID)
 
 	data.CleanupPRData(ctx, channelID, url)
 	return nil

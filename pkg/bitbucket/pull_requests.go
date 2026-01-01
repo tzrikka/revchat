@@ -48,10 +48,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 			slog.Any("error", err), slog.String("channel_id", channelID), slog.String("pr_url", prURL))
 	}
 
-	if err := data.MapURLAndID(ctx, prURL, channelID); err != nil {
-		logger.From(ctx).Error("failed to save PR URL / Slack channel mapping", slog.Any("error", err),
-			slog.String("channel_id", channelID), slog.String("pr_url", prURL))
-	}
+	_ = data.MapURLAndID(ctx, prURL, channelID)
 }
 
 // accountIDs extracts the IDs from a slice of [Account]s.

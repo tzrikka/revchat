@@ -11,20 +11,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
-	"github.com/tzrikka/revchat/pkg/data"
 )
-
-// LookupSlackFileID returns all the Slack IDs associated with a PR comment, if they exist.
-func LookupSlackFileID(ctx workflow.Context, comment *Comment) (string, bool) {
-	fileID, err := data.SwitchURLAndID(ctx, HTMLURL(comment.Links)+"/slack_file_id")
-	if err != nil {
-		logger.From(ctx).Error("failed to retrieve PR comment's Slack file ID",
-			slog.Any("error", err), slog.String("pr_url", HTMLURL(comment.Links)))
-		return "", false
-	}
-
-	return fileID, fileID != ""
-}
 
 // BeautifyInlineComment adds an informative prefix to the comment's text.
 // If the comment contains a suggestion code block, it removes that block

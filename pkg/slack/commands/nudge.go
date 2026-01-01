@@ -15,9 +15,9 @@ import (
 )
 
 func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer string) error {
-	url := prDetailsFromChannel(ctx, event)
+	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return nil // Not a server error as far as we're concerned.
+		return err // May or may not be nil.
 	}
 
 	users := extractAtLeastOneUserID(ctx, event)

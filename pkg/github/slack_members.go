@@ -15,7 +15,7 @@ import (
 
 func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) error {
 	// Already confirmed the Slack channel exists before calling this function.
-	channelID, _ := lookupChannel(ctx, event.Action, event.PullRequest)
+	channelID, _ := lookupChannel(ctx, event.PullRequest)
 	var err error
 
 	// Individual assignee.

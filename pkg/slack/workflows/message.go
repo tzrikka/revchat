@@ -2,7 +2,6 @@ package workflows
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -109,16 +108,22 @@ var commentURLPattern = regexp.MustCompile(`^https://[^/]+/([^/]+)/([^/]+)/pull-
 const expectedSubmatches = 6
 
 func urlParts(ctx workflow.Context, ids string) ([]string, error) {
-	url, err := commentURL(ctx, ids)
-	if err != nil || url == "" {
+	url, err := data.SwitchURLAndID(ctx, ids)
+	if err != nil {
 		return nil, err
+	}
+	if url == "" {
+		// When calling this function, we already confirmed that the channel is a
+		// RevChat channel and the user is opted-in, so there should be a mapping.
+		logger.From(ctx).Debug("didn't find Slack message's PR comment URL", slog.String("slack_ids", ids))
+		return nil, errors.New("didn't find Slack message's PR comment URL")
 	}
 
 	parts := commentURLPattern.FindStringSubmatch(url)
 	if len(parts) != expectedSubmatches {
 		logger.From(ctx).Error("failed to parse Slack message's PR comment URL",
 			slog.String("slack_ids", ids), slog.String("comment_url", url))
-		return nil, fmt.Errorf("invalid Bitbucket PR URL: %s", url)
+		return nil, errors.New("invalid Bitbucket PR comment URL: " + url)
 	}
 
 	return parts, nil

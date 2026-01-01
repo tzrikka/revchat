@@ -11,9 +11,9 @@ import (
 )
 
 func Approve(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace string) error {
-	url := prDetailsFromChannel(ctx, event)
+	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return nil
+		return err // May or may not be nil.
 	}
 
 	user, _, err := UserDetails(ctx, event, event.UserID)
@@ -43,9 +43,9 @@ func Approve(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace s
 }
 
 func Unapprove(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace string) (err error) {
-	url := prDetailsFromChannel(ctx, event)
+	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return nil
+		return err // May or may not be nil.
 	}
 
 	user, _, err := UserDetails(ctx, event, event.UserID)

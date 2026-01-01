@@ -107,11 +107,7 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 	}
 
 	// Slack channel link.
-	channelID, err := data.SwitchURLAndID(ctx, url)
-	if err != nil {
-		logger.From(ctx).Error("failed to retrieve Slack channel ID for reminder",
-			slog.Any("error", err), slog.String("pr_url", url))
-	} else {
+	if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
 		summary.WriteString(fmt.Sprintf("\n          ◦   <#%s>", channelID))
 	}
 

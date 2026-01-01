@@ -1,6 +1,7 @@
 package bitbucket
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -28,7 +29,7 @@ func MentionUserInMsg(ctx workflow.Context, channelID string, user Account, msg 
 }
 
 func MentionUserInReply(ctx workflow.Context, parentURL string, user Account, msg string) error {
-	ids, err := msgIDsForCommentURL(ctx, parentURL, "post")
+	ids, err := msgIDsForCommentURL(ctx, parentURL)
 	if err != nil || ids == nil {
 		return err
 	}
@@ -66,16 +67,16 @@ func SlackDisplayName(ctx workflow.Context, user Account) string {
 }
 
 func ImpersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string, diff []byte) error {
-	return impersonateUserInBoth(ctx, url, channelID, "", channelID+"/", msg, user, diff)
+	return impersonateUserInBoth(ctx, url, channelID, "", channelID, msg, user, diff)
 }
 
 func ImpersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string, diff []byte) error {
-	ids, err := msgIDsForCommentURL(ctx, parentURL, "post")
+	ids, err := msgIDsForCommentURL(ctx, parentURL)
 	if err != nil || ids == nil {
 		return err
 	}
 
-	return impersonateUserInBoth(ctx, url, ids[0], ids[1], fmt.Sprintf("%s/%s/", ids[0], ids[1]), msg, user, diff)
+	return impersonateUserInBoth(ctx, url, ids[0], ids[1], fmt.Sprintf("%s/%s", ids[0], ids[1]), msg, user, diff)
 }
 
 func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPrefix, msg string, user Account, diff []byte) error {
@@ -89,26 +90,14 @@ func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPre
 		return err
 	}
 
-	id := idPrefix + ts
-	if err := data.MapURLAndID(ctx, url, id); err != nil {
-		logger.From(ctx).Error("failed to save PR comment URL / Slack IDs mapping",
-			slog.Any("error", err), slog.String("bitbucket_url", url), slog.String("slack_id", id))
-		// Don't return the error - the message is already posted in Slack, so we
-		// don't want to retry and post it again, even though this is problematic.
-	}
+	_ = data.MapURLAndID(ctx, url, fmt.Sprintf("%s/%s", idPrefix, ts))
 
 	if fileID == "" {
 		return nil
 	}
 
 	// Also remember to delete diff files later, if we update or delete the message.
-	if err := data.MapURLAndID(ctx, url+"/slack_file_id", fmt.Sprintf("%s/%s", id, fileID)); err != nil {
-		logger.From(ctx).Error("failed to save Slack file mapping", slog.Any("error", err),
-			slog.String("bitbucket_url", url), slog.String("slack_id", id), slog.String("file_id", fileID))
-		// Don't return the error - the message is already posted in Slack, so we
-		// don't want to retry and post it again, even though this is problematic.
-	}
-
+	_ = data.MapURLAndID(ctx, url+"/slack_file_id", fmt.Sprintf("%s/%s/%s", idPrefix, ts, fileID))
 	return nil
 }
 
@@ -194,23 +183,18 @@ func impersonateUser(ctx workflow.Context, user Account) (displayName, icon stri
 }
 
 func DeleteMsg(ctx workflow.Context, url string) error {
-	ids, err := msgIDsForCommentURL(ctx, url, "delete")
+	ids, err := msgIDsForCommentURL(ctx, url)
 	if err != nil || ids == nil {
 		return err
 	}
 
-	if err := data.DeleteURLAndIDMapping(ctx, url); err != nil {
-		logger.From(ctx).Error("failed to delete URL/Slack mappings",
-			slog.Any("error", err), slog.String("comment_url", url))
-		// Don't return the error (i.e. don't abort the calling workflow) -
-		// we still want to attempt to delete the Slack message.
-	}
+	data.DeleteURLAndIDMapping(ctx, url)
 
 	return activities.DeleteMessage(ctx, ids[0], ids[len(ids)-1])
 }
 
 func EditMsg(ctx workflow.Context, url, msg string) error {
-	ids, err := msgIDsForCommentURL(ctx, url, "update")
+	ids, err := msgIDsForCommentURL(ctx, url)
 	if err != nil || ids == nil {
 		return err
 	}
@@ -218,19 +202,24 @@ func EditMsg(ctx workflow.Context, url, msg string) error {
 	return activities.UpdateMessage(ctx, ids[0], ids[len(ids)-1], msg)
 }
 
-func msgIDsForCommentURL(ctx workflow.Context, url, action string) ([]string, error) {
+func msgIDsForCommentURL(ctx workflow.Context, url string) ([]string, error) {
 	ids, err := data.SwitchURLAndID(ctx, url)
 	if err != nil {
-		logger.From(ctx).Error("failed to load PR comment's Slack IDs",
-			slog.Any("error", err), slog.String("url", url))
 		return nil, err
+	}
+	if ids == "" {
+		// When calling this function, we know the event is relevant, but we don't
+		// know if the PR is older than RevChat's history, which is beyond our control.
+		// Even so, if we can't find the mapping, it's likely that something is wrong.
+		logger.From(ctx).Debug("didn't find PR comment's Slack message IDs", slog.String("comment_url", url))
+		return nil, errors.New("didn't find PR comment's Slack message IDs")
 	}
 
 	parts := strings.Split(ids, "/")
 	if len(parts) < 2 {
-		msg := fmt.Sprintf("can't %s Slack message - missing/bad IDs", action)
-		logger.From(ctx).Warn(msg, slog.String("bitbucket_url", url), slog.String("slack_ids", ids))
-		return nil, nil
+		logger.From(ctx).Error("failed to parse Slack message IDs",
+			slog.String("comment_url", url), slog.String("slack_ids", ids))
+		return nil, errors.New("invalid Slack message IDs: " + ids)
 	}
 
 	return parts, nil

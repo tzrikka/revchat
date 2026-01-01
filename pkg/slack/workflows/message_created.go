@@ -3,7 +3,6 @@ package workflows
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -31,20 +30,19 @@ func (c *Config) createMessageBitbucket(ctx workflow.Context, event MessageEvent
 		return nil // Slack bot, not a real user.
 	}
 
+	// Need to impersonate in Bitbucket the user who posted the Slack message.
+	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
+	if err != nil || linkID == "" {
+		return err
+	}
+
 	ids := event.Channel
 	if event.ThreadTS != "" {
 		ids = fmt.Sprintf("%s/%s", event.Channel, event.ThreadTS)
 	}
 
-	// If we're not tracking this PR, there's no need/way to mirror this event.
 	url, err := urlParts(ctx, ids)
-	if err != nil || url == nil {
-		return err
-	}
-
-	// Need to impersonate in Bitbucket the user who sent the Slack message.
-	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
-	if err != nil || linkID == "" {
+	if err != nil {
 		return err
 	}
 
@@ -56,14 +54,7 @@ func (c *Config) createMessageBitbucket(ctx workflow.Context, event MessageEvent
 		return err
 	}
 
-	ids = fmt.Sprintf("%s/%s", ids, event.TS)
-	if err := data.MapURLAndID(ctx, newCommentURL, ids); err != nil {
-		logger.From(ctx).Error("failed to save PR comment URL / Slack IDs mapping", slog.Any("error", err),
-			slog.String("slack_ids", ids), slog.String("comment_url", newCommentURL))
-		// Don't return the error - the message is already created in Bitbucket, so
-		// we don't want to retry and post it again, even though this is problematic.
-	}
-
+	_ = data.MapURLAndID(ctx, newCommentURL, fmt.Sprintf("%s/%s", ids, event.TS))
 	return nil
 }
 

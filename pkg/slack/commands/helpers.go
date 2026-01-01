@@ -57,34 +57,31 @@ func PostEphemeralError(ctx workflow.Context, event SlashCommandEvent, msg strin
 // prDetailsFromChannel extracts the PR details based on the Slack channel's ID.
 // This also ensures that the slash command is being run inside a RevChat channel, and
 // indirectly that the user is opted-in since these channels are accessible only to them.
-func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) []string {
+func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) ([]string, error) {
 	url, err := data.SwitchURLAndID(ctx, event.ChannelID)
 	if err != nil {
-		logger.From(ctx).Error("failed to convert Slack channel to PR URL",
-			slog.Any("error", err), slog.String("channel_id", event.ChannelID))
-		PostEphemeralError(ctx, event, "failed to read internal data about the PR.")
-		return nil
+		PostEphemeralError(ctx, event, "failed to read internal data about this channel.")
+		return nil, err
 	}
-
 	if url == "" {
 		PostEphemeralError(ctx, event, "this command can only be used inside RevChat channels.")
-		return nil // Not a server error as far as we're concerned.
+		return nil, nil // Not a server error as far as we're concerned.
 	}
 
 	match := bitbucketURLPattern.FindStringSubmatch(url)
 	if len(match) != 4 {
 		logger.From(ctx).Error("failed to parse PR URL", slog.String("pr_url", url))
-		PostEphemeralError(ctx, event, "this command can only be used inside RevChat channels.")
-		return nil
+		PostEphemeralError(ctx, event, "failed to determine the context of this channel.")
+		return nil, fmt.Errorf("failed to parse PR URL: %s", url)
 	}
 
-	return match
+	return match, nil
 }
 
 func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []string, pr map[string]any, err error) {
-	url = prDetailsFromChannel(ctx, event)
+	url, err = prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return nil, nil, nil, nil
+		return nil, nil, nil, err // The error may or may not be nil.
 	}
 
 	pr, err = data.LoadBitbucketPR(url[0])

@@ -25,10 +25,7 @@ func DeleteFile(ctx workflow.Context, ids string) {
 			slog.Any("error", err), slog.String("file_id", fileID))
 	}
 
-	if err := data.DeleteURLAndIDMapping(ctx, ids); err != nil {
-		logger.From(ctx).Error("failed to delete Slack file mapping",
-			slog.Any("error", err), slog.String("ids", ids))
-	}
+	data.DeleteURLAndIDMapping(ctx, ids)
 }
 
 func Upload(ctx workflow.Context, content []byte, filename, title, snippetType, mimeType, channelID, threadTS string) (*slack.File, error) {

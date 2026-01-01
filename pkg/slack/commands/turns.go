@@ -15,9 +15,9 @@ import (
 )
 
 func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []string, data.User, error) {
-	url := prDetailsFromChannel(ctx, event)
+	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return "", nil, data.User{}, nil // Not a server error as far as we're concerned.
+		return "", nil, data.User{}, err // The error may or may not be nil.
 	}
 
 	emails, err := data.GetCurrentTurn(ctx, url[0])
@@ -116,9 +116,9 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 }
 
 func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
-	url := prDetailsFromChannel(ctx, event)
+	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return nil // Not a server error as far as we're concerned.
+		return err // May or may not be nil.
 	}
 
 	ok, err := data.FreezeTurn(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID))
@@ -136,9 +136,9 @@ func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 }
 
 func UnfreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
-	url := prDetailsFromChannel(ctx, event)
+	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return nil // Not a server error as far as we're concerned.
+		return err // May or may not be nil.
 	}
 
 	ok, err := data.UnfreezeTurn(ctx, url[0])

@@ -1,31 +1,14 @@
 package workflows
 
 import (
-	"log/slog"
-
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
-func commentURL(ctx workflow.Context, ids string) (string, error) {
-	url, err := data.SwitchURLAndID(ctx, ids)
-	if err != nil {
-		logger.From(ctx).Error("failed to retrieve Slack message's PR comment URL",
-			slog.Any("error", err), slog.String("slack_ids", ids))
-		return "", err
-	}
-
-	if url == "" {
-		logger.From(ctx).Debug("Slack message's PR comment URL is empty", slog.String("slack_ids", ids))
-	}
-
-	return url, nil
-}
-
 func isRevChatChannel(ctx workflow.Context, channelID string) bool {
-	url, _ := commentURL(ctx, channelID)
+	url, _ := data.SwitchURLAndID(ctx, channelID)
 	return url != ""
 }
 
