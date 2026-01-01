@@ -71,7 +71,7 @@ func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) []strin
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	match := bitbucketURLPattern.FindStringSubmatch(url) // TODO: Support GitHub too.
+	match := bitbucketURLPattern.FindStringSubmatch(url)
 	if len(match) != 4 {
 		logger.From(ctx).Error("failed to parse PR URL", slog.String("pr_url", url))
 		PostEphemeralError(ctx, event, "this command can only be used inside RevChat channels.")
@@ -87,13 +87,13 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 		return nil, nil, nil, nil
 	}
 
-	pr, err = data.LoadBitbucketPR(url[0]) // TODO: Support GitHub too.
+	pr, err = data.LoadBitbucketPR(url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to load PR snapshot.")
 		return url, nil, nil, err
 	}
 
-	paths = data.ReadBitbucketDiffstatPaths(url[0]) // TODO: Support GitHub too.
+	paths = data.ReadBitbucketDiffstatPaths(url[0])
 	if len(paths) == 0 {
 		PostEphemeralError(ctx, event, "no file paths found in PR diffstat.")
 		return url, nil, pr, nil
@@ -105,9 +105,8 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 // UserDetails retrieves the user details from internal data based on
 // their Slack ID, and (based on that) whether they are opted-in or not.
 func UserDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (data.User, bool, error) {
-	user, err := data.SelectUserBySlackID(userID)
+	user, optedIn, err := data.SelectUserBySlackID(ctx, userID)
 	if err != nil {
-		logger.From(ctx).Error("failed to load user by Slack ID", slog.Any("error", err), slog.String("user_id", userID))
 		msg := "failed to read internal data about you."
 		if userID != event.UserID {
 			msg = fmt.Sprintf("failed to read internal data about <@%s>.", userID)
@@ -116,5 +115,5 @@ func UserDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (
 		return data.User{}, false, err
 	}
 
-	return user, data.IsOptedIn(user), nil
+	return user, optedIn, nil
 }

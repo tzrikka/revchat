@@ -30,8 +30,7 @@ func EmailToSlackID(ctx workflow.Context, email string) string {
 		return ""
 	}
 
-	user, _ := data.SelectUserByEmail(email)
-	if user.SlackID != "" {
+	if user := data.SelectUserByEmail(ctx, email); user.SlackID != "" {
 		return user.SlackID
 	}
 
@@ -56,7 +55,7 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 		return ""
 	}
 
-	user, _ := data.SelectUserBySlackID(userID)
+	user, _, _ := data.SelectUserBySlackID(ctx, userID)
 	if user.Email != "" {
 		return user.Email
 	}
@@ -143,7 +142,7 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 		return ""
 	}
 
-	user, _ := data.SelectUserBySlackID(userID)
+	user, _, _ := data.SelectUserBySlackID(ctx, userID)
 	if user.RealName != "" {
 		return user.RealName
 	}
@@ -173,10 +172,10 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 // the user is not found. It uses persistent data storage, or API calls as a fallback.
 func SlackMentionToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackUserRef string) string {
 	userID := slackUserRef[2 : len(slackUserRef)-1]
-	user, _ := data.SelectUserBySlackID(userID)
+	user, _, _ := data.SelectUserBySlackID(ctx, userID)
 	if user.BitbucketID == "" {
 		// Workaround in case the user's Slack ID isn't stored, but the rest is.
-		user, _ = data.SelectUserByEmail(SlackIDToEmail(ctx, userID))
+		user = data.SelectUserByEmail(ctx, SlackIDToEmail(ctx, userID))
 	}
 
 	if user.BitbucketID != "" {

@@ -29,19 +29,19 @@ func TestUsers(t *testing.T) {
 		t.Errorf("SelectUserByBitbucketID() email = %q, want %q", got.Email, email)
 	}
 
-	got, err := SelectUserByGitHubID(id)
-	if err != nil {
-		t.Errorf("SelectUserByGitHubID() error = %v", err)
-	}
+	got = SelectUserByGitHubID(nil, id)
 	if got.Email != "" {
 		t.Errorf("SelectUserByGitHubID() email = %q, want %q", got.Email, "")
 	}
 
-	got, err = SelectUserBySlackID(id)
-	if err != nil {
-		t.Errorf("SelectUserBySlackID() error = %v", err)
+	gotUser, gotOptedIn, gotErr := SelectUserBySlackID(nil, id)
+	if gotErr != nil {
+		t.Fatalf("SelectUserBySlackID() error = %v", gotErr)
 	}
-	if got.Email != "" {
-		t.Errorf("SelectUserBySlackID() email = %q, want %q", got.Email, "")
+	if gotUser.Email != "" {
+		t.Errorf("SelectUserBySlackID() email = %q, want %q", gotUser.Email, "")
+	}
+	if gotOptedIn {
+		t.Errorf("SelectUserBySlackID() optedIn = %v, want %v", gotOptedIn, false)
 	}
 }

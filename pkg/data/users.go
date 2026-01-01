@@ -69,6 +69,10 @@ func UpsertUser(ctx workflow.Context, email, realName, bitbucketID, githubID, sl
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
 
+	if ctx == nil { // For unit tests.
+		return upsertUserActivity(context.TODO(), email, realName, bitbucketID, githubID, slackID, thrippyLink)
+	}
+
 	err := executeLocalActivity(ctx, upsertUserActivity, nil, email, realName, bitbucketID, githubID, slackID, thrippyLink)
 	if err != nil {
 		logger.From(ctx).Error("failed to upsert user data", slog.Any("error", err),
@@ -77,7 +81,6 @@ func UpsertUser(ctx workflow.Context, email, realName, bitbucketID, githubID, sl
 			slog.String("slack_id", slackID), slog.String("thrippy_link", thrippyLink))
 		return fmt.Errorf("failed to upsert user data: %w", err)
 	}
-
 	return nil
 }
 
@@ -90,7 +93,6 @@ func FollowUser(ctx workflow.Context, followerSlackID, followedSlackID string) b
 			slog.String("follower_id", followerSlackID), slog.String("followed_id", followedSlackID))
 		return false
 	}
-
 	return true
 }
 
@@ -103,7 +105,6 @@ func UnfollowUser(ctx workflow.Context, followerSlackID, followedSlackID string)
 			slog.String("follower_id", followerSlackID), slog.String("followed_id", followedSlackID))
 		return false
 	}
-
 	return true
 }
 
@@ -115,14 +116,104 @@ func SelectUserByBitbucketID(ctx workflow.Context, accountID string) User {
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
 
-	user := User{}
-	if err := executeLocalActivity(ctx, selectUserActivity, &user, indexByBitbucketID, accountID); err != nil {
+	if ctx == nil { // For unit tests.
+		user, _ := selectUserActivity(nil, indexByBitbucketID, accountID)
+		return user
+	}
+
+	user := new(User)
+	if err := executeLocalActivity(ctx, selectUserActivity, user, indexByBitbucketID, accountID); err != nil {
 		logger.From(ctx).Warn("unexpected but not critical: failed to load user data by Bitbucket ID",
 			slog.Any("error", err), slog.String("account_id", accountID))
 		return User{}
 	}
+	return *user
+}
 
-	return user
+func SelectUserByEmail(ctx workflow.Context, email string) User {
+	if email == "" {
+		return User{}
+	}
+
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if ctx == nil { // For unit tests.
+		user, _ := selectUserActivity(nil, indexByEmail, strings.ToLower(email))
+		return user
+	}
+
+	user := new(User)
+	if err := executeLocalActivity(ctx, selectUserActivity, user, indexByEmail, strings.ToLower(email)); err != nil {
+		logger.From(ctx).Error("failed to load user data by email", slog.Any("error", err), slog.String("email", email))
+		return User{}
+	}
+	return *user
+}
+
+func SelectUserByGitHubID(ctx workflow.Context, login string) User {
+	if login == "" {
+		return User{}
+	}
+
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if ctx == nil { // For unit tests.
+		user, _ := selectUserActivity(nil, indexByGitHubID, login)
+		return user
+	}
+
+	user := new(User)
+	if err := executeLocalActivity(ctx, selectUserActivity, user, indexByGitHubID, strings.ToLower(login)); err != nil {
+		logger.From(ctx).Error("failed to load user data by GitHub ID", slog.Any("error", err), slog.String("login", login))
+		return User{}
+	}
+	return *user
+}
+
+func SelectUserBySlackID(ctx workflow.Context, userID string) (User, bool, error) {
+	if userID == "" {
+		return User{}, false, nil
+	}
+
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if ctx == nil { // For unit tests.
+		user, err := selectUserActivity(nil, indexBySlackID, userID)
+		return user, user.ThrippyLink != "", err
+	}
+
+	user := new(User)
+	if err := executeLocalActivity(ctx, selectUserActivity, user, indexBySlackID, userID); err != nil {
+		logger.From(ctx).Error("failed to load user data by Slack ID", slog.Any("error", err), slog.String("user_id", userID))
+		return User{}, false, err
+	}
+
+	return *user, user.ThrippyLink != "", nil
+}
+
+func SelectUserByRealName(ctx workflow.Context, realName string) User {
+	if realName == "" {
+		return User{}
+	}
+
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if ctx == nil { // For unit tests.
+		user, _ := selectUserActivity(nil, indexByRealName, realName)
+		return user
+	}
+
+	user := new(User)
+	if err := executeLocalActivity(ctx, selectUserActivity, user, indexByRealName, realName); err != nil {
+		logger.From(ctx).Error("failed to load user data by real name",
+			slog.Any("error", err), slog.String("real_name", realName))
+		return User{}
+	}
+	return *user
 }
 
 func upsertUserActivity(_ context.Context, email, realName, bitbucketID, githubID, slackID, thrippyLink string) error {
@@ -265,54 +356,6 @@ func (u *Users) findUserIndex(email, realName, bitbucketID, githubID, slackID st
 	}
 
 	return i, nil
-}
-
-func SelectUserByEmail(email string) (User, error) {
-	if email == "" {
-		return User{}, nil
-	}
-
-	usersMutex.Lock()
-	defer usersMutex.Unlock()
-
-	return selectUserActivity(nil, indexByEmail, strings.ToLower(email))
-}
-
-func SelectUserByGitHubID(login string) (User, error) {
-	if login == "" {
-		return User{}, nil
-	}
-
-	usersMutex.Lock()
-	defer usersMutex.Unlock()
-
-	return selectUserActivity(nil, indexByGitHubID, login)
-}
-
-func SelectUserBySlackID(userID string) (User, error) {
-	if userID == "" {
-		return User{}, nil
-	}
-
-	usersMutex.Lock()
-	defer usersMutex.Unlock()
-
-	return selectUserActivity(nil, indexBySlackID, userID)
-}
-
-func SelectUserByRealName(realName string) (User, error) {
-	if realName == "" {
-		return User{}, nil
-	}
-
-	usersMutex.Lock()
-	defer usersMutex.Unlock()
-
-	return selectUserActivity(nil, indexByRealName, realName)
-}
-
-func IsOptedIn(u User) bool {
-	return u.ThrippyLink != ""
 }
 
 func selectUserActivity(ctx workflow.Context, indexType int, id string) (User, error) {

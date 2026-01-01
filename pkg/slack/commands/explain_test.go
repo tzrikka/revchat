@@ -39,7 +39,7 @@ func TestOwnerMention(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ownerMention(tt.owner, tt.approvers)
+			got := ownerMention(nil, tt.owner, tt.approvers)
 			if got != tt.want {
 				t.Errorf("ownerMention(%q) = %q, want %q", tt.owner, got, tt.want)
 			}

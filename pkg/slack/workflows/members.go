@@ -19,14 +19,13 @@ func MemberJoinedWorkflow(ctx workflow.Context, event memberEventWrapper) error 
 		return nil
 	}
 
-	user, err := data.SelectUserBySlackID(e.User)
+	_, optedIn, err := data.SelectUserBySlackID(ctx, e.User)
 	if err != nil {
-		logger.From(ctx).Error("failed to load user by Slack ID", slog.Any("error", err), slog.String("user_id", e.User))
 		return err
 	}
 
 	// If a user was added by someone else, check if the invitee is opted-in.
-	if data.IsOptedIn(user) {
+	if optedIn {
 		return nil
 	}
 

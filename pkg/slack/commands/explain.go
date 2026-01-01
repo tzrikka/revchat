@@ -24,7 +24,7 @@ func Explain(ctx workflow.Context, event SlashCommandEvent) error {
 	workspace, repo, branch, commit := slack.DestinationDetails(pr)
 	owners, groups := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths, false)
 
-	msg := explainCodeOwners(paths, owners, groups, approversForExplain(ctx, pr))
+	msg := explainCodeOwners(ctx, paths, owners, groups, approversForExplain(ctx, pr))
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
@@ -60,7 +60,7 @@ func approversForExplain(ctx workflow.Context, pr map[string]any) map[string]boo
 	return mentions
 }
 
-func explainCodeOwners(paths []string, owners, groups map[string][]string, approvers map[string]bool) string {
+func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[string][]string, approvers map[string]bool) string {
 	var msg strings.Builder
 	msg.WriteString(":mag_right: Code owners per file in this PR:")
 
@@ -75,14 +75,14 @@ func explainCodeOwners(paths []string, owners, groups map[string][]string, appro
 		// First set of bullets: direct owners.
 		var nestedOwners []string
 		for _, owner := range fileOwners {
-			msg.WriteString("\n          ◦   " + ownerMention(owner, approvers))
+			msg.WriteString("\n          ◦   " + ownerMention(ctx, owner, approvers))
 			if strings.HasPrefix(owner, "@") {
 				msg.WriteString(" - ")
 				for i, member := range groups[owner] {
 					if i > 0 {
 						msg.WriteString(", ")
 					}
-					msg.WriteString(ownerMention(member, approvers))
+					msg.WriteString(ownerMention(ctx, member, approvers))
 					if strings.HasPrefix(member, "@") && !slices.Contains(nestedOwners, member) {
 						nestedOwners = append(nestedOwners, member)
 					}
@@ -107,7 +107,7 @@ func explainCodeOwners(paths []string, owners, groups map[string][]string, appro
 				if i > 0 {
 					msg.WriteString(", ")
 				}
-				msg.WriteString(ownerMention(member, approvers))
+				msg.WriteString(ownerMention(ctx, member, approvers))
 			}
 		}
 	}
@@ -137,7 +137,7 @@ func explainCodeOwners(paths []string, owners, groups map[string][]string, appro
 	return msg.String()
 }
 
-func ownerMention(owner string, approvers map[string]bool) string {
+func ownerMention(ctx workflow.Context, owner string, approvers map[string]bool) string {
 	if name, isGroup := strings.CutPrefix(owner, "@"); isGroup {
 		return name
 	}
@@ -148,8 +148,8 @@ func ownerMention(owner string, approvers map[string]bool) string {
 		plusOne = " :+1:"
 	}
 
-	user, err := data.SelectUserByRealName(owner)
-	if err != nil || user.SlackID == "" {
+	user := data.SelectUserByRealName(ctx, owner)
+	if user.SlackID == "" {
 		return owner + plusOne
 	}
 

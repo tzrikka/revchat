@@ -253,13 +253,12 @@ func thrippyLinkID(ctx workflow.Context, userID, channelID string) (string, erro
 		return "", nil // Slack bot, not a real user.
 	}
 
-	user, err := data.SelectUserBySlackID(userID)
+	user, optedIn, err := data.SelectUserBySlackID(ctx, userID)
 	if err != nil {
-		logger.From(ctx).Error("failed to load user by Slack ID", slog.Any("error", err), slog.String("user_id", userID))
 		return "", err
 	}
 
-	if !data.IsOptedIn(user) {
+	if !optedIn {
 		msg := ":warning: Cannot mirror this in the PR, you need to run this slash command: `/revchat opt-in`"
 		return "", activities.PostEphemeralMessage(ctx, channelID, userID, msg)
 	}

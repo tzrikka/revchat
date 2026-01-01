@@ -22,8 +22,7 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 	owners, _ := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths, true)
 	reviewers := slack.RequiredReviewers(paths, owners)
 	for i, fullName := range reviewers {
-		user, _ := data.SelectUserByRealName(fullName)
-		if user.BitbucketID != "" {
+		if user := data.SelectUserByRealName(ctx, fullName); user.BitbucketID != "" {
 			reviewers[i] = user.BitbucketID
 		}
 	}

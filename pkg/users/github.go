@@ -2,12 +2,10 @@ package users
 
 import (
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
@@ -20,10 +18,8 @@ func GitHubToSlackID(ctx workflow.Context, username string, checkOptIn bool) str
 		return ""
 	}
 
-	user, err := data.SelectUserByGitHubID(username)
-	if err != nil {
-		logger.From(ctx).Error("failed to load user by GitHub ID",
-			slog.Any("error", err), slog.String("username", username))
+	user := data.SelectUserByGitHubID(ctx, username)
+	if user.SlackID == "" {
 		return ""
 	}
 

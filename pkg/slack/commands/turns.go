@@ -193,13 +193,12 @@ func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak 
 	}
 
 	for _, email := range emails {
-		u, err := data.SelectUserByEmail(email)
-		if err != nil {
-			logger.From(ctx).Error("failed to load user by email", slog.Any("error", err), slog.String("email", email))
+		user := data.SelectUserByEmail(ctx, email)
+		if user.SlackID == "" {
 			msg.WriteString(fmt.Sprintf(" `%s`", email))
 			continue
 		}
-		msg.WriteString(fmt.Sprintf(" <@%s>", u.SlackID))
+		msg.WriteString(fmt.Sprintf(" <@%s>", user.SlackID))
 	}
 
 	if comma {

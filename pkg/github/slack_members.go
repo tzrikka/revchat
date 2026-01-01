@@ -2,13 +2,11 @@ package github
 
 import (
 	"fmt"
-	"log/slog"
 	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -96,14 +94,8 @@ func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, s
 	}
 
 	slackID := strings.TrimSuffix(strings.TrimPrefix(slackRef, "<@"), ">")
-	user, err := data.SelectUserBySlackID(slackID)
-	if err != nil {
-		logger.From(ctx).Error("failed to load user by Slack ID",
-			slog.Any("error", err), slog.String("user_id", slackID))
-		return ""
-	}
-
-	if !data.IsOptedIn(user) {
+	user, optedIn, _ := data.SelectUserBySlackID(ctx, slackID)
+	if user.SlackID == "" || !optedIn {
 		return ""
 	}
 
