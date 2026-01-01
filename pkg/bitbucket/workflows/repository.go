@@ -59,7 +59,7 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 	defer bitbucket.UpdateChannelBuildsBookmark(ctx, channelID, prURL)
 
 	status := data.CommitStatus{Name: cs.Name, State: cs.State, Desc: cs.Description, URL: cs.URL}
-	if err := data.UpdateBitbucketBuilds(prURL, cs.Commit.Hash, cs.Key, status); err != nil {
+	if err := data.UpdateBitbucketBuilds(ctx, prURL, cs.Commit.Hash, cs.Key, status); err != nil {
 		logger.From(ctx).Error("failed to update Bitbucket build states", slog.Any("error", err),
 			slog.String("pr_url", prURL), slog.String("commit_hash", cs.Commit.Hash))
 		// Don't abort - it's more important to announce this, even if our internal state is stale.
@@ -77,7 +77,7 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 
 	// Other than announcing this specific event, also announce if the PR is ready to be merged
 	// (all builds are successful, the PR has at least 2 approvals, and no pending action items).
-	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(prURL) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
+	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(ctx, prURL) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
 		return err
 	}
 	approvers := 0
@@ -178,8 +178,8 @@ func buildStateEmoji(state string) string {
 	}
 }
 
-func allBuildsSuccessful(url string) bool {
-	prStatus := data.ReadBitbucketBuilds(url)
+func allBuildsSuccessful(ctx workflow.Context, url string) bool {
+	prStatus := data.ReadBitbucketBuilds(ctx, url)
 	if prStatus == nil || len(prStatus.Builds) < 2 {
 		return false
 	}

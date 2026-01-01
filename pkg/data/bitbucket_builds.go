@@ -1,14 +1,13 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
-	"maps"
 	"os"
-	"slices"
-	"strings"
+
+	"go.temporal.io/sdk/workflow"
 )
 
 type PRStatus struct {
@@ -25,12 +24,13 @@ type CommitStatus struct {
 
 var prStatusMutexes RWMutexMap
 
-func ReadBitbucketBuilds(url string) *PRStatus {
+func ReadBitbucketBuilds(ctx workflow.Context, url string) *PRStatus {
 	mu := prStatusMutexes.Get(url)
 	mu.RLock()
 	defer mu.RUnlock()
 
-	pr, err := readStatusFile(url)
+	pr := new(PRStatus)
+	err := executeLocalActivity(ctx, readBitbucketBuildsActivity, pr, url)
 	if err != nil {
 		return nil
 	}
@@ -38,41 +38,34 @@ func ReadBitbucketBuilds(url string) *PRStatus {
 	return pr
 }
 
-func SummarizeBitbucketBuilds(url string) string {
-	mu := prStatusMutexes.Get(url)
-	mu.RLock()
-	defer mu.RUnlock()
-
-	pr, err := readStatusFile(url)
-	if err != nil {
-		return ""
-	}
-
-	keys := slices.Sorted(maps.Keys(pr.Builds))
-	var summary []string
-	for _, k := range keys {
-		switch s := pr.Builds[k].State; s {
-		case "INPROGRESS":
-			// Don't show in-progress builds in summary.
-		case "SUCCESSFUL":
-			summary = append(summary, "large_green_circle")
-		default: // "FAILED", "STOPPED".
-			summary = append(summary, "red_circle")
-		}
-	}
-
-	// Returns a sequence of space-separated emoji.
-	if len(summary) > 0 {
-		return fmt.Sprintf(":%s:", strings.Join(summary, ": :"))
-	}
-	return ""
-}
-
-func UpdateBitbucketBuilds(url, commitHash, key string, cs CommitStatus) error {
+func UpdateBitbucketBuilds(ctx workflow.Context, url, commitHash, key string, cs CommitStatus) error {
 	mu := prStatusMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
+	return executeLocalActivity(ctx, updateBitbucketBuildsActivity, nil, url, commitHash, key, cs)
+}
+
+func DeleteBitbucketBuilds(url string) error {
+	mu := prStatusMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
+
+	path, err := cachedDataPath(url, "_status")
+	if err != nil {
+		return err
+	}
+
+	return os.Remove(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+}
+
+// readBitbucketBuildsActivity runs as a local activity and expects the caller to hold the appropriate mutex.
+func readBitbucketBuildsActivity(_ context.Context, url string) (*PRStatus, error) {
+	return readStatusFile(url)
+}
+
+// updateBitbucketBuildsActivity runs as a local activity and expects the caller to hold the appropriate mutex.
+func updateBitbucketBuildsActivity(ctx context.Context, url, commitHash, key string, cs CommitStatus) error {
 	pr, err := readStatusFile(url)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
@@ -103,7 +96,6 @@ func UpdateBitbucketBuilds(url, commitHash, key string, cs CommitStatus) error {
 	return e.Encode(pr)
 }
 
-// readStatusFile expects the caller to hold the appropriate mutex.
 func readStatusFile(url string) (*PRStatus, error) {
 	path, err := cachedDataPath(url, "_status")
 	if err != nil {
@@ -122,17 +114,4 @@ func readStatusFile(url string) (*PRStatus, error) {
 	}
 
 	return pr, nil
-}
-
-func DeleteBitbucketBuilds(url string) error {
-	mu := prStatusMutexes.Get(url)
-	mu.Lock()
-	defer mu.Unlock()
-
-	path, err := cachedDataPath(url, "_status")
-	if err != nil {
-		return err
-	}
-
-	return os.Remove(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
 }

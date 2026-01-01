@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -122,7 +124,7 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 		summary.WriteString(fmt.Sprintf(", updated `%s` ago", updated))
 	}
 
-	if b := data.SummarizeBitbucketBuilds(url); b != "" {
+	if b := summarizeBuilds(ctx, url); b != "" {
 		summary.WriteString(", build states: ")
 		summary.WriteString(b)
 	}
@@ -171,6 +173,32 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 	// list.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
 
 	return summary.String()
+}
+
+func summarizeBuilds(ctx workflow.Context, url string) string {
+	pr := data.ReadBitbucketBuilds(ctx, url)
+	if pr == nil {
+		return ""
+	}
+
+	keys := slices.Sorted(maps.Keys(pr.Builds))
+	var summary []string
+	for _, k := range keys {
+		switch s := pr.Builds[k].State; s {
+		case "INPROGRESS":
+			// Don't show in-progress builds in summary.
+		case "SUCCESSFUL":
+			summary = append(summary, "large_green_circle")
+		default: // "FAILED", "STOPPED".
+			summary = append(summary, "red_circle")
+		}
+	}
+
+	// Returns a sequence of space-separated emoji.
+	if len(summary) > 0 {
+		return fmt.Sprintf(":%s:", strings.Join(summary, ": :"))
+	}
+	return ""
 }
 
 func approvers(ctx workflow.Context, pr map[string]any) (int, string) {

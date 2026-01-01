@@ -111,7 +111,7 @@ func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 		return
 	}
 
-	results := data.ReadBitbucketBuilds(url)
+	results := data.ReadBitbucketBuilds(ctx, url)
 	if results == nil {
 		return
 	}
