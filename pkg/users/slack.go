@@ -15,56 +15,61 @@ import (
 )
 
 var (
-	displayNameCache = cache.New(24*time.Hour, cache.DefaultCleanupInterval)
-	iconCache        = cache.New(24*time.Hour, cache.DefaultCleanupInterval)
+	displayNameCache = cache.New(4*time.Hour, cache.DefaultCleanupInterval)
+	iconCache        = cache.New(4*time.Hour, cache.DefaultCleanupInterval)
+
+	// No need for thread safety here: this is set only once per process, and even
+	// if multiple workflows set it concurrently, the value will be the same anyway.
+	workspaceURL = ""
 )
 
-// SlackToBitbucketRef converts a Slack user reference ("<@U123>") into a Bitbucket account
-// ID ("@{account:uuid}"). This depends on the user's email address being the same in both
-// systems. This function returns the Slack display name if the user is not found.
-func SlackToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackUserRef string) string {
-	userID := slackUserRef[2 : len(slackUserRef)-1]
-	accountID, _ := EmailToBitbucketID(ctx, bitbucketWorkspace, SlackIDToEmail(ctx, userID))
-	if accountID != "" {
-		return fmt.Sprintf("@{%s}", accountID)
+// EmailToSlackID retrieves a Slack user's ID based on their email address. This function returns an
+// empty string if the user ID is not found. It uses persistent data storage, or API calls as a fallback.
+func EmailToSlackID(ctx workflow.Context, email string) string {
+	if email == "" || email == "bot" {
+		return ""
 	}
 
-	if realName := SlackIDToRealName(ctx, userID); realName != "" {
-		return realName
+	user, _ := data.SelectUserByEmail(email)
+	if user.SlackID != "" {
+		return user.SlackID
 	}
 
-	return slackUserRef // Fallback: return the original Slack user reference.
+	slackUser, err := slack.UsersLookupByEmail(ctx, email)
+	if err != nil {
+		logger.From(ctx).Error("failed to retrieve Slack user info", slog.Any("error", err), slog.String("email", email))
+		return ""
+	}
+
+	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+	_ = data.UpsertUser(ctx, email, slackUser.RealName, "", "", slackUser.ID, "")
+	displayNameCache.Set(slackUser.ID, slackUser.Profile.DisplayName, cache.DefaultExpiration)
+	iconCache.Set(slackUser.ID, slackUser.Profile.Image48, cache.DefaultExpiration)
+
+	return slackUser.ID
 }
 
-// SlackIDToEmail retrieves a Slack user's email address based on their ID.
-// This function uses persistent data storage, and API calls as a fallback.
+// SlackIDToEmail converts a Slack user's ID into their email address. This function returns an empty
+// string if the user ID is not found. It uses persistent data storage, or API calls as a fallback.
 func SlackIDToEmail(ctx workflow.Context, userID string) string {
 	if userID == "" {
 		return ""
 	}
 
-	user, err := data.SelectUserBySlackID(userID)
-	if err != nil {
-		logger.From(ctx).Error("failed to load user by Slack ID",
-			slog.Any("error", err), slog.String("user_id", userID))
-		// Don't return the error (i.e. abort the calling workflow) - use the Slack API as a fallback.
-	}
+	user, _ := data.SelectUserBySlackID(userID)
 	if user.Email != "" {
 		return user.Email
 	}
 
 	info, err := slack.UsersInfo(ctx, userID)
 	if err != nil {
-		logger.From(ctx).Error("failed to retrieve Slack user info",
-			slog.Any("error", err), slog.String("user_id", userID))
+		logger.From(ctx).Error("failed to retrieve Slack user info", slog.Any("error", err), slog.String("user_id", userID))
 		return ""
 	}
 
 	if info.IsBot {
-		if err := data.UpsertUser("bot", "", "", userID, "", ""); err != nil {
-			logger.From(ctx).Error("failed to save Slack bot ID mapping", slog.Any("error", err),
-				slog.String("user_id", userID), slog.String("email", "bot"))
-		}
+		// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+		_ = data.UpsertUser(ctx, "bot", "", "", "", userID, "")
 		return "bot"
 	}
 
@@ -75,30 +80,70 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 		return ""
 	}
 
-	if err := data.UpsertUser(email, "", "", userID, info.RealName, ""); err != nil {
-		logger.From(ctx).Error("failed to save Slack user details", slog.Any("error", err),
-			slog.String("user_id", userID), slog.String("email", email))
-		// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-	}
+	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+	_ = data.UpsertUser(ctx, email, info.RealName, "", "", userID, "")
 	displayNameCache.Set(userID, info.Profile.DisplayName, cache.DefaultExpiration)
 	iconCache.Set(userID, info.Profile.Image48, cache.DefaultExpiration)
 
 	return email
 }
 
+// SlackIDToIcon retrieves a Slack user's icon path based on their ID.
+// This function uses ephemeral data caching, or API calls as a fallback.
+func SlackIDToIcon(ctx workflow.Context, userID string) string {
+	if userID == "" {
+		return ""
+	}
+
+	if icon, found := iconCache.Get(userID); found {
+		return icon
+	}
+
+	info, err := slack.UsersInfo(ctx, userID)
+	if err != nil {
+		logger.From(ctx).Error("failed to retrieve Slack user info", slog.Any("error", err), slog.String("user_id", userID))
+		return ""
+	}
+
+	displayNameCache.Set(userID, info.Profile.DisplayName, cache.DefaultExpiration)
+	iconCache.Set(userID, info.Profile.Image48, cache.DefaultExpiration)
+
+	return info.Profile.Image48
+}
+
+// SlackIDToDisplayName retrieves a Slack user's display name based on their ID.
+// This function uses ephemeral data caching, or API calls as a fallback.
+// Note that display names are not permanent like [SlackIDToRealName].
+func SlackIDToDisplayName(ctx workflow.Context, userID string) string {
+	if userID == "" {
+		return ""
+	}
+
+	if displayName, found := displayNameCache.Get(userID); found {
+		return "@" + displayName
+	}
+
+	info, err := slack.UsersInfo(ctx, userID)
+	if err != nil {
+		logger.From(ctx).Error("failed to retrieve Slack user info", slog.Any("error", err), slog.String("user_id", userID))
+		return ""
+	}
+
+	displayNameCache.Set(userID, info.Profile.DisplayName, cache.DefaultExpiration)
+	iconCache.Set(userID, info.Profile.Image48, cache.DefaultExpiration)
+
+	return "@" + info.Profile.DisplayName
+}
+
 // SlackIDToRealName retrieves a Slack user's full name based on their ID.
-// This function uses persistent data storage, and API calls as a fallback.
+// This function uses persistent data storage, or API calls as a fallback.
+// Note that real names are permanent unlike [SlackIDToDisplayName].
 func SlackIDToRealName(ctx workflow.Context, userID string) string {
 	if userID == "" {
 		return ""
 	}
 
-	user, err := data.SelectUserBySlackID(userID)
-	if err != nil {
-		logger.From(ctx).Error("failed to load user by Slack ID",
-			slog.Any("error", err), slog.String("user_id", userID))
-		// Don't abort - try to use the Slack API as a fallback.
-	}
+	user, _ := data.SelectUserBySlackID(userID)
 	if user.RealName != "" {
 		return user.RealName
 	}
@@ -115,99 +160,49 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 		email = "bot"
 	}
 
-	realName := info.RealName
-	if err := data.UpsertUser(email, "", "", userID, realName, ""); err != nil {
-		logger.From(ctx).Error("failed to save Slack user details", slog.Any("error", err),
-			slog.String("user_id", userID), slog.String("real_name", realName))
-		// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-	}
+	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+	_ = data.UpsertUser(ctx, email, info.RealName, "", "", userID, "")
 	displayNameCache.Set(userID, info.Profile.DisplayName, cache.DefaultExpiration)
 	iconCache.Set(userID, info.Profile.Image48, cache.DefaultExpiration)
 
-	return realName
+	return info.RealName
 }
 
-// SlackIDToDisplayName retrieves a Slack user's display name based on their ID.
-// This function uses ephemeral data caching, and API calls as a fallback.
-func SlackIDToDisplayName(ctx workflow.Context, userID string) string {
-	if userID == "" {
-		return ""
+// SlackMentionToBitbucketRef converts a Slack user mention ("<@U123>") into a Bitbucket
+// account ID ("@{account:uuid}"). This function returns the user's full/display name if
+// the user is not found. It uses persistent data storage, or API calls as a fallback.
+func SlackMentionToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackUserRef string) string {
+	userID := slackUserRef[2 : len(slackUserRef)-1]
+	user, _ := data.SelectUserBySlackID(userID)
+	if user.BitbucketID == "" {
+		// Workaround in case the user's Slack ID isn't stored, but the rest is.
+		user, _ = data.SelectUserByEmail(SlackIDToEmail(ctx, userID))
 	}
 
-	if displayName, found := displayNameCache.Get(userID); found {
-		return "@" + displayName
+	if user.BitbucketID != "" {
+		return fmt.Sprintf("@{%s}", user.BitbucketID)
 	}
 
-	info, err := slack.UsersInfo(ctx, userID)
-	if err != nil {
-		logger.From(ctx).Error("failed to retrieve Slack user info",
-			slog.Any("error", err), slog.String("user_id", userID))
-		return ""
+	// Fallback 1: slower but better, based on the user's email address.
+	if accountID := EmailToBitbucketID(ctx, bitbucketWorkspace, SlackIDToEmail(ctx, userID)); accountID != "" {
+		return fmt.Sprintf("@{%s}", accountID)
 	}
 
-	displayNameCache.Set(userID, info.Profile.DisplayName, cache.DefaultExpiration)
-	iconCache.Set(userID, info.Profile.Image48, cache.DefaultExpiration)
-
-	return "@" + info.Profile.DisplayName
-}
-
-// SlackIDToIcon retrieves a Slack user's icon path based on their ID.
-// This function uses ephemeral data caching, and API calls as a fallback.
-func SlackIDToIcon(ctx workflow.Context, userID string) string {
-	if userID == "" {
-		return ""
+	if workspaceURL == "" {
+		if resp, err := slack.AuthTest(ctx); err == nil {
+			workspaceURL = resp.URL
+		}
 	}
 
-	if icon, found := iconCache.Get(userID); found {
-		return icon
+	// Fallback 2: return the Slack user's full name, as a link to their profile.
+	if realName := SlackIDToRealName(ctx, userID); realName != "" {
+		return fmt.Sprintf("[%s](%steam/%s)", realName, workspaceURL, userID)
 	}
 
-	info, err := slack.UsersInfo(ctx, userID)
-	if err != nil {
-		logger.From(ctx).Error("failed to retrieve Slack user info",
-			slog.Any("error", err), slog.String("user_id", userID))
-		return ""
+	// Fallback 3: return the Slack user's display name, as a link to their profile.
+	if displayName := SlackIDToDisplayName(ctx, userID); displayName != "" {
+		return fmt.Sprintf("[%s](%steam/%s)", displayName, workspaceURL, userID)
 	}
 
-	displayNameCache.Set(userID, info.Profile.DisplayName, cache.DefaultExpiration)
-	iconCache.Set(userID, info.Profile.Image48, cache.DefaultExpiration)
-
-	return info.Profile.Image48
-}
-
-// EmailToSlackID retrieves a Slack user's ID based on their email address.
-// This function uses data caching, and API calls as a fallback.
-func EmailToSlackID(ctx workflow.Context, email string) string {
-	if email == "" || email == "bot" {
-		return ""
-	}
-
-	user, err := data.SelectUserByEmail(email)
-	if err != nil {
-		logger.From(ctx).Error("failed to load user by email",
-			slog.Any("error", err), slog.String("email", email))
-		// Don't abort - try to use the Slack API as a fallback.
-	}
-	if user.SlackID != "" {
-		return user.SlackID
-	} else if user.Email == email {
-		logger.From(ctx).Debug("user in DB without Slack ID", slog.String("email", email))
-	}
-
-	slackUser, err := slack.UsersLookupByEmail(ctx, email)
-	if err != nil {
-		logger.From(ctx).Error("failed to retrieve Slack user info",
-			slog.Any("error", err), slog.String("email", email))
-		return ""
-	}
-
-	if err := data.UpsertUser(email, "", "", slackUser.ID, slackUser.RealName, ""); err != nil {
-		logger.From(ctx).Error("failed to save Slack user details", slog.Any("error", err),
-			slog.String("user_id", slackUser.ID), slog.String("email", email))
-		// Don't return the error (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-	}
-	displayNameCache.Set(slackUser.ID, slackUser.Profile.DisplayName, cache.DefaultExpiration)
-	iconCache.Set(slackUser.ID, slackUser.Profile.Image48, cache.DefaultExpiration)
-
-	return slackUser.ID
+	return slackUserRef // Last resort: return the original Slack user mention (ugly but unavoidable).
 }

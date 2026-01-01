@@ -7,17 +7,35 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+
+	"go.temporal.io/sdk/temporal"
+	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/xdg"
 )
 
 const (
+	activityTimeout  = 3 * time.Second
+	activityAttempts = 3
+
 	fileFlags = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
 	filePerms = xdg.NewFilePermissions
 )
 
 var pathCache = map[string]string{}
+
+func executeLocalActivity(ctx workflow.Context, activity, result any, args ...any) error {
+	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
+		StartToCloseTimeout: activityTimeout,
+		RetryPolicy: &temporal.RetryPolicy{
+			BackoffCoefficient: 1.0,
+			MaximumAttempts:    activityAttempts,
+		},
+	})
+	return workflow.ExecuteLocalActivity(ctx, activity, args...).Get(ctx, result)
+}
 
 func readJSON(filename string) (map[string]string, error) {
 	path, err := cachedDataPath(filename, "")
@@ -34,7 +52,7 @@ func readJSON(filename string) (map[string]string, error) {
 		return map[string]string{}, nil
 	}
 
-	f, err := os.Open(path) //gosec:disable G304 -- specified by admin by design
+	f, err := os.Open(path) //gosec:disable G304 // Specified by admin by design.
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +72,7 @@ func writeJSON(filename string, m map[string]string) error {
 		return err
 	}
 
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- specified by admin by design
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // Specified by admin by design.
 	if err != nil {
 		return err
 	}
@@ -81,7 +99,7 @@ func cachedDataPath(filename, suffix string) (string, error) {
 	// Sanitize the filename, create the directory and the file if needed.
 	path, err := xdg.CreateFile(xdg.DataHome, config.DirName, filename)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create data file: %w", err)
 	}
 
 	pathCache[filename+suffix] = path

@@ -54,7 +54,7 @@ func approversForExplain(ctx workflow.Context, pr map[string]any) map[string]boo
 			continue
 		}
 
-		mentions[users.BitbucketToSlackRef(ctx, accountID, "")] = false
+		mentions[users.BitbucketIDToSlackRef(ctx, accountID, "")] = false
 	}
 
 	return mentions

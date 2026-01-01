@@ -34,7 +34,7 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 		}
 
 		url := "https://" + strings.TrimSuffix(path, "_turn.json")
-		emails, err := data.GetCurrentTurn(url)
+		emails, err := data.GetCurrentTurn(ctx, url)
 		if err != nil {
 			logger.From(ctx).Error("failed to get current attention state for PR",
 				slog.Any("error", err), slog.String("pr_url", url))
@@ -49,7 +49,7 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 			}
 			logger.From(ctx).Warn("Slack email lookup error - removing from turn",
 				slog.String("missing_email", email), slog.String("pr_url", url))
-			_ = data.RemoveFromTurn(url, email) // Example: user deactivated after being added to the PR.
+			_ = data.RemoveFromTurn(ctx, url, email) // Example: user deactivated after being added to the PR.
 		}
 
 		slackUserIDs[url] = slackIDs
@@ -100,7 +100,7 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 			if !ok {
 				name = ""
 			}
-			summary.WriteString(" by " + users.BitbucketToSlackRef(ctx, id, name))
+			summary.WriteString(" by " + users.BitbucketIDToSlackRef(ctx, id, name))
 		}
 	}
 
@@ -204,7 +204,7 @@ func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
 			names.WriteString(", ")
 		}
 
-		names.WriteString(users.BitbucketToSlackRef(ctx, accountID, ""))
+		names.WriteString(users.BitbucketIDToSlackRef(ctx, accountID, ""))
 	}
 
 	return count, names.String()

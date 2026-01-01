@@ -2,12 +2,10 @@ package commands
 
 import (
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
@@ -39,9 +37,7 @@ func Follow(ctx workflow.Context, event SlashCommandEvent) error {
 			continue
 		}
 
-		if err := data.FollowUser(event.UserID, userID); err != nil {
-			logger.From(ctx).Error("failed to follow user", slog.Any("error", err),
-				slog.String("follower_id", event.UserID), slog.String("followed_id", userID))
+		if !data.FollowUser(ctx, event.UserID, userID) {
 			PostEphemeralError(ctx, event, fmt.Sprintf("failed to follow <@%s>.", userID))
 			continue
 		}
@@ -84,9 +80,7 @@ func Unfollow(ctx workflow.Context, event SlashCommandEvent) error {
 			continue
 		}
 
-		if err := data.UnfollowUser(event.UserID, userID); err != nil {
-			logger.From(ctx).Error("failed to unfollow user", slog.Any("error", err),
-				slog.String("unfollower_id", event.UserID), slog.String("followed_id", userID))
+		if !data.UnfollowUser(ctx, event.UserID, userID) {
 			PostEphemeralError(ctx, event, fmt.Sprintf("failed to unfollow <@%s>.", userID))
 			continue
 		}

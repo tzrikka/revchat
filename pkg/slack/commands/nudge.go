@@ -79,7 +79,7 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 		return false
 	}
 
-	ok, err := data.Nudge(url, user.Email)
+	ok, err := data.Nudge(ctx, url, user.Email)
 	if err != nil {
 		logger.From(ctx).Error("failed to nudge user", slog.Any("error", err),
 			slog.String("pr_url", url), slog.String("user_id", userID))
@@ -123,7 +123,7 @@ var nudgeImageFiles = []string{
 // imageURL selects a random nudge image and returns its full URL.
 // This function uses [workflow.SideEffect] to enforce determinism.
 func imageURL(ctx workflow.Context, httpServer string) string {
-	encoded := workflow.SideEffect(ctx, func(ctx workflow.Context) interface{} {
+	encoded := workflow.SideEffect(ctx, func(ctx workflow.Context) any {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(nudgeImageFiles))))
 		if err != nil {
 			logger.From(ctx).Error("crypto.rand.Int() failed", slog.Any("error", err))

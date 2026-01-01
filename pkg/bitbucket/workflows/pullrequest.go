@@ -27,7 +27,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	maxLen, prefix, private := c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix, c.SlackChannelsArePrivate
 	channelID, err := bitbucket.CreateSlackChannel(ctx, pr, maxLen, prefix, private)
 	if err != nil {
-		if userID := users.BitbucketToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
+		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
 			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
 		}
 		return err
@@ -47,7 +47,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 	err = activities.InviteUsersToChannel(ctx, channelID, bitbucket.Invitees(ctx, pr))
 	if err != nil {
-		if userID := users.BitbucketToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
+		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
 			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
 		}
 		// Undo channel creation and PR data initialization.
@@ -162,22 +162,22 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	}
 
 	for _, id := range added {
-		email, err := users.BitbucketToEmail(ctx, id)
-		if err != nil {
+		email := users.BitbucketIDToEmail(ctx, id)
+		if email == "" {
 			continue
 		}
-		if err := data.AddReviewerToPR(prURL, email); err != nil {
+		if err := data.AddReviewerToPR(ctx, prURL, email); err != nil {
 			logger.From(ctx).Error("failed to add reviewer to Bitbucket PR's attention state",
 				slog.Any("error", err), slog.String("pr_url", prURL))
 		}
 	}
 
 	for _, id := range removed {
-		email, err := users.BitbucketToEmail(ctx, id)
-		if err != nil {
+		email := users.BitbucketIDToEmail(ctx, id)
+		if email == "" {
 			continue
 		}
-		if err := data.RemoveFromTurn(prURL, email); err != nil {
+		if err := data.RemoveFromTurn(ctx, prURL, email); err != nil {
 			logger.From(ctx).Error("failed to remove reviewers from Bitbucket PR's attention state",
 				slog.Any("error", err), slog.String("pr_url", prURL))
 		}
@@ -246,12 +246,12 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 
 	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
 
-	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
+	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
 	msg := "%s "
 
 	switch event.Type {
 	case "approved":
-		if err := data.RemoveFromTurn(prURL, email); err != nil {
+		if err := data.RemoveFromTurn(ctx, prURL, email); err != nil {
 			logger.From(ctx).Error("failed to remove user from Bitbucket PR's attention state", slog.Any("error", err),
 				slog.String("pr_url", prURL), slog.String("email", email), slog.String("account_id", event.Actor.AccountID))
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
@@ -259,12 +259,12 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 		msg += "approved this PR. :+1:"
 
 	case "unapproved":
-		if err := data.AddReviewerToPR(prURL, email); err != nil {
+		if err := data.AddReviewerToPR(ctx, prURL, email); err != nil {
 			logger.From(ctx).Error("failed to add user back to Bitbucket PR's attention state", slog.Any("error", err),
 				slog.String("pr_url", prURL), slog.String("email", email), slog.String("account_id", event.Actor.AccountID))
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
-		if err := data.SwitchTurn(prURL, email); err != nil {
+		if err := data.SwitchTurn(ctx, prURL, email); err != nil {
 			logger.From(ctx).Error("failed to switch Bitbucket PR's attention state", slog.Any("error", err),
 				slog.String("pr_url", prURL), slog.String("email", email), slog.String("account_id", event.Actor.AccountID))
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
@@ -279,7 +279,7 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
 
-		if err := data.SwitchTurn(prURL, email); err != nil {
+		if err := data.SwitchTurn(ctx, prURL, email); err != nil {
 			logger.From(ctx).Error("failed to switch Bitbucket PR's attention state",
 				slog.Any("error", err), slog.String("pr_url", prURL), slog.String("email", email))
 			// Don't abort - it's more important to announce this, even if our internal state is stale.

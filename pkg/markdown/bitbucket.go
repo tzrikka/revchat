@@ -31,7 +31,7 @@ func BitbucketToSlack(ctx workflow.Context, text, prURL string) string {
 	// Mentions: "@{account:uuid}" --> "<@U123>" or "Display Name",
 	for _, bbRef := range regexp.MustCompile(`@\{[\w:-]+\}`).FindAllString(text, -1) {
 		accountID := bbRef[2 : len(bbRef)-1]
-		text = strings.ReplaceAll(text, bbRef, users.BitbucketToSlackRef(ctx, accountID, ""))
+		text = strings.ReplaceAll(text, bbRef, users.BitbucketIDToSlackRef(ctx, accountID, ""))
 	}
 
 	return text
@@ -196,7 +196,7 @@ func slackToBitbucketLists(text string) string {
 func slackToBitbucketReferences(ctx workflow.Context, bitbucketWorkspace, text string) string {
 	// User mentions: "<@U123>" --> "@{account:uuid}" or "Display Name".
 	for _, slackRef := range regexp.MustCompile(`<@[A-Z0-9]+>`).FindAllString(text, -1) {
-		bbRef := users.SlackToBitbucketRef(ctx, bitbucketWorkspace, slackRef)
+		bbRef := users.SlackMentionToBitbucketRef(ctx, bitbucketWorkspace, slackRef)
 		text = strings.ReplaceAll(text, slackRef, bbRef)
 	}
 

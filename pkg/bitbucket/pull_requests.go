@@ -30,7 +30,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 			slog.Any("error", err), slog.String("pr_url", prURL))
 	}
 
-	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
+	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
 	if email == "" {
 		logger.From(ctx).Error("initializing Bitbucket PR data without author's email",
 			slog.String("pr_url", prURL), slog.String("account_id", event.Actor.AccountID))
@@ -38,7 +38,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 
 	reviewers := []string{}
 	for _, r := range event.PullRequest.Reviewers {
-		if e, err := users.BitbucketToEmail(ctx, r.AccountID); err == nil {
+		if e := users.BitbucketIDToEmail(ctx, r.AccountID); e != "" {
 			reviewers = append(reviewers, e)
 		}
 	}

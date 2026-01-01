@@ -20,7 +20,7 @@ func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []st
 		return "", nil, data.User{}, nil // Not a server error as far as we're concerned.
 	}
 
-	emails, err := data.GetCurrentTurn(url[0])
+	emails, err := data.GetCurrentTurn(ctx, url[0])
 	if err != nil {
 		logger.From(ctx).Error("failed to get current turn for PR",
 			slog.Any("error", err), slog.String("pr_url", url[0]))
@@ -53,7 +53,7 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 	msg := "Thanks for letting me know!\n\n"
 
-	ok, err := data.Nudge(url, user.Email)
+	ok, err := data.Nudge(ctx, url, user.Email)
 	if err != nil {
 		logger.From(ctx).Error("failed to self-nudge", slog.Any("error", err),
 			slog.String("pr_url", url), slog.String("email", user.Email))
@@ -62,14 +62,14 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 	if !ok {
 		msg = ":thinking_face: I didn't think you're supposed to review this PR, thanks for letting me know!\n\n"
 
-		if err := data.AddReviewerToPR(url, user.Email); err != nil {
+		if err := data.AddReviewerToPR(ctx, url, user.Email); err != nil {
 			logger.From(ctx).Error("failed to add reviewer to PR", slog.Any("error", err),
 				slog.String("pr_url", url), slog.String("email", user.Email))
 			PostEphemeralError(ctx, event, "failed to write internal data about this.")
 		}
 	}
 
-	emails, err = data.GetCurrentTurn(url)
+	emails, err = data.GetCurrentTurn(ctx, url)
 	if err != nil {
 		logger.From(ctx).Error("failed to get current turn for PR after switching",
 			slog.Any("error", err), slog.String("pr_url", url))
@@ -96,14 +96,14 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
 
-	if err := data.SwitchTurn(url, user.Email); err != nil {
+	if err := data.SwitchTurn(ctx, url, user.Email); err != nil {
 		logger.From(ctx).Error("failed to switch PR turn", slog.Any("error", err),
 			slog.String("pr_url", url), slog.String("email", user.Email))
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}
 
-	newTurn, err := data.GetCurrentTurn(url)
+	newTurn, err := data.GetCurrentTurn(ctx, url)
 	if err != nil {
 		logger.From(ctx).Error("failed to get current turn for PR after switching",
 			slog.Any("error", err), slog.String("pr_url", url))
@@ -121,7 +121,7 @@ func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	ok, err := data.FreezeTurn(url[0], users.SlackIDToEmail(ctx, event.UserID))
+	ok, err := data.FreezeTurn(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID))
 	if err != nil {
 		logger.From(ctx).Error("failed to freeze PR turn", slog.Any("error", err), slog.String("pr_url", url[0]))
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
@@ -141,7 +141,7 @@ func UnfreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	ok, err := data.UnfreezeTurn(url[0])
+	ok, err := data.UnfreezeTurn(ctx, url[0])
 	if err != nil {
 		logger.From(ctx).Error("failed to unfreeze PR turn", slog.Any("error", err), slog.String("pr_url", url[0]))
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")

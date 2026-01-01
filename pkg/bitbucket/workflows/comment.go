@@ -34,8 +34,8 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 
 	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
 
-	email, _ := users.BitbucketToEmail(ctx, event.Actor.AccountID)
-	if err := data.SwitchTurn(prURL, email); err != nil {
+	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
+	if err := data.SwitchTurn(ctx, prURL, email); err != nil {
 		logger.From(ctx).Error("failed to switch Bitbucket PR's attention state",
 			slog.Any("error", err), slog.String("pr_url", prURL), slog.String("account_id", event.Actor.AccountID))
 		// Don't abort - it's more important to post the comment, even if our internal state is stale.
@@ -196,12 +196,7 @@ func checksum(s string) string {
 
 // pollCommentForUpdates is a convenience wrapper for [setScheduleActivity].
 func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentURL, rawText string) {
-	user, err := data.SelectUserByBitbucketID(accountID)
-	if err != nil {
-		// user.ThrippyLink == "", which is still usable for our purposes.
-		logger.From(ctx).Warn("unexpected but not critical: failed to load user by Bitbucket ID",
-			slog.Any("error", err), slog.String("user_id", accountID))
-	}
+	user := data.SelectUserByBitbucketID(ctx, accountID)
 
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		StartToCloseTimeout: CommentPollingInterval,

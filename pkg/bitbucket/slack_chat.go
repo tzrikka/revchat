@@ -44,7 +44,7 @@ func SlackDisplayName(ctx workflow.Context, user Account) string {
 	// We don't want to use a Slack mention, because that would spam the user in
 	// Slack with echoes of their own actions. So we write their name instead
 	// of "users.BitbucketToSlackRef(ctx, user.AccountID, user.DisplayName)".
-	slackUserID := users.BitbucketToSlackID(ctx, user.AccountID, false)
+	slackUserID := users.BitbucketIDToSlackID(ctx, user.AccountID, false)
 	displayName := users.SlackIDToDisplayName(ctx, slackUserID)
 	if displayName == "" {
 		displayName = user.DisplayName
@@ -185,7 +185,7 @@ func ImpersonationToMention(msg string) string {
 }
 
 func impersonateUser(ctx workflow.Context, user Account) (displayName, icon string) {
-	id := users.BitbucketToSlackID(ctx, user.AccountID, false)
+	id := users.BitbucketIDToSlackID(ctx, user.AccountID, false)
 	if id == "" {
 		return user.DisplayName, ""
 	}

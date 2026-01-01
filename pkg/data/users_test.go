@@ -13,41 +13,35 @@ func TestUsers(t *testing.T) {
 	email := "email@example.com"
 
 	// Before adding the user.
-	gotUser, err := SelectUserByBitbucketID(id)
-	if err != nil {
-		t.Fatalf("SelectUserByBitbucketID() error = %v", err)
-	}
-	if gotUser.Email != "" {
-		t.Fatalf("SelectUserByBitbucketID() email = %q, want %q", gotUser.Email, "")
+	got := SelectUserByBitbucketID(nil, id)
+	if got.Email != "" {
+		t.Fatalf("SelectUserByBitbucketID() email = %q, want %q", got.Email, "")
 	}
 
 	// Add the user.
-	if err := UpsertUser(email, id, "", "", "", ""); err != nil {
+	if err := UpsertUser(nil, email, "", id, "", "", ""); err != nil {
 		t.Fatalf("UpsertUser() error = %v", err)
 	}
 
 	// After adding the user.
-	gotUser, err = SelectUserByBitbucketID(id)
-	if err != nil {
-		t.Errorf("SelectUserByBitbucketID() error = %v", err)
-	}
-	if gotUser.Email != email {
-		t.Errorf("SelectUserByBitbucketID() email = %q, want %q", gotUser.Email, email)
+	got = SelectUserByBitbucketID(nil, id)
+	if got.Email != email {
+		t.Errorf("SelectUserByBitbucketID() email = %q, want %q", got.Email, email)
 	}
 
-	gotUser, err = SelectUserByGitHubID(id)
+	got, err := SelectUserByGitHubID(id)
 	if err != nil {
 		t.Errorf("SelectUserByGitHubID() error = %v", err)
 	}
-	if gotUser.Email != "" {
-		t.Errorf("SelectUserByGitHubID() email = %q, want %q", gotUser.Email, "")
+	if got.Email != "" {
+		t.Errorf("SelectUserByGitHubID() email = %q, want %q", got.Email, "")
 	}
 
-	gotUser, err = SelectUserBySlackID(id)
+	got, err = SelectUserBySlackID(id)
 	if err != nil {
 		t.Errorf("SelectUserBySlackID() error = %v", err)
 	}
-	if gotUser.Email != "" {
-		t.Errorf("SelectUserBySlackID() email = %q, want %q", gotUser.Email, "")
+	if got.Email != "" {
+		t.Errorf("SelectUserBySlackID() email = %q, want %q", got.Email, "")
 	}
 }

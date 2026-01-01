@@ -12,19 +12,14 @@ import (
 )
 
 func Diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.Diffstat {
-	user, err := data.SelectUserByBitbucketID(event.Actor.AccountID)
-	if err != nil {
-		// user.ThrippyLink == "", which is still usable for our purposes.
-		logger.From(ctx).Warn("unexpected but not critical: failed to load user by Bitbucket ID",
-			slog.Any("error", err), slog.String("user_id", event.Actor.AccountID))
-	}
-
 	workspace, repo, found := strings.Cut(event.Repository.FullName, "/")
 	if !found {
 		logger.From(ctx).Error("failed to parse Bitbucket workspace and repository name",
 			slog.String("full_name", event.Repository.FullName))
 		return nil
 	}
+
+	user := data.SelectUserByBitbucketID(ctx, event.Actor.AccountID)
 
 	ds, err := bitbucket.PullRequestsDiffstat(ctx, user.ThrippyLink, workspace, repo, event.PullRequest.ID)
 	if err != nil {

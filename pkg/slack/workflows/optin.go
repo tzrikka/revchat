@@ -37,9 +37,9 @@ func (c *Config) OptInSlashCommand(ctx workflow.Context, event commands.SlashCom
 	}
 
 	// Ensure the user's basic details are set even if they're unrecognized.
-	user.Email = strings.ToLower(info.Profile.Email)
 	user.RealName = info.RealName
 	user.SlackID = event.UserID
+	user.Email = strings.ToLower(info.Profile.Email)
 	if info.IsBot {
 		user.Email = "bot"
 	}
@@ -76,7 +76,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashComman
 		if err.Error() == errLinkAuthzTimeout { // For some reason errors.Is() doesn't work across Temporal?
 			logger.From(ctx).Warn("user did not complete Thrippy OAuth flow in time", slog.String("email", user.Email))
 			commands.PostEphemeralError(ctx, event, "Bitbucket authorization timed out - please try opting in again.")
-			return nil // Not a *server* error as far as we're concerned.
+			return nil // Not a server error as far as we're concerned.
 		} else {
 			logger.From(ctx).Error("failed to authorize Bitbucket user",
 				slog.Any("error", err), slog.String("email", user.Email))
@@ -85,8 +85,7 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashComman
 		}
 	}
 
-	if err := data.UpsertUser(user.Email, "", "", user.SlackID, user.RealName, linkID); err != nil {
-		logger.From(ctx).Error("failed to opt-in user", slog.Any("error", err), slog.String("email", user.Email))
+	if err := data.UpsertUser(ctx, user.Email, user.RealName, "", "", user.SlackID, linkID); err != nil {
 		commands.PostEphemeralError(ctx, event, "failed to write internal data about you.")
 		_ = c.deleteThrippyLink(ctx, linkID)
 		return err
@@ -112,8 +111,7 @@ func (c *Config) OptOutSlashCommand(ctx workflow.Context, event commands.SlashCo
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
-	if err := data.UpsertUser(user.Email, user.BitbucketID, user.GitHubID, user.SlackID, "", "X"); err != nil {
-		logger.From(ctx).Error("failed to opt-out user", slog.Any("error", err), slog.String("email", user.Email))
+	if err := data.UpsertUser(ctx, user.Email, user.RealName, user.BitbucketID, user.GitHubID, user.SlackID, "X"); err != nil {
 		commands.PostEphemeralError(ctx, event, "failed to write internal data about you.")
 		return err
 	}

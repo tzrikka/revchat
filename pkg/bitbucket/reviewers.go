@@ -24,14 +24,13 @@ func Invitees(ctx workflow.Context, pr PullRequest) []string {
 	for _, aid := range bitbucketIDs {
 		// True = don't include opted-out users. They will still be mentioned
 		// in the channel, but as non-members they won't be notified about it.
-		if sid := users.BitbucketToSlackID(ctx, aid, true); sid != "" {
+		if sid := users.BitbucketIDToSlackID(ctx, aid, true); sid != "" {
 			slackIDs = append(slackIDs, sid)
 		}
 	}
 
-	if user, err := data.SelectUserByBitbucketID(pr.Author.AccountID); err == nil {
-		slackIDs = append(slackIDs, user.Followers...)
-	}
+	user := data.SelectUserByBitbucketID(ctx, pr.Author.AccountID)
+	slackIDs = append(slackIDs, user.Followers...)
 
 	slices.Sort(slackIDs)
 	return slices.Compact(slackIDs)
@@ -95,7 +94,7 @@ func ReviewerMentions(ctx workflow.Context, added, removed []string) string {
 func bitbucketAccountsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
 	var sb strings.Builder
 	for _, aid := range accountIDs {
-		if ref := users.BitbucketToSlackRef(ctx, aid, ""); ref != "" {
+		if ref := users.BitbucketIDToSlackRef(ctx, aid, ""); ref != "" {
 			sb.WriteString(" " + ref)
 		}
 	}
@@ -107,7 +106,7 @@ func BitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {
 	for _, aid := range accountIDs {
 		// True = don't include opted-out users. They will still be mentioned
 		// in the channel, but as non-members they won't be notified about it.
-		if sid := users.BitbucketToSlackID(ctx, aid, true); sid != "" {
+		if sid := users.BitbucketIDToSlackID(ctx, aid, true); sid != "" {
 			slackIDs = append(slackIDs, sid)
 		}
 	}

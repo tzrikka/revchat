@@ -1,13 +1,20 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+
+	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/logger"
 )
 
 const (
@@ -20,23 +27,25 @@ const (
 	indexByRealName    = 5
 )
 
-// User represents a mapping between various user IDs and email
-// addresses across different platforms (Bitbucket, GitHub, Slack).
+// User represents a mapping between a unique email address and
+// at least 2 other unique identifiers for that person across
+// different systems (Bitbucket, GitHub, Slack, Thrippy).
 type User struct {
-	Created string `json:"created,omitempty"`
-	Updated string `json:"updated,omitempty"`
-	Deleted string `json:"deleted,omitempty"`
+	Email string `json:"email,omitempty"`
 
-	Email       string `json:"email,omitempty"`
 	BitbucketID string `json:"bitbucket_id,omitempty"`
 	GitHubID    string `json:"github_id,omitempty"`
 	SlackID     string `json:"slack_id,omitempty"`
-	RealName    string `json:"real_name,omitempty"`
-
 	ThrippyLink string `json:"thrippy_link,omitempty"`
+
+	RealName string `json:"real_name,omitempty"` // Not guaranteed to be unique, unlike the fields above.
 
 	// Slack user IDs, controlled by the un/follow slash commands, used when creating channels.
 	Followers []string `json:"followers,omitempty"`
+
+	Created string `json:"created,omitempty"`
+	Updated string `json:"updated,omitempty"`
+	Deleted string `json:"deleted,omitempty"`
 }
 
 // Users is an indexed copy of a collection of [User] entries.
@@ -56,10 +65,67 @@ var (
 	usersMutex sync.Mutex
 )
 
-func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink string) error {
+func UpsertUser(ctx workflow.Context, email, realName, bitbucketID, githubID, slackID, thrippyLink string) error {
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
 
+	err := executeLocalActivity(ctx, upsertUserActivity, nil, email, realName, bitbucketID, githubID, slackID, thrippyLink)
+	if err != nil {
+		logger.From(ctx).Error("failed to upsert user data", slog.Any("error", err),
+			slog.String("email", email), slog.String("real_name", realName),
+			slog.String("bitbucket_id", bitbucketID), slog.String("github_id", githubID),
+			slog.String("slack_id", slackID), slog.String("thrippy_link", thrippyLink))
+		return fmt.Errorf("failed to upsert user data: %w", err)
+	}
+
+	return nil
+}
+
+func FollowUser(ctx workflow.Context, followerSlackID, followedSlackID string) bool {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if err := executeLocalActivity(ctx, followUserActivity, nil, followerSlackID, followedSlackID); err != nil {
+		logger.From(ctx).Error("failed to follow user", slog.Any("error", err),
+			slog.String("follower_id", followerSlackID), slog.String("followed_id", followedSlackID))
+		return false
+	}
+
+	return true
+}
+
+func UnfollowUser(ctx workflow.Context, followerSlackID, followedSlackID string) bool {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if err := executeLocalActivity(ctx, unfollowUserActivity, nil, followerSlackID, followedSlackID); err != nil {
+		logger.From(ctx).Error("failed to unfollow user", slog.Any("error", err),
+			slog.String("follower_id", followerSlackID), slog.String("followed_id", followedSlackID))
+		return false
+	}
+
+	return true
+}
+
+func SelectUserByBitbucketID(ctx workflow.Context, accountID string) User {
+	if accountID == "" {
+		return User{}
+	}
+
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	user := User{}
+	if err := executeLocalActivity(ctx, selectUserActivity, &user, indexByBitbucketID, accountID); err != nil {
+		logger.From(ctx).Warn("unexpected but not critical: failed to load user data by Bitbucket ID",
+			slog.Any("error", err), slog.String("account_id", accountID))
+		return User{}
+	}
+
+	return user
+}
+
+func upsertUserActivity(_ context.Context, email, realName, bitbucketID, githubID, slackID, thrippyLink string) error {
 	if usersDB == nil {
 		var err error
 		usersDB, err = readUsersFile()
@@ -68,9 +134,7 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 		}
 	}
 
-	email = strings.ToLower(email)
-
-	i, err := usersDB.findUserIndex(email, bitbucketID, githubID, slackID, realName)
+	i, err := usersDB.findUserIndex(email, realName, bitbucketID, githubID, slackID)
 	if err != nil {
 		return err
 	}
@@ -83,12 +147,16 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 	usersDB.entries[i].Updated = now
 
 	// Allow partial updates, don't overwrite existing fields with empty values.
-	// (we already checked for conflicts in [Users.findIndex]).
+	// (we already checked for conflicts in [Users.findUserIndex]).
 	if email != "" {
 		usersDB.entries[i].Email = email
 		if email != "bot" {
 			usersDB.emailIndex[email] = i
 		}
+	}
+	if realName != "" {
+		usersDB.entries[i].RealName = realName
+		usersDB.nameIndex[realName] = i
 	}
 	if bitbucketID != "" {
 		usersDB.entries[i].BitbucketID = bitbucketID
@@ -102,10 +170,6 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 		usersDB.entries[i].SlackID = slackID
 		usersDB.slackIndex[slackID] = i
 	}
-	if realName != "" {
-		usersDB.entries[i].RealName = realName
-		usersDB.nameIndex[realName] = i
-	}
 	if thrippyLink != "" {
 		if thrippyLink == "X" {
 			thrippyLink = ""
@@ -116,10 +180,7 @@ func UpsertUser(email, bitbucketID, githubID, slackID, realName, thrippyLink str
 	return usersDB.writeUsersFile()
 }
 
-func FollowUser(followerSlackID, followedSlackID string) error {
-	usersMutex.Lock()
-	defer usersMutex.Unlock()
-
+func followUserActivity(_ context.Context, followerSlackID, followedSlackID string) error {
 	if usersDB == nil {
 		var err error
 		usersDB, err = readUsersFile()
@@ -128,7 +189,7 @@ func FollowUser(followerSlackID, followedSlackID string) error {
 		}
 	}
 
-	i, err := usersDB.findUserIndex("", "", "", followedSlackID, "")
+	i, err := usersDB.findUserIndex("", "", "", "", followedSlackID)
 	if err != nil || i < 0 {
 		return err
 	}
@@ -142,10 +203,7 @@ func FollowUser(followerSlackID, followedSlackID string) error {
 	return usersDB.writeUsersFile()
 }
 
-func UnfollowUser(unfollowerSlackID, followedSlackID string) error {
-	usersMutex.Lock()
-	defer usersMutex.Unlock()
-
+func unfollowUserActivity(_ context.Context, followerSlackID, followedSlackID string) error {
 	if usersDB == nil {
 		var err error
 		usersDB, err = readUsersFile()
@@ -154,12 +212,12 @@ func UnfollowUser(unfollowerSlackID, followedSlackID string) error {
 		}
 	}
 
-	i, err := usersDB.findUserIndex("", "", "", followedSlackID, "")
+	i, err := usersDB.findUserIndex("", "", "", "", followedSlackID)
 	if err != nil || i < 0 {
 		return err
 	}
 
-	j := slices.Index(usersDB.entries[i].Followers, unfollowerSlackID)
+	j := slices.Index(usersDB.entries[i].Followers, followerSlackID)
 	if j < 0 {
 		return nil
 	}
@@ -170,16 +228,22 @@ func UnfollowUser(unfollowerSlackID, followedSlackID string) error {
 	return usersDB.writeUsersFile()
 }
 
-func (u *Users) findUserIndex(email, bitbucketID, githubID, slackID, realName string) (int, error) {
+func (u *Users) findUserIndex(email, realName, bitbucketID, githubID, slackID string) (int, error) {
 	emailIndex, emailFound := u.emailIndex[email]
+	nameIndex, nameFound := u.nameIndex[realName]
 	bitbucketIndex, bitbucketFound := u.bitbucketIndex[bitbucketID]
 	githubIndex, githubFound := u.githubIndex[githubID]
 	slackIndex, slackFound := u.slackIndex[slackID]
-	nameIndex, nameFound := u.nameIndex[realName]
 
 	i := -1
 	if emailFound {
 		i = emailIndex
+	}
+	if nameFound {
+		if i >= 0 && i != nameIndex {
+			return -1, errors.New("conflicting user entries")
+		}
+		i = nameIndex
 	}
 	if bitbucketFound {
 		if i >= 0 && i != bitbucketIndex {
@@ -199,48 +263,59 @@ func (u *Users) findUserIndex(email, bitbucketID, githubID, slackID, realName st
 		}
 		i = slackIndex
 	}
-	if nameFound {
-		if i >= 0 && i != nameIndex {
-			return -1, errors.New("conflicting user entries")
-		}
-		i = nameIndex
-	}
 
 	return i, nil
 }
 
 func SelectUserByEmail(email string) (User, error) {
-	return selectUserBy(indexByEmail, strings.ToLower(email))
-}
-
-func SelectUserByBitbucketID(bitbucketID string) (User, error) {
-	return selectUserBy(indexByBitbucketID, bitbucketID)
-}
-
-func SelectUserByGitHubID(githubID string) (User, error) {
-	return selectUserBy(indexByGitHubID, githubID)
-}
-
-func SelectUserBySlackID(slackID string) (User, error) {
-	return selectUserBy(indexBySlackID, slackID)
-}
-
-func SelectUserByRealName(realName string) (User, error) {
-	return selectUserBy(indexByRealName, realName)
-}
-
-func IsOptedIn(u User) bool {
-	return u.ThrippyLink != ""
-}
-
-func selectUserBy(indexType int, id string) (User, error) {
-	if id == "" {
+	if email == "" {
 		return User{}, nil
 	}
 
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
 
+	return selectUserActivity(nil, indexByEmail, strings.ToLower(email))
+}
+
+func SelectUserByGitHubID(login string) (User, error) {
+	if login == "" {
+		return User{}, nil
+	}
+
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	return selectUserActivity(nil, indexByGitHubID, login)
+}
+
+func SelectUserBySlackID(userID string) (User, error) {
+	if userID == "" {
+		return User{}, nil
+	}
+
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	return selectUserActivity(nil, indexBySlackID, userID)
+}
+
+func SelectUserByRealName(realName string) (User, error) {
+	if realName == "" {
+		return User{}, nil
+	}
+
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	return selectUserActivity(nil, indexByRealName, realName)
+}
+
+func IsOptedIn(u User) bool {
+	return u.ThrippyLink != ""
+}
+
+func selectUserActivity(ctx workflow.Context, indexType int, id string) (User, error) {
 	if usersDB == nil {
 		var err error
 		usersDB, err = readUsersFile()
@@ -289,7 +364,7 @@ func readUsersFile() (*Users, error) {
 
 	u := &Users{entries: []User{}}
 	if fi.Size() > 0 {
-		f, err := os.Open(path) //gosec:disable G304 -- specified by admin by design
+		f, err := os.Open(path) //gosec:disable G304 // Specified by admin by design.
 		if err != nil {
 			return nil, err
 		}
@@ -339,7 +414,7 @@ func (u *Users) writeUsersFile() error {
 		return err
 	}
 
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- specified by admin by design
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // Specified by admin by design.
 	if err != nil {
 		return err
 	}

@@ -7,10 +7,7 @@ import (
 )
 
 func TestEmailToBitbucketID(t *testing.T) {
-	got, err := users.EmailToBitbucketID(nil, "workspace", "")
-	if err == nil {
-		t.Error("EmailToBitbucketID() error = nil")
-	}
+	got := users.EmailToBitbucketID(nil, "workspace", "")
 	want := ""
 	if got != want {
 		t.Errorf("EmailToBitbucketID() = %q, want %q", got, want)

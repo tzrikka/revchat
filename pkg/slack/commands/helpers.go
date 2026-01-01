@@ -71,7 +71,7 @@ func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) []strin
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	match := bitbucketURLPattern.FindStringSubmatch(url)
+	match := bitbucketURLPattern.FindStringSubmatch(url) // TODO: Support GitHub too.
 	if len(match) != 4 {
 		logger.From(ctx).Error("failed to parse PR URL", slog.String("pr_url", url))
 		PostEphemeralError(ctx, event, "this command can only be used inside RevChat channels.")
@@ -87,13 +87,13 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 		return nil, nil, nil, nil
 	}
 
-	pr, err = data.LoadBitbucketPR(url[0])
+	pr, err = data.LoadBitbucketPR(url[0]) // TODO: Support GitHub too.
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to load PR snapshot.")
 		return url, nil, nil, err
 	}
 
-	paths = data.ReadBitbucketDiffstatPaths(url[0])
+	paths = data.ReadBitbucketDiffstatPaths(url[0]) // TODO: Support GitHub too.
 	if len(paths) == 0 {
 		PostEphemeralError(ctx, event, "no file paths found in PR diffstat.")
 		return url, nil, pr, nil

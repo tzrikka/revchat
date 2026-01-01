@@ -4,10 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
 	"time"
+
+	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/timpani-api/pkg/jira"
 )
 
 // PRTurn represents the attention state for all the
@@ -39,7 +45,7 @@ func InitTurns(url, author string, reviewers []string) error {
 
 // DeleteTurns removes the attention state file of a specific PR.
 // This is used when the PR is closed or marked as a draft.
-func DeleteTurns(url string) error {
+func DeleteTurns(ctx workflow.Context, url string) error {
 	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
@@ -49,13 +55,13 @@ func DeleteTurns(url string) error {
 		return err
 	}
 
-	return os.Remove(path) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	return os.Remove(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
 }
 
 // AddReviewerToPR adds a new reviewer to the attention state of a specific PR.
 // This function is idempotent: if a reviewer already exists, or is the PR author,
 // it does nothing. It also ignores empty or "bot" email addresses.
-func AddReviewerToPR(url, email string) error {
+func AddReviewerToPR(ctx workflow.Context, url, email string) error {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
@@ -65,7 +71,7 @@ func AddReviewerToPR(url, email string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurnFile(url)
+	t, err := readTurnFile(ctx, url)
 	if err != nil {
 		return err
 	}
@@ -82,12 +88,12 @@ func AddReviewerToPR(url, email string) error {
 // pay attention to a specific PR. If the PR has no assigned reviewers, this function
 // returns the PR author (as a reminder for them to assign reviewers). If any assigned
 // reviewer has their turn flag set to false, we add the author to the list as well.
-func GetCurrentTurn(url string) ([]string, error) {
+func GetCurrentTurn(ctx workflow.Context, url string) ([]string, error) {
 	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurnFile(url)
+	t, err := readTurnFile(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +123,7 @@ func GetCurrentTurn(url string) ([]string, error) {
 // This is used when that reviewer approves the PR, or is unassigned from the PR.
 // This function is idempotent: if the reviewer does not exist, it does nothing.
 // It also ignores empty or "bot" email addresses.
-func RemoveFromTurn(url, email string) error {
+func RemoveFromTurn(ctx workflow.Context, url, email string) error {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
@@ -127,7 +133,7 @@ func RemoveFromTurn(url, email string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurnFile(url)
+	t, err := readTurnFile(ctx, url)
 	if err != nil {
 		return err
 	}
@@ -143,12 +149,12 @@ func RemoveFromTurn(url, email string) error {
 // FreezeTurn marks the attention state of a specific PR as frozen by a specific user.
 // This prevents any changes by [SwitchTurn], and only by it, until it is unfrozen.
 // If the turn is already frozen, this function returns false and does nothing.
-func FreezeTurn(url, email string) (bool, error) {
+func FreezeTurn(ctx workflow.Context, url, email string) (bool, error) {
 	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurnFile(url)
+	t, err := readTurnFile(ctx, url)
 	if err != nil {
 		return false, err
 	}
@@ -165,12 +171,12 @@ func FreezeTurn(url, email string) (bool, error) {
 
 // UnfreezeTurn is the inverse of [FreezeTurn].
 // If the turn is not frozen, this function returns false and does nothing.
-func UnfreezeTurn(url string) (bool, error) {
+func UnfreezeTurn(ctx workflow.Context, url string) (bool, error) {
 	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurnFile(url)
+	t, err := readTurnFile(ctx, url)
 	if err != nil {
 		return false, err
 	}
@@ -189,7 +195,7 @@ func UnfreezeTurn(url string) (bool, error) {
 // If the user is not found, or if the turn is frozen, this function does nothing.
 // If the user is the PR author, it adds all reviewers to the attention state.
 // If the user is a reviewer, it adds the author to the attention state.
-func SwitchTurn(url, email string) error {
+func SwitchTurn(ctx workflow.Context, url, email string) error {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
@@ -199,7 +205,7 @@ func SwitchTurn(url, email string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurnFile(url)
+	t, err := readTurnFile(ctx, url)
 	if err != nil {
 		return err
 	}
@@ -225,7 +231,7 @@ func SwitchTurn(url, email string) error {
 // Nudge records that a specific user has been nudged about a specific PR,
 // so it becomes their turn to pay attention to that PR if it wasn't already.
 // It returns true if the nudge is valid (the user is in the current turn list).
-func Nudge(url, email string) (bool, error) {
+func Nudge(ctx workflow.Context, url, email string) (bool, error) {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return false, nil
@@ -235,7 +241,7 @@ func Nudge(url, email string) (bool, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurnFile(url)
+	t, err := readTurnFile(ctx, url)
 	if err != nil {
 		return false, err
 	}
@@ -263,16 +269,16 @@ func Nudge(url, email string) (bool, error) {
 }
 
 // readTurnFile expects the caller to hold the appropriate mutex.
-func readTurnFile(url string) (*PRTurn, error) {
+func readTurnFile(ctx workflow.Context, url string) (*PRTurn, error) {
 	path, err := cachedDataPath(url, "_turn")
 	if err != nil {
 		return nil, err
 	}
 
-	f, err := os.Open(path) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return resetTurn(url)
+			return resetTurn(ctx, url)
 		}
 		return nil, err
 	}
@@ -280,10 +286,10 @@ func readTurnFile(url string) (*PRTurn, error) {
 
 	t := new(PRTurn)
 	if err := json.NewDecoder(f).Decode(&t); err != nil {
-		return resetTurn(url)
+		return resetTurn(ctx, url)
 	}
 	if t.Author == "" {
-		return resetTurn(url)
+		return resetTurn(ctx, url)
 	}
 
 	normalizeEmailAddresses(t)
@@ -309,7 +315,7 @@ func writeTurnFile(url string, t *PRTurn) error {
 		return err
 	}
 
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party.
 	if err != nil {
 		return err
 	}
@@ -323,13 +329,13 @@ func writeTurnFile(url string, t *PRTurn) error {
 
 // resetTurn recreates the attention state file for a specific PR, based on the current
 // PR snapshot. This is a fallback for when the turn file is missing or corrupted.
-func resetTurn(url string) (*PRTurn, error) {
+func resetTurn(ctx workflow.Context, url string) (*PRTurn, error) {
 	snapshot, err := LoadBitbucketPR(url)
 	if err != nil {
 		return nil, err
 	}
 
-	author := bitbucketIDToEmail(snapshot["author"])
+	author := bitbucketIDToEmail(ctx, snapshot["author"])
 
 	reviewers := map[string]bool{}
 	jsonList, ok := snapshot["reviewers"].([]any)
@@ -337,16 +343,16 @@ func resetTurn(url string) (*PRTurn, error) {
 		jsonList = []any{}
 	}
 	for _, r := range jsonList {
-		reviewers[bitbucketIDToEmail(r)] = true
+		reviewers[bitbucketIDToEmail(ctx, r)] = true
 	}
 
 	t := &PRTurn{Author: author, Reviewers: reviewers}
 	return t, writeTurnFile(url, t)
 }
 
-// bitbucketIDToEmail converts the "account_id" value in the given map
-// to the user's email address, based on RevChat's own user database.
-func bitbucketIDToEmail(snapshot any) string {
+// bitbucketIDToEmail converts the "account_id" value in the given PR data
+// map to the user's email address, based on RevChat's own user database.
+func bitbucketIDToEmail(ctx workflow.Context, snapshot any) string {
 	m, ok := snapshot.(map[string]any)
 	if !ok {
 		return ""
@@ -357,6 +363,32 @@ func bitbucketIDToEmail(snapshot any) string {
 		return ""
 	}
 
-	user, _ := SelectUserByBitbucketID(accountID)
-	return user.Email
+	return BitbucketIDToEmail(ctx, accountID)
+}
+
+// BitbucketIDToEmail converts a Bitbucket account ID into an email address. This function returns an empty
+// string if the account ID is not found. It uses persistent data storage, or API calls as a fallback.
+// This function is also wrapped in the "users" package, and reused by other packages from there.
+func BitbucketIDToEmail(ctx workflow.Context, accountID string) string {
+	if accountID == "" {
+		return ""
+	}
+
+	if user := SelectUserByBitbucketID(ctx, accountID); user.Email != "" {
+		return user.Email
+	}
+
+	// We use the Jira API as a fallback because the Bitbucket API doesn't expose email addresses.
+	jiraUser, err := jira.UsersGet(ctx, accountID)
+	if err != nil {
+		logger.From(ctx).Error("failed to retrieve Jira user info",
+			slog.Any("error", err), slog.String("account_id", accountID))
+		return ""
+	}
+
+	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+	email := strings.ToLower(jiraUser.Email)
+	_ = UpsertUser(ctx, email, "", accountID, "", "", "")
+
+	return email
 }
