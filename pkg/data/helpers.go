@@ -125,5 +125,5 @@ type RWMutexMap struct {
 
 func (mm *RWMutexMap) Get(key string) *sync.RWMutex {
 	actual, _ := mm.sm.LoadOrStore(key, &sync.RWMutex{})
-	return actual.(*sync.RWMutex) //nolint:errcheck
+	return actual.(*sync.RWMutex) //nolint:errcheck // Type assertion always succeeds.
 }

@@ -226,7 +226,7 @@ func (c *Config) secureCreds() (credentials.TransportCredentials, error) {
 // This function is based on [credentials.NewClientTLSFromFile], but uses
 // TLS 1.3 as the minimum version (instead of 1.2), and support mTLS too.
 func newClientTLSFromFile(caPath, serverNameOverride string, certs []tls.Certificate) (credentials.TransportCredentials, error) {
-	b, err := os.ReadFile(caPath) //gosec:disable G304 -- specified by admin by design
+	b, err := os.ReadFile(caPath) //gosec:disable G304 // Specified by admin by design.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read server CA cert file for gRPC client: %w", err)
 	}

@@ -50,7 +50,7 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 	// Update the reviewers list in Bitbucket.
 	pr["reviewers"] = make([]map[string]any, len(reviewers))
 	for i, accountID := range reviewers {
-		pr["reviewers"].([]map[string]any)[i] = map[string]any{ //nolint:errcheck
+		pr["reviewers"].([]map[string]any)[i] = map[string]any{ //nolint:errcheck // Type assertion always succeeds.
 			"account_id": accountID,
 		}
 	}

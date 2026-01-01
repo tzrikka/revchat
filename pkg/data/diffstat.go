@@ -28,7 +28,7 @@ func readBitbucketDiffstat(url string) []bitbucket.Diffstat {
 		return nil
 	}
 
-	f, err := os.Open(path) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
 	if err != nil {
 		return nil
 	}
@@ -67,7 +67,7 @@ func UpdateBitbucketDiffstat(url string, ds []bitbucket.Diffstat) error {
 		return err
 	}
 
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party.
 	if err != nil {
 		return err
 	}
@@ -88,5 +88,5 @@ func DeleteBitbucketDiffstat(url string) error {
 		return err
 	}
 
-	return os.Remove(path) //gosec:disable G304 -- URL received from signature-verified 3rd-party
+	return os.Remove(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
 }

@@ -15,7 +15,7 @@ import (
 // StoreBitbucketPR saves a snapshot of a Bitbucket pull request.
 // This is used to detect changes in the pull request over time.
 func StoreBitbucketPR(url string, pr any) error {
-	f, err := os.OpenFile(prPath(url), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 -- verified URL
+	f, err := os.OpenFile(prPath(url), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 // Verified URL.
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func StoreBitbucketPR(url string, pr any) error {
 // This is used to detect changes in the pull request over time.
 // This function returns nil if no snapshot is found.
 func LoadBitbucketPR(url string) (map[string]any, error) {
-	f, err := os.Open(prPath(url)) //gosec:disable G304 -- URL received from verified 3rd-party
+	f, err := os.Open(prPath(url)) //gosec:disable G304 // URL received from verified 3rd-party.
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
@@ -51,7 +51,7 @@ func LoadBitbucketPR(url string) (map[string]any, error) {
 // becomes obsolete (i.e. when the PR is merged, closed, or marked as a draft).
 // This function is idempotent: it does not return an error if the snapshot does not exist.
 func DeleteBitbucketPR(url string) error {
-	if err := os.Remove(prPath(url)); err != nil { //gosec:disable G304 -- URL received from verified 3rd-party
+	if err := os.Remove(prPath(url)); err != nil { //gosec:disable G304 // URL received from verified 3rd-party.
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}

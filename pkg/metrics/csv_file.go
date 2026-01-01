@@ -49,7 +49,7 @@ func incrementSignalCounterAsSideEffect(ctx workflow.Context, name string) any {
 }
 
 func AppendToCSVFile(path string, record []string) error {
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 -- hardcoded path
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // Hardcoded path.
 	if err != nil {
 		return err
 	}

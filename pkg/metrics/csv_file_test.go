@@ -18,7 +18,7 @@ func TestIncrementSignalCounter(t *testing.T) {
 	// Test 1: "metrics" directory does not exist - no file, but also no runtime effect.
 	incrementSignalCounterAsSideEffect(nil, "signal1")
 
-	_, err := os.ReadFile(path) //gosec:disable G304 -- unit test with fake files
+	_, err := os.ReadFile(path) //gosec:disable G304 // Unit test with fake files.
 	if !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestIncrementSignalCounter(t *testing.T) {
 	incrementSignalCounterAsSideEffect(nil, "signal2")
 	incrementSignalCounterAsSideEffect(nil, "signal3")
 
-	f, err := os.ReadFile(path) //gosec:disable G304 -- unit test with fake files
+	f, err := os.ReadFile(path) //gosec:disable G304 // Unit test with fake files.
 	if err != nil {
 		t.Fatal(err)
 	}
