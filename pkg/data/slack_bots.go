@@ -1,7 +1,6 @@
 package data
 
 import (
-	"context"
 	"sync"
 
 	"go.temporal.io/sdk/workflow"
@@ -50,17 +49,15 @@ func GetSlackBotUserID(ctx workflow.Context, botID string) (string, error) {
 	return m[botID], nil
 }
 
+// readSlackBotsFile is a thin wrapper over [readJSONActivity].
 func readSlackBotsFile(ctx workflow.Context) (map[string]string, error) {
 	slackBotsMutex.RLock()
 	defer slackBotsMutex.RUnlock()
-
-	if ctx == nil { // For unit testing.
-		return readJSONActivity(context.Background(), slackBotsFile)
-	}
 
 	file := map[string]string{}
 	if err := executeLocalActivity(ctx, readJSONActivity, &file, slackBotsFile); err != nil {
 		return nil, err
 	}
+
 	return file, nil
 }

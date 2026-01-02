@@ -111,7 +111,7 @@ func (c *Config) prepareForReset(ctx workflow.Context, info *workflow.Info) {
 	if c.shutdownSignal != "" {
 		msg = "shutting down worker process as requested by OS signal"
 	}
-	logger.From(ctx).Warn(msg, slog.String("lead_time", time.Since(startTime).String()),
+	logger.From(ctx).Warn(msg, slog.Duration("lead_time", time.Since(startTime)),
 		slog.Int("history_length", info.GetCurrentHistoryLength()),
 		slog.Int("history_size", info.GetCurrentHistorySize()))
 }

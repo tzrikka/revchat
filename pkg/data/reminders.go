@@ -28,6 +28,7 @@ func SetReminder(ctx workflow.Context, userID, kitchenTime, tz string) error {
 	if ctx == nil { // For unit testing.
 		return writeJSONActivity(context.Background(), remindersFile, m)
 	}
+
 	return executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
 }
 
@@ -45,6 +46,7 @@ func DeleteReminder(ctx workflow.Context, userID string) error {
 	if ctx == nil { // For unit testing.
 		return writeJSONActivity(context.Background(), remindersFile, m)
 	}
+
 	return executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
 }
 
@@ -60,5 +62,6 @@ func ListReminders(ctx workflow.Context) (map[string]string, error) {
 	if err := executeLocalActivity(ctx, readJSONActivity, &file, remindersFile); err != nil {
 		return nil, err
 	}
+
 	return file, nil
 }

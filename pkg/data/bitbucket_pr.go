@@ -1,63 +1,69 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/xdg"
 )
 
-// StoreBitbucketPR saves a snapshot of a Bitbucket pull request.
-// This is used to detect changes in the pull request over time.
-func StoreBitbucketPR(url string, pr any) error {
+// StoreBitbucketPR writes a snapshot of a Bitbucket PR, which is used to detect metadata changes.
+func StoreBitbucketPR(ctx workflow.Context, url string, pr any) {
 	f, err := os.OpenFile(prPath(url), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 // Verified URL.
 	if err != nil {
-		return err
+		logger.From(ctx).Error("failed to open Bitbucket PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
+		return
 	}
 	defer f.Close()
 
 	e := json.NewEncoder(f)
 	e.SetIndent("", "  ")
-	return e.Encode(pr)
+	if err := e.Encode(pr); err != nil {
+		logger.From(ctx).Error("failed to write Bitbucket PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
+	}
 }
 
-// LoadBitbucketPR loads a snapshot of a Bitbucket pull request.
-// This is used to detect changes in the pull request over time.
-// This function returns nil if no snapshot is found.
-func LoadBitbucketPR(url string) (map[string]any, error) {
+// LoadBitbucketPR reads a snapshot of a Bitbucket PR, which is used to detect metadata
+// changes. If a snapshot doesn't exist, this function returns a nil map and no error.
+func LoadBitbucketPR(ctx workflow.Context, url string) (map[string]any, error) {
 	f, err := os.Open(prPath(url)) //gosec:disable G304 // URL received from verified 3rd-party.
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
+		logger.From(ctx).Error("failed to open Bitbucket PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
 		return nil, err
 	}
 	defer f.Close()
 
 	m := map[string]any{}
 	if err := json.NewDecoder(f).Decode(&m); err != nil {
+		logger.From(ctx).Error("failed to read Bitbucket PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
 		return nil, err
 	}
 
 	return m, nil
 }
 
-// DeleteBitbucketPR deletes the snapshot of a Bitbucket pull request when it
-// becomes obsolete (i.e. when the PR is merged, closed, or marked as a draft).
-// This function is idempotent: it does not return an error if the snapshot does not exist.
-func DeleteBitbucketPR(url string) error {
-	if err := os.Remove(prPath(url)); err != nil { //gosec:disable G304 // URL received from verified 3rd-party.
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return err
+func DeleteBitbucketPR(ctx workflow.Context, url string) {
+	if ctx == nil { // For unit testing.
+		_ = deletePRFileActivity(context.Background(), prPath(url), "")
+		return
 	}
-	return nil
+
+	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, prPath(url), ""); err != nil {
+		logger.From(ctx).Warn("failed to delete Bitbucket PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
+	}
 }
 
 // prPath returns the absolute path to the JSON snapshot file of a Bitbucket PR.

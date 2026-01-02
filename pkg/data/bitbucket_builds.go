@@ -13,6 +13,8 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 )
 
+// PRStatus represents the current status of all reported
+// builds for a specific Bitbucket PR at a specific commit.
 type PRStatus struct {
 	CommitHash string                  `json:"commit_hash"`
 	Builds     map[string]CommitStatus `json:"builds"`
@@ -25,52 +27,66 @@ type CommitStatus struct {
 	URL   string `json:"url"`
 }
 
+const (
+	statusFileSuffix = "_status"
+)
+
 var prStatusMutexes RWMutexMap
 
-func ReadBitbucketBuilds(ctx workflow.Context, url string) *PRStatus {
-	mu := prStatusMutexes.Get(url)
+func ReadBitbucketBuilds(ctx workflow.Context, prURL string) *PRStatus {
+	mu := prStatusMutexes.Get(prURL)
 	mu.RLock()
 	defer mu.RUnlock()
 
 	pr := new(PRStatus)
-	err := executeLocalActivity(ctx, readBitbucketBuildsActivity, pr, url)
+	err := executeLocalActivity(ctx, readBitbucketBuildsActivity, pr, prURL)
 	if err != nil {
+		logger.From(ctx).Error("failed to read Bitbucket PR's build states",
+			slog.Any("error", err), slog.String("pr_url", prURL))
 		return nil
 	}
 
 	return pr
 }
 
-func UpdateBitbucketBuilds(ctx workflow.Context, url, commitHash, key string, cs CommitStatus) {
-	mu := prStatusMutexes.Get(url)
+// UpdateBitbucketBuilds appends the given build status to the given PR,
+// unless the new status is based on a different (i.e. newer) commit,
+// in which case this function discards all previous build statuses.
+func UpdateBitbucketBuilds(ctx workflow.Context, prURL, commitHash, key string, cs CommitStatus) {
+	mu := prStatusMutexes.Get(prURL)
 	mu.Lock()
 	defer mu.Unlock()
 
-	if err := executeLocalActivity(ctx, updateBitbucketBuildsActivity, nil, url, commitHash, key, cs); err != nil {
-		logger.From(ctx).Error("failed to update Bitbucket build states", slog.Any("error", err),
-			slog.String("pr_url", url), slog.String("commit_hash", commitHash))
+	if err := executeLocalActivity(ctx, updateBitbucketBuildsActivity, nil, prURL, commitHash, key, cs); err != nil {
+		logger.From(ctx).Error("failed to update Bitbucket PR's build states", slog.Any("error", err),
+			slog.String("pr_url", prURL), slog.String("commit_hash", commitHash))
 	}
 }
 
-func DeleteBitbucketBuilds(url string) error {
-	mu := prStatusMutexes.Get(url)
+func DeleteBitbucketBuilds(ctx workflow.Context, prURL string) {
+	mu := prStatusMutexes.Get(prURL)
 	mu.Lock()
 	defer mu.Unlock()
 
-	path, err := cachedDataPath(url, "_status")
-	if err != nil {
-		return err
+	if ctx == nil { // For unit testing.
+		_ = deletePRFileActivity(context.Background(), prURL, statusFileSuffix)
+		return
 	}
 
-	return os.Remove(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, prURL, statusFileSuffix); err != nil {
+		logger.From(ctx).Warn("failed to delete Bitbucket PR's build states",
+			slog.Any("error", err), slog.String("pr_url", prURL))
+	}
 }
 
-// readBitbucketBuildsActivity runs as a local activity and expects the caller to hold the appropriate mutex.
+// readBitbucketBuildsActivity runs as a Temporal local activity (using
+// [executeLocalActivity]), and expects the caller to hold the appropriate mutex.
 func readBitbucketBuildsActivity(_ context.Context, url string) (*PRStatus, error) {
 	return readStatusFile(url)
 }
 
-// updateBitbucketBuildsActivity runs as a local activity and expects the caller to hold the appropriate mutex.
+// updateBitbucketBuildsActivity runs as a Temporal local activity (using
+// [executeLocalActivity]) and expects the caller to hold the appropriate mutex.
 func updateBitbucketBuildsActivity(ctx context.Context, url, commitHash, key string, cs CommitStatus) error {
 	pr, err := readStatusFile(url)
 	if err != nil {
@@ -86,7 +102,7 @@ func updateBitbucketBuildsActivity(ctx context.Context, url, commitHash, key str
 	}
 
 	pr.Builds[key] = cs
-	path, err := cachedDataPath(url, "_status")
+	path, err := cachedDataPath(url, statusFileSuffix)
 	if err != nil {
 		return err
 	}
@@ -103,7 +119,7 @@ func updateBitbucketBuildsActivity(ctx context.Context, url, commitHash, key str
 }
 
 func readStatusFile(url string) (*PRStatus, error) {
-	path, err := cachedDataPath(url, "_status")
+	path, err := cachedDataPath(url, statusFileSuffix)
 	if err != nil {
 		return nil, err
 	}

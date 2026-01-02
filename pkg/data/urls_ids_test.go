@@ -7,7 +7,7 @@ import (
 func TestURLsIDs(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache = map[string]string{} // Reset global state.
+	pathCache.Clear()
 
 	url := "url"
 	channel := "channel"
@@ -38,9 +38,7 @@ func TestURLsIDs(t *testing.T) {
 	}
 
 	// Remove mapping.
-	if err := DeleteURLAndIDMapping(nil, "url"); err != nil {
-		t.Fatalf("DeleteURLAndIDMapping() error = %v", err)
-	}
+	DeleteURLAndIDMapping(nil, "url")
 
 	// After removal.
 	got, err = SwitchURLAndID(nil, url)
@@ -56,7 +54,7 @@ func TestURLsIDs(t *testing.T) {
 func TestURLsIDsThreadDeletion(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache = map[string]string{} // Reset global state.
+	pathCache.Clear()
 
 	// Initialization.
 	if err := MapURLAndID(nil, "url1", "channel1"); err != nil {
@@ -86,9 +84,7 @@ func TestURLsIDsThreadDeletion(t *testing.T) {
 	}
 
 	// Remove "url1" and "channel1" mappings.
-	if err := DeleteURLAndIDMapping(nil, "url1"); err != nil {
-		t.Fatalf("DeleteURLAndIDMapping() error = %v", err)
-	}
+	DeleteURLAndIDMapping(nil, "url1")
 
 	// Check remaining mappings.
 	tests := []struct {

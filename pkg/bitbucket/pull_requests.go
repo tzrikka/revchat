@@ -16,14 +16,9 @@ import (
 // InitPRData saves the initial state of a new PR: snapshot of PR metadata,
 // and 2-way ID mapping for syncs between Bitbucket and Slack. If there are
 // errors, they are logged but ignored, as we can try to create the data later.
-// None of this is critical, so we only log errors and not return them to the caller.
 func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) {
 	prURL := HTMLURL(event.PullRequest.Links)
-
-	if err := data.StoreBitbucketPR(prURL, event.PullRequest); err != nil {
-		logger.From(ctx).Error("failed to save Bitbucket PR snapshot", slog.Any("error", err),
-			slog.String("pr_url", prURL), slog.String("channel_id", channelID))
-	}
+	data.StoreBitbucketPR(ctx, prURL, event.PullRequest)
 
 	if err := data.UpdateBitbucketDiffstat(prURL, Diffstat(ctx, event)); err != nil {
 		logger.From(ctx).Error("failed to update Bitbucket PR's diffstat",
@@ -43,7 +38,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 		}
 	}
 
-	if err := data.InitTurns(prURL, email, reviewers); err != nil {
+	if err := data.InitTurns(ctx, prURL, email, reviewers); err != nil {
 		logger.From(ctx).Error("failed to initialize Bitbucket PR turn-taking state",
 			slog.Any("error", err), slog.String("channel_id", channelID), slog.String("pr_url", prURL))
 	}
@@ -85,15 +80,12 @@ func MapToStruct(m any, pr *PullRequest) error {
 
 // SwitchSnapshot stores the given new PR snapshot, and returns the previous one (if there is one).
 func SwitchSnapshot(ctx workflow.Context, prURL string, snapshot PullRequest) (*PullRequest, error) {
-	defer func() { _ = data.StoreBitbucketPR(prURL, snapshot) }()
+	defer func() { data.StoreBitbucketPR(ctx, prURL, snapshot) }()
 
-	prev, err := data.LoadBitbucketPR(prURL)
+	prev, err := data.LoadBitbucketPR(ctx, prURL)
 	if err != nil {
-		logger.From(ctx).Error("failed to load Bitbucket PR snapshot",
-			slog.Any("error", err), slog.String("pr_url", prURL))
 		return nil, err
 	}
-
 	if prev == nil {
 		return nil, nil
 	}

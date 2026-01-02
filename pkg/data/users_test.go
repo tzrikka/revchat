@@ -7,7 +7,7 @@ import (
 func TestUsers(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache = map[string]string{} // Reset global state.
+	pathCache.Clear()
 
 	id := "user_id"
 	email := "email@example.com"

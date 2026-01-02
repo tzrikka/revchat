@@ -21,7 +21,7 @@ type CodeOwners struct {
 	Users  map[string]bool
 }
 
-// CountOwnedFiles counts how many of the given file paths are owned by the specified
+// CountOwnedFiles counts how many of the given file paths are owned by the given
 // user, according to the "CODEOWNERS" file in the given branch (a PR's destination).
 func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, commit, userName string, paths []string) int {
 	if userName == "" {

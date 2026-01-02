@@ -2,13 +2,11 @@ package workflows
 
 import (
 	"fmt"
-	"log/slog"
 	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/slack/commands"
 )
 
@@ -68,8 +66,6 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		return commands.Reminders(ctx, event)
 	}
 
-	logger.From(ctx).Warn("unrecognized Slack slash command",
-		slog.String("username", event.UserName), slog.String("text", event.Text))
 	commands.PostEphemeralError(ctx, event, fmt.Sprintf("unrecognized command - try `%s help`", event.Command))
 	return nil
 }

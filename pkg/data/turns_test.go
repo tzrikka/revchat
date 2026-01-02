@@ -8,7 +8,7 @@ import (
 func TestTurns(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache = map[string]string{} // Reset global state.
+	pathCache.Clear()
 
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
@@ -23,7 +23,7 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Initialize state without reviewers.
-	if err := InitTurns(url, "author", []string{}); err != nil {
+	if err := InitTurns(nil, url, "author", []string{}); err != nil {
 		t.Fatalf("InitTurns() error = %v", err)
 	}
 
@@ -219,12 +219,12 @@ func TestTurns(t *testing.T) {
 func TestNudge(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache = map[string]string{} // Reset global state.
+	pathCache.Clear()
 
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Initialize state.
-	if err := InitTurns(url, "author", []string{"rev1", "rev2"}); err != nil {
+	if err := InitTurns(nil, url, "author", []string{"rev1", "rev2"}); err != nil {
 		t.Fatalf("InitTurns() error = %v", err)
 	}
 

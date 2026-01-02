@@ -102,10 +102,8 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 		}
 
 		url := "https://" + strings.TrimSuffix(path, "_snapshot.json")
-		snapshot, err := data.LoadBitbucketPR(url)
+		snapshot, err := data.LoadBitbucketPR(ctx, url)
 		if err != nil {
-			logger.From(ctx).Error("failed to load Bitbucket PR snapshot",
-				slog.Any("error", err), slog.String("pr_url", url))
 			return nil // Continue walking.
 		}
 

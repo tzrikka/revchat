@@ -78,7 +78,7 @@ func SetReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 	}
 
 	if _, err := time.LoadLocation(user.TZ); err != nil {
-		logger.From(ctx).Warn("unrecognized user timezone", slog.Any("error", err),
+		logger.From(ctx).Error("unrecognized user timezone", slog.Any("error", err),
 			slog.String("user_id", event.UserID), slog.String("tz", user.TZ))
 		PostEphemeralError(ctx, event, fmt.Sprintf("your Slack timezone is unrecognized: `%s`", user.TZ))
 		return err

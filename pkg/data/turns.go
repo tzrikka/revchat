@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -26,11 +27,15 @@ type PRTurn struct {
 	FrozenBy string `json:"frozen_by,omitempty"`
 }
 
+const (
+	turnFileSuffix = "_turn"
+)
+
 var prTurnMutexes RWMutexMap
 
 // InitTurns initializes the attention state of a new PR.
 // Users are specified using their email addresses.
-func InitTurns(url, author string, reviewers []string) error {
+func InitTurns(ctx workflow.Context, url, author string, reviewers []string) error {
 	t := &PRTurn{
 		Author:    author,
 		Reviewers: make(map[string]bool, len(reviewers)),
@@ -40,22 +45,23 @@ func InitTurns(url, author string, reviewers []string) error {
 		t.Reviewers[reviewer] = true
 	}
 
-	return writeTurnFile(url, t) // Happens only once per PR, so no need for mutex here.
+	// Happens only once per PR, so no need for mutex here.
+	return writeTurnFile(ctx, url, t)
 }
 
-// DeleteTurns removes the attention state file of a specific PR.
-// This is used when the PR is closed or marked as a draft.
-func DeleteTurns(ctx workflow.Context, url string) error {
+func DeleteTurns(ctx workflow.Context, url string) {
 	mu := prTurnMutexes.Get(url)
 	mu.Lock()
 	defer mu.Unlock()
 
-	path, err := cachedDataPath(url, "_turn")
-	if err != nil {
-		return err
+	if ctx == nil { // For unit testing.
+		_ = deletePRFileActivity(context.Background(), url, turnFileSuffix)
+		return
 	}
 
-	return os.Remove(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, url, turnFileSuffix); err != nil {
+		logger.From(ctx).Warn("failed to delete PR attention state", slog.Any("error", err), slog.String("pr_url", url))
+	}
 }
 
 // AddReviewerToPR adds a new reviewer to the attention state of a specific PR.
@@ -81,7 +87,7 @@ func AddReviewerToPR(ctx workflow.Context, url, email string) error {
 	}
 	t.Reviewers[email] = true
 
-	return writeTurnFile(url, t)
+	return writeTurnFile(ctx, url, t)
 }
 
 // GetCurrentTurn returns the email addresses of all the users whose turn it is to
@@ -143,7 +149,7 @@ func RemoveFromTurn(ctx workflow.Context, url, email string) error {
 	}
 
 	delete(t.Reviewers, email)
-	return writeTurnFile(url, t)
+	return writeTurnFile(ctx, url, t)
 }
 
 // FreezeTurn marks the attention state of a specific PR as frozen by a specific user.
@@ -166,7 +172,7 @@ func FreezeTurn(ctx workflow.Context, url, email string) (bool, error) {
 	t.FrozenAt = time.Now().UTC().Format(time.RFC3339)
 	t.FrozenBy = email
 
-	return true, writeTurnFile(url, t)
+	return true, writeTurnFile(ctx, url, t)
 }
 
 // UnfreezeTurn is the inverse of [FreezeTurn].
@@ -188,7 +194,7 @@ func UnfreezeTurn(ctx workflow.Context, url string) (bool, error) {
 	t.FrozenAt = ""
 	t.FrozenBy = ""
 
-	return true, writeTurnFile(url, t)
+	return true, writeTurnFile(ctx, url, t)
 }
 
 // SwitchTurn switches the turn of a specific user in a specific PR.
@@ -225,7 +231,7 @@ func SwitchTurn(ctx workflow.Context, url, email string) error {
 		}
 	}
 
-	return writeTurnFile(url, t)
+	return writeTurnFile(ctx, url, t)
 }
 
 // Nudge records that a specific user has been nudged about a specific PR,
@@ -265,12 +271,12 @@ func Nudge(ctx workflow.Context, url, email string) (bool, error) {
 
 	// Valid nudge that requires a state change.
 	t.Reviewers[email] = true
-	return true, writeTurnFile(url, t)
+	return true, writeTurnFile(ctx, url, t)
 }
 
 // readTurnFile expects the caller to hold the appropriate mutex.
 func readTurnFile(ctx workflow.Context, url string) (*PRTurn, error) {
-	path, err := cachedDataPath(url, "_turn")
+	path, err := cachedDataPath(url, turnFileSuffix)
 	if err != nil {
 		return nil, err
 	}
@@ -308,9 +314,18 @@ func normalizeEmailAddresses(t *PRTurn) {
 	}
 }
 
-// writeTurnFile expects the caller to hold the appropriate mutex.
-func writeTurnFile(url string, t *PRTurn) error {
-	path, err := cachedDataPath(url, "_turn")
+// writeTurnFile wraps [writeTurnFileActivity] and expects the caller to hold the appropriate mutex.
+func writeTurnFile(ctx workflow.Context, url string, t *PRTurn) error {
+	if ctx == nil { // For unit testing.
+		return writeTurnFileActivity(context.Background(), url, t)
+	}
+
+	return executeLocalActivity(ctx, writeTurnFileActivity, nil, url, t)
+}
+
+// writeTurnFileActivity runs as a local activity and expects the caller to hold the appropriate mutex.
+func writeTurnFileActivity(_ context.Context, url string, t *PRTurn) error {
+	path, err := cachedDataPath(url, turnFileSuffix)
 	if err != nil {
 		return err
 	}
@@ -322,6 +337,7 @@ func writeTurnFile(url string, t *PRTurn) error {
 	defer f.Close()
 
 	normalizeEmailAddresses(t)
+
 	e := json.NewEncoder(f)
 	e.SetIndent("", "  ")
 	return e.Encode(t)
@@ -330,7 +346,9 @@ func writeTurnFile(url string, t *PRTurn) error {
 // resetTurn recreates the attention state file for a specific PR, based on the current
 // PR snapshot. This is a fallback for when the turn file is missing or corrupted.
 func resetTurn(ctx workflow.Context, url string) (*PRTurn, error) {
-	snapshot, err := LoadBitbucketPR(url)
+	logger.From(ctx).Warn("resetting PR attention state file", slog.String("pr_url", url))
+
+	snapshot, err := LoadBitbucketPR(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +365,7 @@ func resetTurn(ctx workflow.Context, url string) (*PRTurn, error) {
 	}
 
 	t := &PRTurn{Author: author, Reviewers: reviewers}
-	return t, writeTurnFile(url, t)
+	return t, writeTurnFile(ctx, url, t)
 }
 
 // bitbucketIDToEmail converts the "account_id" value in the given PR data

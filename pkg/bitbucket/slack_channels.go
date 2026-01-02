@@ -42,12 +42,7 @@ func CreateSlackChannel(ctx workflow.Context, pr PullRequest, maxLen int, prefix
 			}
 		}
 
-		if err := data.LogSlackChannelCreated(id, name, prURL); err != nil {
-			logger.From(ctx).Error("failed to log Slack channel creation", slog.Any("error", err),
-				slog.String("channel_id", id), slog.String("pr_url", prURL))
-			// Don't return the error (i.e. don't abort the calling workflow because of logging errors).
-		}
-
+		data.LogSlackChannelCreated(ctx, id, name, prURL)
 		return id, nil
 	}
 
@@ -70,13 +65,8 @@ func RenameSlackChannel(ctx workflow.Context, pr PullRequest, channelID string, 
 		}
 
 		if err == nil {
-			if logErr := data.LogSlackChannelRenamed(channelID, name); logErr != nil {
-				logger.From(ctx).Error("failed to log Slack channel renaming", slog.Any("error", logErr),
-					slog.String("channel_id", channelID), slog.String("new_name", name))
-				// Don't return the error (i.e. don't abort the calling workflow because of logging errors).
-			}
+			data.LogSlackChannelRenamed(ctx, channelID, name)
 		}
-
 		return err
 	}
 

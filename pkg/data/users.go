@@ -117,7 +117,7 @@ func SelectUserByBitbucketID(ctx workflow.Context, accountID string) User {
 	defer usersMutex.Unlock()
 
 	if ctx == nil { // For unit tests.
-		user, _ := selectUserActivity(nil, indexByBitbucketID, accountID)
+		user, _ := selectUserActivity(context.Background(), indexByBitbucketID, accountID)
 		return user
 	}
 
@@ -139,7 +139,7 @@ func SelectUserByEmail(ctx workflow.Context, email string) User {
 	defer usersMutex.Unlock()
 
 	if ctx == nil { // For unit tests.
-		user, _ := selectUserActivity(nil, indexByEmail, strings.ToLower(email))
+		user, _ := selectUserActivity(context.Background(), indexByEmail, strings.ToLower(email))
 		return user
 	}
 
@@ -160,7 +160,7 @@ func SelectUserByGitHubID(ctx workflow.Context, login string) User {
 	defer usersMutex.Unlock()
 
 	if ctx == nil { // For unit tests.
-		user, _ := selectUserActivity(nil, indexByGitHubID, login)
+		user, _ := selectUserActivity(context.Background(), indexByGitHubID, login)
 		return user
 	}
 
@@ -181,7 +181,7 @@ func SelectUserBySlackID(ctx workflow.Context, userID string) (User, bool, error
 	defer usersMutex.Unlock()
 
 	if ctx == nil { // For unit tests.
-		user, err := selectUserActivity(nil, indexBySlackID, userID)
+		user, err := selectUserActivity(context.Background(), indexBySlackID, userID)
 		return user, user.ThrippyLink != "", err
 	}
 
@@ -203,7 +203,7 @@ func SelectUserByRealName(ctx workflow.Context, realName string) User {
 	defer usersMutex.Unlock()
 
 	if ctx == nil { // For unit tests.
-		user, _ := selectUserActivity(nil, indexByRealName, realName)
+		user, _ := selectUserActivity(context.Background(), indexByRealName, realName)
 		return user
 	}
 
@@ -358,7 +358,7 @@ func (u *Users) findUserIndex(email, realName, bitbucketID, githubID, slackID st
 	return i, nil
 }
 
-func selectUserActivity(ctx workflow.Context, indexType int, id string) (User, error) {
+func selectUserActivity(ctx context.Context, indexType int, id string) (User, error) {
 	if usersDB == nil {
 		var err error
 		usersDB, err = readUsersFile()

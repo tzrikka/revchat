@@ -78,12 +78,11 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 
 	// Title.
 	title := fmt.Sprintf("\n\n  •  *<%s>*", url)
-	pr, err := data.LoadBitbucketPR(url)
-	if err != nil {
-		logger.From(ctx).Error("failed to load PR snapshot for reminder",
-			slog.Any("error", err), slog.String("pr_url", url))
-	} else if t, ok := pr["title"].(string); ok && len(t) > 0 {
-		title = fmt.Sprintf("\n\n  •  <%s|*%s*>", url, t)
+	pr, err := data.LoadBitbucketPR(ctx, url)
+	if err == nil {
+		if t, ok := pr["title"].(string); ok && len(t) > 0 {
+			title = fmt.Sprintf("\n\n  •  <%s|*%s*>", url, t)
+		}
 	}
 
 	// Draft indicator.

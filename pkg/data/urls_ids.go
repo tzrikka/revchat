@@ -63,13 +63,7 @@ func DeleteURLAndIDMapping(ctx workflow.Context, key string) {
 		delete(m, k)
 	}
 
-	urlsIDsMutex.Lock()
-	defer urlsIDsMutex.Unlock()
-
-	if ctx == nil { // For unit testing.
-		_ = writeJSONActivity(context.Background(), urlsIDsFile, m)
-	}
-	_ = executeLocalActivity(ctx, writeJSONActivity, nil, urlsIDsFile, m)
+	_ = writeURLsIDsFile(ctx, m)
 }
 
 func readURLsIDsFile(ctx workflow.Context) (map[string]string, error) {
@@ -82,7 +76,7 @@ func readURLsIDsFile(ctx workflow.Context) (map[string]string, error) {
 
 	file := map[string]string{}
 	if err := executeLocalActivity(ctx, readJSONActivity, &file, urlsIDsFile); err != nil {
-		logger.From(ctx).Error("failed to read mapping of PR URLs and Slack IDs", slog.Any("error", err))
+		logger.From(ctx).Warn("failed to read mapping of PR URLs and Slack IDs", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -99,7 +93,7 @@ func writeURLsIDsFile(ctx workflow.Context, m map[string]string) error {
 
 	err := executeLocalActivity(ctx, writeJSONActivity, nil, urlsIDsFile, m)
 	if err != nil {
-		logger.From(ctx).Error("failed to write mapping of PR URLs and Slack IDs", slog.Any("error", err))
+		logger.From(ctx).Error("failed to update mapping of PR URLs and Slack IDs", slog.Any("error", err))
 		return err
 	}
 

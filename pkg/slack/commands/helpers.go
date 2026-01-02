@@ -84,7 +84,7 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 		return nil, nil, nil, err // The error may or may not be nil.
 	}
 
-	pr, err = data.LoadBitbucketPR(url[0])
+	pr, err = data.LoadBitbucketPR(ctx, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to load PR snapshot.")
 		return url, nil, nil, err

@@ -8,12 +8,12 @@ import (
 func TestBitbucket(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache = map[string]string{} // Reset global state.
+	pathCache.Clear()
 
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Initial state.
-	got, err := LoadBitbucketPR(url)
+	got, err := LoadBitbucketPR(nil, url)
 	if err != nil {
 		t.Fatalf("LoadBitbucketPR() error = %v", err)
 	}
@@ -24,11 +24,9 @@ func TestBitbucket(t *testing.T) {
 	// Initial snapshot.
 	pr1 := map[string]any{"title": "pr1"}
 
-	if err := StoreBitbucketPR(url, pr1); err != nil {
-		t.Fatalf("SaveBitbucketPR() error = %v", err)
-	}
+	StoreBitbucketPR(nil, url, pr1)
 
-	got, err = LoadBitbucketPR(url)
+	got, err = LoadBitbucketPR(nil, url)
 	if err != nil {
 		t.Fatalf("LoadBitbucketPR() error = %v", err)
 	}
@@ -39,11 +37,9 @@ func TestBitbucket(t *testing.T) {
 	// Update snapshot.
 	pr2 := map[string]any{"title": "pr2"}
 
-	if err := StoreBitbucketPR(url, pr2); err != nil {
-		t.Fatalf("SaveBitbucketPR() error = %v", err)
-	}
+	StoreBitbucketPR(nil, url, pr2)
 
-	got, err = LoadBitbucketPR(url)
+	got, err = LoadBitbucketPR(nil, url)
 	if err != nil {
 		t.Fatalf("LoadBitbucketPR() error = %v", err)
 	}
@@ -52,11 +48,9 @@ func TestBitbucket(t *testing.T) {
 	}
 
 	// Delete snapshot.
-	if err := DeleteBitbucketPR(url); err != nil {
-		t.Fatalf("DeleteBitbucketPR() error = %v", err)
-	}
+	DeleteBitbucketPR(nil, url)
 
-	got, err = LoadBitbucketPR(url)
+	got, err = LoadBitbucketPR(nil, url)
 	if err != nil {
 		t.Fatalf("LoadBitbucketPR() error = %v", err)
 	}
