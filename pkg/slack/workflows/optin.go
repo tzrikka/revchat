@@ -111,7 +111,10 @@ func (c *Config) OptOutSlashCommand(ctx workflow.Context, event commands.SlashCo
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
-	if err := data.UpsertUser(ctx, user.Email, user.RealName, user.BitbucketID, user.GitHubID, user.SlackID, "X"); err != nil {
+	data.DeleteReminder(ctx, user.SlackID)
+	data.RemoveFollower(ctx, user.SlackID)
+
+	if err := data.UpsertUser(ctx, user.Email, "", user.BitbucketID, user.GitHubID, user.SlackID, "X"); err != nil {
 		commands.PostEphemeralError(ctx, event, "failed to write internal data about you.")
 		return err
 	}

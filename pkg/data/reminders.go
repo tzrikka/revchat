@@ -32,10 +32,10 @@ func SetReminder(ctx workflow.Context, userID, kitchenTime, tz string) error {
 	return executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
 }
 
-func DeleteReminder(ctx workflow.Context, userID string) error {
+func DeleteReminder(ctx workflow.Context, userID string) {
 	m, err := ListReminders(ctx)
 	if err != nil {
-		return err
+		return
 	}
 
 	delete(m, userID)
@@ -44,10 +44,11 @@ func DeleteReminder(ctx workflow.Context, userID string) error {
 	defer remindersMutex.Unlock()
 
 	if ctx == nil { // For unit testing.
-		return writeJSONActivity(context.Background(), remindersFile, m)
+		_ = writeJSONActivity(context.Background(), remindersFile, m)
+		return
 	}
 
-	return executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
+	_ = executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
 }
 
 func ListReminders(ctx workflow.Context) (map[string]string, error) {

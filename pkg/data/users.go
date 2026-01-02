@@ -112,6 +112,16 @@ func UnfollowUser(ctx workflow.Context, followerSlackID, followedSlackID string)
 	return true
 }
 
+func RemoveFollower(ctx workflow.Context, followerSlackID string) {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	if err := executeLocalActivity(ctx, removeFollowerActivity, nil, followerSlackID); err != nil {
+		logger.From(ctx).Error("failed to remove follower", slog.Any("error", err),
+			slog.String("slack_id", followerSlackID))
+	}
+}
+
 func SelectUserByBitbucketID(ctx workflow.Context, accountID string) User {
 	if accountID == "" {
 		return User{}
@@ -381,6 +391,26 @@ func unfollowUserActivity(_ context.Context, followerSlackID, followedSlackID st
 		usersCache.Set(user.SlackID, user, cache.DefaultExpiration)
 	}
 	return usersDB.writeUsersFile()
+}
+
+func removeFollowerActivity(ctx context.Context, followerSlackID string) error {
+	if usersDB == nil {
+		var err error
+		usersDB, err = readUsersFile()
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, user := range usersDB.entries {
+		if slices.Contains(user.Followers, followerSlackID) {
+			if err := unfollowUserActivity(ctx, followerSlackID, user.SlackID); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (u *Users) findUserIndex(email, realName, bitbucketID, githubID, slackID string) (int, error) {
