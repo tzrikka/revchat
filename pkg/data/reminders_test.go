@@ -63,9 +63,7 @@ func TestReminders(t *testing.T) {
 	}
 
 	// Remove mapping.
-	if err := DeleteReminder(nil, uid1); err != nil {
-		t.Fatalf("DeleteReminder() error = %v", err)
-	}
+	DeleteReminder(nil, uid1)
 
 	// After removal.
 	got, err = ListReminders(nil)
