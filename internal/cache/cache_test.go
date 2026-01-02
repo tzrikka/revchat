@@ -8,7 +8,7 @@ import (
 )
 
 func TestCacheNoExpiration(t *testing.T) {
-	c := cache.New(cache.NoExpiration, cache.NoCleanup)
+	c := cache.New[string](cache.NoExpiration, cache.NoCleanup)
 	k, v := "key1", "val1"
 
 	wantInt := 0
@@ -55,7 +55,7 @@ func TestCacheNoExpiration(t *testing.T) {
 }
 
 func TestCacheWithExpiration(t *testing.T) {
-	c := cache.New(1*time.Nanosecond, cache.NoCleanup)
+	c := cache.New[string](1*time.Nanosecond, cache.NoCleanup)
 	k, v := "key1", "val1"
 	c.Set(k, v, cache.DefaultExpiration)
 
@@ -93,7 +93,7 @@ func TestCacheWithExpiration(t *testing.T) {
 }
 
 func TestCacheItemCopy(t *testing.T) {
-	c := cache.New(cache.NoExpiration, cache.NoCleanup)
+	c := cache.New[string](cache.NoExpiration, cache.NoCleanup)
 	k, v := "key1", "val1"
 	c.Set(k, v, cache.DefaultExpiration)
 
@@ -119,7 +119,7 @@ func TestCacheItemCopy(t *testing.T) {
 }
 
 func TestCacheItemsCopy(t *testing.T) {
-	c := cache.New(cache.NoExpiration, cache.NoCleanup)
+	c := cache.New[string](cache.NoExpiration, cache.NoCleanup)
 	k, v := "key1", "val1"
 	c.Set(k, v, cache.DefaultExpiration)
 
@@ -128,7 +128,7 @@ func TestCacheItemsCopy(t *testing.T) {
 		t.Fatalf("Cache.Items() did not find key: %s", k)
 	}
 
-	items1[k] = cache.Item{
+	items1[k] = cache.Item[string]{
 		Value:      "val2",
 		Expiration: time.Now(),
 	}
@@ -147,7 +147,7 @@ func TestCacheItemsCopy(t *testing.T) {
 }
 
 func TestCacheAdd(t *testing.T) {
-	c := cache.New(cache.NoExpiration, cache.NoCleanup)
+	c := cache.New[string](cache.NoExpiration, cache.NoCleanup)
 	k, v := "key1", "val1"
 
 	if added := c.Add(k, v, cache.DefaultExpiration); !added {
@@ -164,7 +164,7 @@ func TestCacheAdd(t *testing.T) {
 }
 
 func TestCacheReplace(t *testing.T) {
-	c := cache.New(cache.NoExpiration, cache.NoCleanup)
+	c := cache.New[string](cache.NoExpiration, cache.NoCleanup)
 	k, v1, v2 := "key1", "val1", "val2"
 
 	if replaced := c.Replace(k, v1, cache.DefaultExpiration); replaced {
@@ -185,7 +185,7 @@ func TestCacheReplace(t *testing.T) {
 }
 
 func TestCacheReplaceKeepNoExpiration(t *testing.T) {
-	c := cache.New(cache.NoExpiration, cache.NoCleanup)
+	c := cache.New[string](cache.NoExpiration, cache.NoCleanup)
 	k, v := "key1", "val1"
 	c.Set(k, v, cache.DefaultExpiration)
 
@@ -208,7 +208,7 @@ func TestCacheReplaceKeepNoExpiration(t *testing.T) {
 }
 
 func TestCacheReplaceKeepExactTTL(t *testing.T) {
-	c := cache.New(1*time.Hour, cache.NoCleanup)
+	c := cache.New[string](1*time.Hour, cache.NoCleanup)
 	k, v1, v2 := "key1", "val1", "val2"
 
 	c.Set(k, v1, 3*time.Hour)

@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	displayNameCache = cache.New(4*time.Hour, cache.DefaultCleanupInterval)
-	iconCache        = cache.New(4*time.Hour, cache.DefaultCleanupInterval)
+	displayNameCache = cache.New[string](4*time.Hour, cache.DefaultCleanupInterval)
+	iconCache        = cache.New[string](4*time.Hour, cache.DefaultCleanupInterval)
 
 	// No need for thread safety here: this is set only once per process, and even
 	// if multiple workflows set it concurrently, the value will be the same anyway.

@@ -15,7 +15,7 @@ import (
 // Worst case, we overwrite with the same value once.
 var (
 	cachedSlackBaseURL  = ""
-	cachedSlackChannels = cache.New(10*time.Minute, cache.DefaultCleanupInterval)
+	cachedSlackChannels = cache.New[string](10*time.Minute, cache.DefaultCleanupInterval)
 )
 
 func slackBaseURL(ctx workflow.Context) string {

@@ -10,22 +10,22 @@ import (
 
 // Cache is an in-memory concurrency-safe key-value store for strings, with optional expiration.
 // Think of it as a basic and local version of Redis or https://github.com/patrickmn/go-cache.
-type Cache struct {
+type Cache[T any] struct {
 	mu   sync.RWMutex
-	data map[string]Item
+	data map[string]Item[T]
 
 	defaultExpiration time.Duration
 }
 
 // Item represents a single cache item, with its value and expiration time.
 // An Expiration of zero means the item never expires.
-type Item struct {
-	Value      string
+type Item[T any] struct {
+	Value      T
 	Expiration time.Time
 }
 
 // Expired checks if the item is expired.
-func (i *Item) Expired() bool {
+func (i *Item[T]) Expired() bool {
 	if i.Expiration.IsZero() {
 		return false
 	}
@@ -41,13 +41,13 @@ const (
 )
 
 // New creates a new [Cache] instance.
-func New(defaultExpiration, cleanupInterval time.Duration) *Cache {
+func New[T any](defaultExpiration, cleanupInterval time.Duration) *Cache[T] {
 	if defaultExpiration <= DefaultExpiration {
 		defaultExpiration = NoExpiration
 	}
 
-	c := &Cache{
-		data:              make(map[string]Item),
+	c := &Cache[T]{
+		data:              make(map[string]Item[T]),
 		defaultExpiration: defaultExpiration,
 	}
 	if cleanupInterval > NoCleanup {
@@ -61,7 +61,7 @@ func New(defaultExpiration, cleanupInterval time.Duration) *Cache {
 // We do not support stopping it - it's expected to run for the lifetime of the program.
 // Either way, Go 1.23+ can garbage collect the ticker even if it's not stopped.
 // Note that lazy expiration is also handled in [Get] and [Item].
-func cleanupWorker(c *Cache, interval time.Duration) {
+func cleanupWorker[T any](c *Cache[T], interval time.Duration) {
 	for now := range time.NewTicker(interval).C {
 		c.mu.Lock()
 		for key, item := range c.data {
@@ -74,40 +74,40 @@ func cleanupWorker(c *Cache, interval time.Duration) {
 }
 
 // Del removes a specified item from the cache. If the item does not exist, this is a no-op.
-func (c *Cache) Del(key string) {
+func (c *Cache[T]) Del(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	delete(c.data, key)
 }
 
-// Get retrieves a value from the cache, and also returns a boolean indicating if it was
-// found and not expired. It also handles lazy expiration (deleting expired items).
-func (c *Cache) Get(key string) (string, bool) {
+// Get retrieves a value from the cache, and also returns a boolean indicating if it
+// was found and not expired. It also handles lazy expiration (deleting expired items).
+func (c *Cache[T]) Get(key string) (T, bool) {
 	item, ok := c.Item(key)
 	return item.Value, ok
 }
 
 // Item retrieves a copy of an [Item] from the cache, and also returns a boolean indicating
 // if it was found and not expired. It also handles lazy expiration (deleting expired items).
-func (c *Cache) Item(key string) (Item, bool) {
+func (c *Cache[T]) Item(key string) (Item[T], bool) {
 	c.mu.RLock()
 	item, ok := c.data[key]
 	c.mu.RUnlock()
 
 	if !ok {
-		return Item{}, false
+		return Item[T]{}, false
 	}
 
 	if item.Expired() {
 		c.Del(key)
-		return Item{}, false
+		return Item[T]{}, false
 	}
 
 	return item, true
 }
 
-func (c *Cache) expirationTime(ttl time.Duration) time.Time {
+func (c *Cache[T]) expirationTime(ttl time.Duration) time.Time {
 	if ttl == DefaultExpiration {
 		ttl = c.defaultExpiration
 	}
@@ -120,11 +120,11 @@ func (c *Cache) expirationTime(ttl time.Duration) time.Time {
 // Set adds a value to the cache with an optional Time-To-Live duration
 // until it expires (see also [DefaultExpiration] and [NoExpiration]).
 // Note that any negative TTL value is treated as [NoExpiration].
-func (c *Cache) Set(key, value string, ttl time.Duration) {
+func (c *Cache[T]) Set(key string, value T, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.data[key] = Item{
+	c.data[key] = Item[T]{
 		Value:      value,
 		Expiration: c.expirationTime(ttl),
 	}
@@ -133,7 +133,7 @@ func (c *Cache) Set(key, value string, ttl time.Duration) {
 // Add adds a value to the cache only if the key does not already exist
 // or is expired. It returns true if the item was added, false otherwise.
 // Note that any negative TTL value is treated as [NoExpiration].
-func (c *Cache) Add(key, value string, ttl time.Duration) bool {
+func (c *Cache[T]) Add(key string, value T, ttl time.Duration) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -141,7 +141,7 @@ func (c *Cache) Add(key, value string, ttl time.Duration) bool {
 		return false
 	}
 
-	c.data[key] = Item{
+	c.data[key] = Item[T]{
 		Value:      value,
 		Expiration: c.expirationTime(ttl),
 	}
@@ -151,7 +151,7 @@ func (c *Cache) Add(key, value string, ttl time.Duration) bool {
 // Replace updates a value in the cache only if the key already exists and is not expired.
 // It returns true if the item was replaced, false otherwise. See also [KeepTTL], and
 // note that any negative TTL value is treated as [NoExpiration].
-func (c *Cache) Replace(key, value string, ttl time.Duration) bool {
+func (c *Cache[T]) Replace(key string, value T, ttl time.Duration) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

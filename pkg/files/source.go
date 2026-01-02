@@ -14,7 +14,7 @@ import (
 // It substantially reduces API calls in workflows that call [CountOwnedFiles]
 // and [CountHighRiskFiles] and iterate over many users with many PRs,
 // but on the other hand we don't want this data to become stale.
-var fileCache = cache.New(10*time.Minute, cache.DefaultCleanupInterval)
+var fileCache = cache.New[string](10*time.Minute, cache.DefaultCleanupInterval)
 
 func getBitbucketSourceFile(ctx workflow.Context, workspace, repo, branch, commit, path string) string {
 	key := fmt.Sprintf("%s:%s:%s:%s", workspace, repo, branch, path)

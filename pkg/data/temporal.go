@@ -35,7 +35,7 @@ const (
 // pathCache caches the absolute paths to data files to avoid repeated filesystem operations.
 // Entries expire after 7 days, and the cache is cleaned every about once a day (1,399
 // is a prime number of minutes close to 23.5 hours to avoid a repeated spike pattern).
-var pathCache = cache.New(7*24*time.Hour, 1433*time.Minute)
+var pathCache = cache.New[string](7*24*time.Hour, 1433*time.Minute)
 
 func executeLocalActivity(ctx workflow.Context, activity, result any, args ...any) error {
 	f := runtime.FuncForPC(reflect.ValueOf(activity).Pointer())
