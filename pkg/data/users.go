@@ -453,7 +453,7 @@ func selectUserActivity(ctx context.Context, indexType int, id string) (User, er
 	}
 
 	entryCopy := usersDB.entries[i]
-	entryCopy.Email = strings.ToLower(entryCopy.Email)
+	usersCache.Set(id, entryCopy, cache.DefaultExpiration)
 	return entryCopy, nil
 }
 
