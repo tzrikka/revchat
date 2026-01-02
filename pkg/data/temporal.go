@@ -57,7 +57,7 @@ func executeLocalActivity(ctx workflow.Context, activity, result any, args ...an
 
 // readJSONActivity runs as a Temporal local activity (using
 // [executeLocalActivity]), and expects the caller to hold the appropriate mutex.
-func readJSONActivity(ctx context.Context, filename string) (map[string]string, error) {
+func readJSONActivity(_ context.Context, filename string) (map[string]string, error) {
 	path, err := cachedDataPath(filename, "")
 	if err != nil {
 		return nil, err
