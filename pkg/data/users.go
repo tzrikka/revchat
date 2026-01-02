@@ -14,6 +14,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/internal/logger"
 )
 
@@ -63,11 +64,14 @@ type Users struct {
 var (
 	usersDB    *Users
 	usersMutex sync.Mutex
+	usersCache = cache.New[User](10*time.Minute, cache.DefaultCleanupInterval)
 )
 
 func UpsertUser(ctx workflow.Context, email, realName, bitbucketID, githubID, slackID, thrippyLink string) error {
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
+
+	email = strings.ToLower(email)
 
 	if ctx == nil { // For unit tests.
 		return upsertUserActivity(context.Background(), email, realName, bitbucketID, githubID, slackID, thrippyLink)
@@ -121,6 +125,10 @@ func SelectUserByBitbucketID(ctx workflow.Context, accountID string) User {
 		return user
 	}
 
+	if user, found := usersCache.Get(accountID); found {
+		return user
+	}
+
 	user := new(User)
 	if err := executeLocalActivity(ctx, selectUserActivity, user, indexByBitbucketID, accountID); err != nil {
 		logger.From(ctx).Warn("unexpected but not critical: failed to load user data by Bitbucket ID",
@@ -135,16 +143,22 @@ func SelectUserByEmail(ctx workflow.Context, email string) User {
 		return User{}
 	}
 
+	email = strings.ToLower(email)
+
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
 
 	if ctx == nil { // For unit tests.
-		user, _ := selectUserActivity(context.Background(), indexByEmail, strings.ToLower(email))
+		user, _ := selectUserActivity(context.Background(), indexByEmail, email)
+		return user
+	}
+
+	if user, found := usersCache.Get(email); found {
 		return user
 	}
 
 	user := new(User)
-	if err := executeLocalActivity(ctx, selectUserActivity, user, indexByEmail, strings.ToLower(email)); err != nil {
+	if err := executeLocalActivity(ctx, selectUserActivity, user, indexByEmail, email); err != nil {
 		logger.From(ctx).Error("failed to load user data by email", slog.Any("error", err), slog.String("email", email))
 		return User{}
 	}
@@ -161,6 +175,10 @@ func SelectUserByGitHubID(ctx workflow.Context, login string) User {
 
 	if ctx == nil { // For unit tests.
 		user, _ := selectUserActivity(context.Background(), indexByGitHubID, login)
+		return user
+	}
+
+	if user, found := usersCache.Get(login); found {
 		return user
 	}
 
@@ -183,6 +201,10 @@ func SelectUserBySlackID(ctx workflow.Context, userID string) (User, bool, error
 	if ctx == nil { // For unit tests.
 		user, err := selectUserActivity(context.Background(), indexBySlackID, userID)
 		return user, user.ThrippyLink != "", err
+	}
+
+	if user, found := usersCache.Get(userID); found {
+		return user, user.ThrippyLink != "", nil
 	}
 
 	user := new(User)
@@ -268,6 +290,20 @@ func upsertUserActivity(_ context.Context, email, realName, bitbucketID, githubI
 		usersDB.entries[i].ThrippyLink = thrippyLink
 	}
 
+	// Now that the user is fully updated, cache and persist it too.
+	user := usersDB.entries[i]
+	if email != "" && email != "bot" {
+		usersCache.Set(email, user, cache.DefaultExpiration)
+	}
+	if bitbucketID != "" {
+		usersCache.Set(bitbucketID, user, cache.DefaultExpiration)
+	}
+	if githubID != "" {
+		usersCache.Set(githubID, user, cache.DefaultExpiration)
+	}
+	if slackID != "" {
+		usersCache.Set(slackID, user, cache.DefaultExpiration)
+	}
 	return usersDB.writeUsersFile()
 }
 
@@ -291,6 +327,20 @@ func followUserActivity(_ context.Context, followerSlackID, followedSlackID stri
 		slices.Sort(usersDB.entries[i].Followers)
 	}
 
+	// Now that the user is updated, cache and persist it too.
+	user := usersDB.entries[i]
+	if user.BitbucketID != "" {
+		usersCache.Set(user.BitbucketID, user, cache.DefaultExpiration)
+	}
+	if user.Email != "" && user.Email != "bot" {
+		usersCache.Set(user.Email, user, cache.DefaultExpiration)
+	}
+	if user.GitHubID != "" {
+		usersCache.Set(user.GitHubID, user, cache.DefaultExpiration)
+	}
+	if user.SlackID != "" {
+		usersCache.Set(user.SlackID, user, cache.DefaultExpiration)
+	}
 	return usersDB.writeUsersFile()
 }
 
@@ -316,6 +366,20 @@ func unfollowUserActivity(_ context.Context, followerSlackID, followedSlackID st
 	usersDB.entries[i].Followers = slices.Delete(usersDB.entries[i].Followers, j, j+1)
 	usersDB.entries[i].Updated = time.Now().UTC().Format(time.RFC3339)
 
+	// Now that the user is updated, cache and persist it too.
+	user := usersDB.entries[i]
+	if user.BitbucketID != "" {
+		usersCache.Set(user.BitbucketID, user, cache.DefaultExpiration)
+	}
+	if user.Email != "" && user.Email != "bot" {
+		usersCache.Set(user.Email, user, cache.DefaultExpiration)
+	}
+	if user.GitHubID != "" {
+		usersCache.Set(user.GitHubID, user, cache.DefaultExpiration)
+	}
+	if user.SlackID != "" {
+		usersCache.Set(user.SlackID, user, cache.DefaultExpiration)
+	}
 	return usersDB.writeUsersFile()
 }
 

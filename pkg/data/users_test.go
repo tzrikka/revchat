@@ -10,6 +10,7 @@ func TestUsers(t *testing.T) {
 	pathCache.Clear()
 
 	id := "user_id"
+	name := "First Last"
 	email := "email@example.com"
 
 	// Before adding the user.
@@ -19,7 +20,7 @@ func TestUsers(t *testing.T) {
 	}
 
 	// Add the user.
-	if err := UpsertUser(nil, email, "", id, "", "", ""); err != nil {
+	if err := UpsertUser(nil, email, name, id, "", "", ""); err != nil {
 		t.Fatalf("UpsertUser() error = %v", err)
 	}
 
@@ -27,6 +28,9 @@ func TestUsers(t *testing.T) {
 	got = SelectUserByBitbucketID(nil, id)
 	if got.Email != email {
 		t.Errorf("SelectUserByBitbucketID() email = %q, want %q", got.Email, email)
+	}
+	if got.RealName != name {
+		t.Errorf("SelectUserByBitbucketID() name = %q, want %q", got.RealName, name)
 	}
 
 	got = SelectUserByGitHubID(nil, id)
