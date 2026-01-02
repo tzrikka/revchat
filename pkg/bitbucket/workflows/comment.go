@@ -325,7 +325,7 @@ func (c Config) unsetScheduleActivity(ctx context.Context, commentURL string) er
 	}
 	defer cli.Close()
 
-	handle := cli.ScheduleClient().GetHandle(ctx, commentURL)
+	handle := cli.ScheduleClient().GetHandle(ctx, trimURLPrefix(commentURL))
 	if _, err := handle.Describe(ctx); err == nil {
 		if err := handle.Delete(ctx); err != nil {
 			l.Error("failed to delete Bitbucket PR comment polling schedule",
