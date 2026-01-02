@@ -2,9 +2,11 @@ package markdown
 
 import (
 	"log/slog"
+	"time"
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -13,7 +15,7 @@ import (
 // Worst case, we overwrite with the same value once.
 var (
 	cachedSlackBaseURL  = ""
-	cachedSlackChannels = map[string]string{}
+	cachedSlackChannels = cache.New(10*time.Minute, cache.DefaultCleanupInterval)
 )
 
 func slackBaseURL(ctx workflow.Context) string {
@@ -32,7 +34,7 @@ func slackBaseURL(ctx workflow.Context) string {
 }
 
 func slackChannelIDToName(ctx workflow.Context, id string) string {
-	if name, ok := cachedSlackChannels[id]; ok {
+	if name, ok := cachedSlackChannels.Get(id); ok {
 		return name
 	}
 
@@ -49,6 +51,6 @@ func slackChannelIDToName(ctx workflow.Context, id string) string {
 		return ""
 	}
 
-	cachedSlackChannels[id] = name
+	cachedSlackChannels.Set(id, name, cache.DefaultExpiration)
 	return name
 }
