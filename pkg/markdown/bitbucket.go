@@ -62,17 +62,35 @@ func bitbucketToSlackLinks(text, prURL string) string {
 	// Images: "![text](url){ ... }" --> "!<url|text>" --> ":camera: <url|text>".
 	text = regexp.MustCompile(`!(<|&lt;)(.*?)>`).ReplaceAllString(text, ":camera: <${2}>")
 
-	// PR references: "#123" --> "<PR URL|#123>".
-	baseURL := "<" + regexp.MustCompile(`/pull-requests/\d+.*`).ReplaceAllString(prURL, "/pull-requests/")
-	text = regexp.MustCompile(`#(\d+)`).ReplaceAllString(text, baseURL+"${1}|#${1}>")
+	// PR references: "[[proj/]repo]#123" --> "<PR URL|#123>".
+	baseURL := regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/pull-requests/`).FindAllStringSubmatch(prURL, -1)
+	if len(baseURL) == 0 || len(baseURL[0]) < 4 {
+		return text
+	}
 
-	// PR references in another repo: "repo#123" --> "<PR URL|repo#123>".
-	pattern := `([\w-]+)<(.*?)/([\w-]+)/pull-requests/(\d+)\|`
-	text = regexp.MustCompile(pattern).ReplaceAllString(text, "<${2}/${1}/pull-requests/${4}|${1}")
+	done := map[string]bool{}
+	prPattern := regexp.MustCompile(`(([\w-]+/)?([\w-]+))?#(\d+)`)
+	for _, id := range prPattern.FindAllStringSubmatch(text, -1) {
+		if len(id) < 5 || done[id[0]] {
+			continue
+		}
 
-	// PR references in another workspace: "proj/repo#123" --> "<PR URL|proj/repo#123>".
-	pattern = `([\w-]+)/<(.*?)/([\w-]+)/([\w-]+)/pull-requests/(\d+)\|`
-	return regexp.MustCompile(pattern).ReplaceAllString(text, "<${2}/${1}/${4}/pull-requests/${5}|${1}/")
+		if id[2] == "" {
+			id[2] = baseURL[0][2]
+		} else {
+			id[2], _ = strings.CutSuffix(id[2], "/")
+		}
+
+		if id[3] == "" {
+			id[3] = baseURL[0][3]
+		}
+
+		link := fmt.Sprintf("<https://%s/%s/%s/pull-requests/%s|%s>", baseURL[0][1], id[2], id[3], id[4], id[0])
+		text = strings.ReplaceAll(text, id[0], link)
+		done[id[0]] = true
+	}
+
+	return text
 }
 
 func bitbucketToSlackLists(text string) string {

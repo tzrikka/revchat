@@ -40,7 +40,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	activities.SetChannelDescription(ctx, channelID, pr.Title, prURL)
 	bitbucket.SetChannelBookmarks(ctx, channelID, prURL, pr)
 
-	msg := "%s created this PR: " + bitbucket.LinkifyTitle(ctx, c.LinkifyMap, pr.Title)
+	msg := "%s created this PR: " + bitbucket.LinkifyTitle(ctx, c.LinkifyMap, prURL, pr.Title)
 	if desc := strings.TrimSpace(pr.Description); desc != "" {
 		msg += "\n\n" + markdown.BitbucketToSlack(ctx, desc, prURL)
 	}
@@ -135,7 +135,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	// Title edited.
 	if snapshot.Title != event.PullRequest.Title {
-		msg := ":pencil2: %s edited the PR title: " + bitbucket.LinkifyTitle(ctx, c.LinkifyMap, event.PullRequest.Title)
+		msg := ":pencil2: %s edited the PR title: " + bitbucket.LinkifyTitle(ctx, c.LinkifyMap, prURL, event.PullRequest.Title)
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 		activities.SetChannelDescription(ctx, channelID, event.PullRequest.Title, prURL)
 		err = bitbucket.RenameSlackChannel(ctx, event.PullRequest, channelID, c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix)

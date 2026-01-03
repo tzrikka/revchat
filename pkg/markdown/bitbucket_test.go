@@ -169,9 +169,9 @@ func TestBitbucketToSlack(t *testing.T) {
 		},
 		{
 			name: "pr_ref_in_other_workspace",
-			text: "foo-bar/blah-2-blah#3456",
+			text: "foo-bar/blah-2-blah#3456 " + "foo-bar/blah-2-blah#3456",
 			url:  "https://bitbucket.org/workspace/repo/pull-requests/123",
-			want: "<https://bitbucket.org/foo-bar/blah-2-blah/pull-requests/3456|foo-bar/blah-2-blah#3456>",
+			want: "<https://bitbucket.org/foo-bar/blah-2-blah/pull-requests/3456|foo-bar/blah-2-blah#3456> <https://bitbucket.org/foo-bar/blah-2-blah/pull-requests/3456|foo-bar/blah-2-blah#3456>",
 		},
 		// Simple lists.
 		{

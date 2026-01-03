@@ -39,11 +39,32 @@ func TestLinkifyTitle(t *testing.T) {
 			text: "FOO-1234 and [BAR-5678]",
 			want: "<https://domain.atlassian.net/browse/FOO-1234|FOO-1234> and [BAR-5678]",
 		},
+		{
+			name: "pr_in_this_repo",
+			text: "Foo #123 bar",
+			want: "Foo <https://bitbucket.org/workspace/repo/pull-requests/123|#123> bar",
+		},
+		{
+			name: "pr_in_other_repo",
+			text: "Foo other#123 bar",
+			want: "Foo <https://bitbucket.org/workspace/other/pull-requests/123|other#123> bar",
+		},
+		{
+			name: "pr_in_other_project_1",
+			text: "Foo proj/other#123 bar",
+			want: "Foo <https://bitbucket.org/proj/other/pull-requests/123|proj/other#123> bar",
+		},
+		{
+			name: "pr_in_other_project_2",
+			text: "proj/other#123 xxx proj/other#123",
+			want: "<https://bitbucket.org/proj/other/pull-requests/123|proj/other#123> xxx <https://bitbucket.org/proj/other/pull-requests/123|proj/other#123>",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := LinkifyTitle(nil, tt.cfg, tt.text); got != tt.want {
+			prURL := "https://bitbucket.org/workspace/repo/pull-requests/98765"
+			if got := LinkifyTitle(nil, tt.cfg, prURL, tt.text); got != tt.want {
 				t.Errorf("LinkifyTitle() = %q, want %q", got, tt.want)
 			}
 		})
