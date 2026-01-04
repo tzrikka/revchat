@@ -59,7 +59,7 @@ func BitbucketIDToSlackID(ctx workflow.Context, accountID string, checkOptIn boo
 		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID))
 	}
 
-	if checkOptIn && user.ThrippyLink == "" {
+	if checkOptIn && !user.IsOptedIn() {
 		return ""
 	}
 

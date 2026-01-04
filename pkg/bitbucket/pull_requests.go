@@ -31,24 +31,17 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 			slog.String("pr_url", prURL), slog.String("account_id", event.Actor.AccountID))
 	}
 
-	reviewers := []string{}
-	for _, r := range event.PullRequest.Reviewers {
-		if e := users.BitbucketIDToEmail(ctx, r.AccountID); e != "" {
-			reviewers = append(reviewers, e)
-		}
-	}
-
-	if err := data.InitTurns(ctx, prURL, email, reviewers); err != nil {
-		logger.From(ctx).Error("failed to initialize Bitbucket PR turn-taking state",
-			slog.Any("error", err), slog.String("channel_id", channelID), slog.String("pr_url", prURL))
-	}
-
+	data.InitTurns(ctx, prURL, email)
 	_ = data.MapURLAndID(ctx, prURL, channelID)
 }
 
 // accountIDs extracts the IDs from a slice of [Account]s.
 // The output is guaranteed to be sorted, without repetitions, and not contain teams/apps.
 func accountIDs(accounts []Account) []string {
+	if len(accounts) == 0 {
+		return nil
+	}
+
 	ids := make([]string, 0, len(accounts))
 	for _, a := range accounts {
 		if a.Type == "user" || a.Type == "" {

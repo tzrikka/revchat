@@ -97,8 +97,6 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 	}
 
 	if err := data.SwitchTurn(ctx, url, user.Email); err != nil {
-		logger.From(ctx).Error("failed to switch PR turn", slog.Any("error", err),
-			slog.String("pr_url", url), slog.String("email", user.Email))
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}

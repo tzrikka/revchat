@@ -67,6 +67,10 @@ var (
 	usersCache = cache.New[User](10*time.Minute, cache.DefaultCleanupInterval)
 )
 
+func (u User) IsOptedIn() bool {
+	return u.ThrippyLink != ""
+}
+
 func UpsertUser(ctx workflow.Context, email, realName, bitbucketID, githubID, slackID, thrippyLink string) error {
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
@@ -210,11 +214,11 @@ func SelectUserBySlackID(ctx workflow.Context, userID string) (User, bool, error
 
 	if ctx == nil { // For unit tests.
 		user, err := selectUserActivity(context.Background(), indexBySlackID, userID)
-		return user, user.ThrippyLink != "", err
+		return user, user.IsOptedIn(), err
 	}
 
 	if user, found := usersCache.Get(userID); found {
-		return user, user.ThrippyLink != "", nil
+		return user, user.IsOptedIn(), nil
 	}
 
 	user := new(User)
@@ -223,7 +227,7 @@ func SelectUserBySlackID(ctx workflow.Context, userID string) (User, bool, error
 		return User{}, false, err
 	}
 
-	return *user, user.ThrippyLink != "", nil
+	return *user, user.IsOptedIn(), nil
 }
 
 func SelectUserByRealName(ctx workflow.Context, realName string) User {

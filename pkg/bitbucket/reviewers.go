@@ -10,34 +10,28 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-// Invitees returns a list of opted-in Slack user IDs (PR author/participants/reviewers/followers).
+// ChannelMembers returns a list of opted-in Slack user IDs who are PR authors/reviewers/followers.
 // The output is guaranteed to be sorted, without repetitions, and not contain teams/apps.
-func Invitees(ctx workflow.Context, pr PullRequest) []string {
-	accounts := append([]Account{pr.Author}, pr.Reviewers...)
-	for _, p := range pr.Participants {
-		accounts = append(accounts, p.User)
-	}
+func ChannelMembers(ctx workflow.Context, pr PullRequest) []string {
+	accounts := []Account{pr.Author}
 
-	bitbucketIDs := accountIDs(accounts)
-
-	slackIDs := make([]string, 0, len(bitbucketIDs))
-	for _, aid := range bitbucketIDs {
-		// True = don't include opted-out users. They will still be mentioned
-		// in the channel, but as non-members they won't be notified about it.
-		if sid := users.BitbucketIDToSlackID(ctx, aid, true); sid != "" {
-			slackIDs = append(slackIDs, sid)
+	if !pr.Draft {
+		accounts = append(accounts, pr.Reviewers...)
+		// Include non-reviewer participants as well, if there are any; deduplication is done below.
+		for _, participant := range pr.Participants {
+			accounts = append(accounts, participant.User)
 		}
 	}
 
-	user := data.SelectUserByBitbucketID(ctx, pr.Author.AccountID)
-	slackIDs = append(slackIDs, user.Followers...)
+	slackIDs := BitbucketToSlackIDs(ctx, accountIDs(accounts))
+	slackIDs = append(slackIDs, data.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers...)
 
 	slices.Sort(slackIDs)
 	return slices.Compact(slackIDs)
 }
 
-// ReviewerDiff returns the lists of added and removed reviewers, compared to the previous snapshot of the PR.
-// The output is guaranteed to be sorted, without repetitions, and not contain teams/apps.
+// ReviewerDiff returns the lists of added and removed reviewers, compared to the previous snapshot
+// of the PR. The output is guaranteed to be sorted, without repetitions, and not contain teams/apps.
 func ReviewersDiff(prev, curr PullRequest) (added, removed []string) {
 	prevIDs := accountIDs(prev.Reviewers)
 	currIDs := accountIDs(curr.Reviewers)
@@ -66,10 +60,10 @@ func ReviewerMentions(ctx workflow.Context, added, removed []string) string {
 		// Do nothing.
 	case 1:
 		sb.WriteString("added this reviewer:")
-		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
+		sb.WriteString(bitbucketAccountIDsToSlackMentions(ctx, added))
 	default:
 		sb.WriteString("added these reviewers:")
-		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, added))
+		sb.WriteString(bitbucketAccountIDsToSlackMentions(ctx, added))
 	}
 
 	if len(added) > 0 && len(removed) > 0 {
@@ -81,33 +75,33 @@ func ReviewerMentions(ctx workflow.Context, added, removed []string) string {
 		// Do nothing.
 	case 1:
 		sb.WriteString("removed this reviewer:")
-		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
+		sb.WriteString(bitbucketAccountIDsToSlackMentions(ctx, removed))
 	default:
 		sb.WriteString("removed these reviewers:")
-		sb.WriteString(bitbucketAccountsToSlackMentions(ctx, removed))
+		sb.WriteString(bitbucketAccountIDsToSlackMentions(ctx, removed))
 	}
 
 	sb.WriteString(".")
 	return sb.String()
 }
 
-func bitbucketAccountsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
+func bitbucketAccountIDsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
 	var sb strings.Builder
-	for _, aid := range accountIDs {
-		if ref := users.BitbucketIDToSlackRef(ctx, aid, ""); ref != "" {
-			sb.WriteString(" " + ref)
+	for _, id := range accountIDs {
+		if mention := users.BitbucketIDToSlackRef(ctx, id, ""); mention != "" {
+			sb.WriteString(" " + mention)
 		}
 	}
 	return sb.String()
 }
 
 func BitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {
-	slackIDs := []string{}
-	for _, aid := range accountIDs {
+	slackIDs := make([]string, 0, len(accountIDs))
+	for _, bitbucketID := range accountIDs {
 		// True = don't include opted-out users. They will still be mentioned
 		// in the channel, but as non-members they won't be notified about it.
-		if sid := users.BitbucketIDToSlackID(ctx, aid, true); sid != "" {
-			slackIDs = append(slackIDs, sid)
+		if slackID := users.BitbucketIDToSlackID(ctx, bitbucketID, true); slackID != "" {
+			slackIDs = append(slackIDs, slackID)
 		}
 	}
 	return slackIDs

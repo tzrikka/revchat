@@ -23,7 +23,7 @@ func GitHubToSlackID(ctx workflow.Context, username string, checkOptIn bool) str
 		return ""
 	}
 
-	if checkOptIn && user.ThrippyLink == "" {
+	if checkOptIn && !user.IsOptedIn() {
 		return ""
 	}
 

@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -45,7 +46,8 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 		msg += "\n\n" + markdown.BitbucketToSlack(ctx, desc, prURL)
 	}
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
-	err = activities.InviteUsersToChannel(ctx, channelID, bitbucket.Invitees(ctx, pr))
+
+	err = activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr))
 	if err != nil {
 		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
 			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
@@ -65,7 +67,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, prURL)
+	channelID, found := activities.LookupChannel(ctx, event.Type, prURL)
 	if !found {
 		return nil
 	}
@@ -102,7 +104,7 @@ func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequest
 func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, prURL)
+	channelID, found := activities.LookupChannel(ctx, event.Type, prURL)
 	if !found {
 		return nil
 	}
@@ -123,14 +125,14 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, snapshot)
 
-	// Announce transitions between drafts and ready to review.
+	var errs []error
+
+	// Announce transitions between draft and ready-to-review modes.
 	if !snapshot.Draft && event.PullRequest.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
-		return nil
-	}
-	if snapshot.Draft && !event.PullRequest.Draft {
+	} else if snapshot.Draft && !event.PullRequest.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
-		snapshot.Reviewers = nil // Force re-adding any reviewers that were added while the PR was a draft.
+		errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, event.PullRequest)))
 	}
 
 	// Title edited.
@@ -138,7 +140,8 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		msg := ":pencil2: %s edited the PR title: " + bitbucket.LinkifyTitle(ctx, c.LinkifyMap, prURL, event.PullRequest.Title)
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 		activities.SetChannelDescription(ctx, channelID, event.PullRequest.Title, prURL)
-		err = bitbucket.RenameSlackChannel(ctx, event.PullRequest, channelID, c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix)
+		err := bitbucket.RenameSlackChannel(ctx, event.PullRequest, channelID, c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix)
+		errs = append(errs, err)
 	}
 
 	// Description edited.
@@ -156,31 +159,9 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	if len(added)+len(removed) > 0 {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, bitbucket.ReviewerMentions(ctx, added, removed))
 		if !event.PullRequest.Draft {
-			_ = activities.InviteUsersToChannel(ctx, channelID, bitbucket.BitbucketToSlackIDs(ctx, added))
+			errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.BitbucketToSlackIDs(ctx, added)))
 		}
-		_ = activities.KickUsersFromChannel(ctx, channelID, bitbucket.BitbucketToSlackIDs(ctx, removed))
-	}
-
-	for _, id := range added {
-		email := users.BitbucketIDToEmail(ctx, id)
-		if email == "" {
-			continue
-		}
-		if err := data.AddReviewerToPR(ctx, prURL, email); err != nil {
-			logger.From(ctx).Error("failed to add reviewer to Bitbucket PR's attention state",
-				slog.Any("error", err), slog.String("pr_url", prURL))
-		}
-	}
-
-	for _, id := range removed {
-		email := users.BitbucketIDToEmail(ctx, id)
-		if email == "" {
-			continue
-		}
-		if err := data.RemoveFromTurn(ctx, prURL, email); err != nil {
-			logger.From(ctx).Error("failed to remove reviewers from Bitbucket PR's attention state",
-				slog.Any("error", err), slog.String("pr_url", prURL))
-		}
+		errs = append(errs, activities.KickUsersFromChannel(ctx, channelID, prURL, bitbucket.BitbucketToSlackIDs(ctx, removed)))
 	}
 
 	// Commit(s) pushed to the PR branch.
@@ -188,6 +169,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		if err := data.UpdateBitbucketDiffstat(prURL, bitbucket.Diffstat(ctx, event)); err != nil {
 			logger.From(ctx).Error("failed to update Bitbucket PR's diffstat",
 				slog.Any("error", err), slog.String("pr_url", prURL))
+			errs = append(errs, err)
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
 
@@ -227,7 +209,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 // PullRequestReviewedWorkflow mirrors PR review results in the PR's Slack channel:
@@ -239,7 +221,7 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	pr := event.PullRequest
 	prURL := bitbucket.HTMLURL(pr.Links)
-	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, prURL)
+	channelID, found := activities.LookupChannel(ctx, event.Type, prURL)
 	if !found {
 		return nil
 	}
@@ -248,55 +230,52 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 
 	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
 	msg := "%s "
+	var err error
 
 	switch event.Type {
 	case "approved":
-		if err := data.RemoveFromTurn(ctx, prURL, email); err != nil {
+		msg += "approved this PR. :+1:"
+		err = data.RemoveFromTurn(ctx, prURL, email)
+		if err != nil {
 			logger.From(ctx).Error("failed to remove user from Bitbucket PR's attention state", slog.Any("error", err),
 				slog.String("pr_url", prURL), slog.String("email", email), slog.String("account_id", event.Actor.AccountID))
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
-		msg += "approved this PR. :+1:"
 
 	case "unapproved":
-		if err := data.AddReviewerToPR(ctx, prURL, email); err != nil {
-			logger.From(ctx).Error("failed to add user back to Bitbucket PR's attention state", slog.Any("error", err),
-				slog.String("pr_url", prURL), slog.String("email", email), slog.String("account_id", event.Actor.AccountID))
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
-		}
-		if err := data.SwitchTurn(ctx, prURL, email); err != nil {
-			logger.From(ctx).Error("failed to switch Bitbucket PR's attention state", slog.Any("error", err),
-				slog.String("pr_url", prURL), slog.String("email", email), slog.String("account_id", event.Actor.AccountID))
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
-		}
 		msg += "unapproved this PR. :-1:"
+		// If the user isn't opted-in, or isn't a member of the Slack channel, don't add them back to the
+		// PR's attention state (just like the logic in other places, e.g. PR creation and PR updates).
+		if user := data.SelectUserByEmail(ctx, email); user.IsOptedIn() {
+			err = activities.InviteUsersToChannel(ctx, channelID, prURL, []string{users.EmailToSlackID(ctx, email)})
+			// Don't abort - it's more important to announce this, even if our internal state is stale.
+		}
 
 	case "changes_request_created":
 		pr.ChangeRequestCount++
-		if _, err := bitbucket.SwitchSnapshot(ctx, prURL, pr); err != nil {
+		msg += "requested changes in this PR. :warning:"
+		_, err = bitbucket.SwitchSnapshot(ctx, prURL, pr)
+		if err != nil {
 			logger.From(ctx).Error("failed to update change-request count in PR snapshot",
 				slog.Any("error", err), slog.String("pr_url", prURL), slog.Int("new_count", pr.ChangeRequestCount))
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
-
-		if err := data.SwitchTurn(ctx, prURL, email); err != nil {
-			logger.From(ctx).Error("failed to switch Bitbucket PR's attention state",
-				slog.Any("error", err), slog.String("pr_url", prURL), slog.String("email", email))
+		if err2 := data.SwitchTurn(ctx, prURL, email); err2 != nil {
+			err = errors.Join(err, err2)
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
-		msg += "requested changes in this PR. :warning:"
 
 	case "changes_request_removed":
 		pr.ChangeRequestCount--
 		if pr.ChangeRequestCount < 0 {
 			pr.ChangeRequestCount = 0 // Should not happen, but just in case.
 		}
-		if _, err := bitbucket.SwitchSnapshot(ctx, prURL, pr); err != nil {
+		_, err = bitbucket.SwitchSnapshot(ctx, prURL, pr)
+		if err != nil {
 			logger.From(ctx).Error("failed to update change-request count in PR snapshot",
 				slog.Any("error", err), slog.String("pr_url", prURL), slog.Int("new_count", pr.ChangeRequestCount))
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
-		return nil
 
 	default:
 		logger.From(ctx).Error("unrecognized Bitbucket PR review event type", slog.String("event_type", event.Type))
@@ -304,5 +283,5 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 	}
 
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
-	return nil
+	return err
 }

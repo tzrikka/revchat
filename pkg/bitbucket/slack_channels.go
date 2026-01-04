@@ -13,16 +13,6 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
-// LookupSlackChannel returns the ID of a Slack channel associated with the given PR, if it exists.
-func LookupSlackChannel(ctx workflow.Context, eventType, prURL string) (string, bool) {
-	if prURL == "" {
-		return "", false
-	}
-
-	channelID, _ := data.SwitchURLAndID(ctx, prURL)
-	return channelID, channelID != ""
-}
-
 func CreateSlackChannel(ctx workflow.Context, pr PullRequest, maxLen int, prefix string, private bool) (string, error) {
 	title := slack.NormalizeChannelName(pr.Title, maxLen)
 	prURL := HTMLURL(pr.Links)
@@ -59,15 +49,9 @@ func RenameSlackChannel(ctx workflow.Context, pr PullRequest, channelID string, 
 			name = fmt.Sprintf("%s_%d", name, i)
 		}
 
-		retry, err := activities.RenameChannel(ctx, channelID, name)
-		if retry {
-			continue
+		if retry, err := activities.RenameChannel(ctx, channelID, name); !retry {
+			return err
 		}
-
-		if err == nil {
-			data.LogSlackChannelRenamed(ctx, channelID, name)
-		}
-		return err
 	}
 
 	logger.From(ctx).Error("too many failed attempts to rename Slack channel",

@@ -33,20 +33,13 @@ const (
 
 var prTurnMutexes RWMutexMap
 
-// InitTurns initializes the attention state of a new PR.
-// Users are specified using their email addresses.
-func InitTurns(ctx workflow.Context, url, author string, reviewers []string) error {
-	t := &PRTurn{
-		Author:    author,
-		Reviewers: make(map[string]bool, len(reviewers)),
-	}
-
-	for _, reviewer := range reviewers {
-		t.Reviewers[reviewer] = true
-	}
-
+// InitTurns initializes the attention state of a new PR with its author's email address.
+// The initial state has no reviewers; they are added when they are added to the Slack channel.
+func InitTurns(ctx workflow.Context, url, author string) {
 	// Happens only once per PR, so no need for mutex here.
-	return writeTurnFile(ctx, url, t)
+	if err := writeTurnFile(ctx, url, &PRTurn{Author: author, Reviewers: map[string]bool{}}); err != nil {
+		logger.From(ctx).Error("failed to initialize PR attention state", slog.Any("error", err), slog.String("pr_url", url))
+	}
 }
 
 func DeleteTurns(ctx workflow.Context, url string) {
@@ -213,6 +206,8 @@ func SwitchTurn(ctx workflow.Context, url, email string) error {
 
 	t, err := readTurnFile(ctx, url)
 	if err != nil {
+		logger.From(ctx).Error("failed to read PR's attention state to switch turns",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
 		return err
 	}
 
@@ -231,7 +226,13 @@ func SwitchTurn(ctx workflow.Context, url, email string) error {
 		}
 	}
 
-	return writeTurnFile(ctx, url, t)
+	if err := writeTurnFile(ctx, url, t); err != nil {
+		logger.From(ctx).Error("failed to write PR's attention state to switch turns",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
+		return err
+	}
+
+	return nil
 }
 
 // Nudge records that a specific user has been nudged about a specific PR,

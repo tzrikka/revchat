@@ -27,19 +27,16 @@ import (
 func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, prURL)
+	channelID, found := sact.LookupChannel(ctx, event.Type, prURL)
 	if !found {
 		return nil
 	}
 
 	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
 
+	// Don't abort if this fails - it's more important to post the comment.
 	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
-	if err := data.SwitchTurn(ctx, prURL, email); err != nil {
-		logger.From(ctx).Error("failed to switch Bitbucket PR's attention state",
-			slog.Any("error", err), slog.String("pr_url", prURL), slog.String("account_id", event.Actor.AccountID))
-		// Don't abort - it's more important to post the comment, even if our internal state is stale.
-	}
+	_ = data.SwitchTurn(ctx, prURL, email)
 
 	// If the comment was created by RevChat, don't repost it. However, we still
 	// need to poll for updates (comment created in Slack, but edited in Bitbucket).
@@ -81,7 +78,7 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 // [10-minute window]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
 func (c Config) CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
-	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
+	channelID, found := sact.LookupChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
 	if !found {
 		return nil
 	}
@@ -135,7 +132,7 @@ func (c Config) updateCommentInWorkflow(ctx workflow.Context, comment *bitbucket
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-deleted
 func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
-	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
+	channelID, found := sact.LookupChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
 	if !found {
 		return nil
 	}
@@ -156,7 +153,7 @@ func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.Pul
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-resolved
 func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
+	channelID, found := sact.LookupChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
 	if !found {
 		return nil
 	}
@@ -172,7 +169,7 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-reopened
 func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := bitbucket.LookupSlackChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
+	channelID, found := sact.LookupChannel(ctx, event.Type, bitbucket.HTMLURL(event.PullRequest.Links))
 	if !found {
 		return nil
 	}

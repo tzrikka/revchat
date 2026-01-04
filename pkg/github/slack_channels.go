@@ -85,7 +85,7 @@ func (c Config) initChannel(ctx workflow.Context, event PullRequestEvent) error 
 	c.setChannelBookmarks(ctx, channelID, url, pr)
 	c.postIntroMsg(ctx, channelID, event.Action, pr, event.Sender)
 
-	err = activities.InviteUsersToChannel(ctx, channelID, c.prParticipants(ctx, pr))
+	err = activities.InviteUsersToChannel(ctx, channelID, pr.HTMLURL, c.prParticipants(ctx, pr))
 	if err != nil {
 		c.reportCreationErrorToAuthor(ctx, event.Sender.Login, url)
 		data.DeleteURLAndIDMapping(ctx, url)

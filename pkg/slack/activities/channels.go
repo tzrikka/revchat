@@ -1,19 +1,33 @@
 package activities
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 const (
 	channelMetadataMaxLen = 250
 )
+
+// LookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
+func LookupChannel(ctx workflow.Context, eventType, prURL string) (string, bool) {
+	if prURL == "" {
+		return "", false
+	}
+
+	channelID, _ := data.SwitchURLAndID(ctx, prURL)
+	return channelID, channelID != ""
+}
 
 // ArchiveChannel is an idempotent function, unlike the underlying Slack API call.
 func ArchiveChannel(ctx workflow.Context, channelID, prURL string) error {
@@ -44,7 +58,10 @@ func CreateChannel(ctx workflow.Context, name, prURL string, private bool) (id s
 	return id, false, nil
 }
 
-func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []string) error {
+// InviteUsersToChannel adds up to 1,000 users to the given Slack channel
+// and PR attention state (the given users are expected to be opted-in).
+// This is an idempotent function, unlike the underlying Slack API call.
+func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, userIDs []string) error {
 	if len(userIDs) == 0 {
 		return nil
 	}
@@ -55,6 +72,23 @@ func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []stri
 		userIDs = userIDs[:1000]
 	}
 
+	var errs []error
+	var dontInvite []string
+	for _, id := range userIDs {
+		if err := data.AddReviewerToPR(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
+			logger.From(ctx).Error("failed to add reviewer to PR's attention state",
+				slog.Any("error", err), slog.String("pr_url", prURL))
+			dontInvite = append(dontInvite, id)
+			errs = append(errs, err)
+		}
+	}
+
+	// Don't invite users we failed to add to the PR's attention state.
+	for _, id := range dontInvite {
+		i := slices.Index(userIDs, id)
+		userIDs = slices.Delete(userIDs, i, i+1)
+	}
+
 	if err := slack.ConversationsInvite(ctx, channelID, userIDs, true); err != nil {
 		msg := "failed to add user(s) to Slack channel"
 
@@ -62,37 +96,46 @@ func InviteUsersToChannel(ctx workflow.Context, channelID string, userIDs []stri
 			msg += " - already in channel" // This is not a problem.
 			logger.From(ctx).Debug(msg, slog.Any("error", err), slog.String("channel_id", channelID),
 				slog.String("user_ids", strings.Join(userIDs, ",")))
-			return nil
+			return errors.Join(errs...)
 		}
 
 		logger.From(ctx).Error(msg, slog.Any("error", err), slog.String("channel_id", channelID),
 			slog.String("user_ids", strings.Join(userIDs, ",")))
-		return err
+		errs = append(errs, err)
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
-func KickUsersFromChannel(ctx workflow.Context, channelID string, userIDs []string) error {
-	var err error
-	for _, userID := range userIDs {
-		err = slack.ConversationsKick(ctx, channelID, userID)
+// KickUsersFromChannel removes the given users from the given Slack channel and PR
+// attention state. This is an idempotent function, unlike the underlying Slack API call.
+func KickUsersFromChannel(ctx workflow.Context, channelID, prURL string, userIDs []string) error {
+	var errs []error
+	for _, id := range userIDs {
+		err := slack.ConversationsKick(ctx, channelID, id)
 		if err != nil {
 			msg := "failed to remove user from Slack channel"
 
 			if strings.Contains(err.Error(), "not_in_channel") {
 				msg += " - not in channel" // This is not a problem.
 				logger.From(ctx).Debug(msg, slog.Any("error", err),
-					slog.String("channel_id", channelID), slog.String("user_id", userID))
+					slog.String("channel_id", channelID), slog.String("user_id", id))
+			} else {
+				logger.From(ctx).Error(msg, slog.Any("error", err),
+					slog.String("channel_id", channelID), slog.String("user_id", id))
+				errs = append(errs, err)
 				continue
 			}
+		}
 
-			logger.From(ctx).Error(msg, slog.Any("error", err),
-				slog.String("channel_id", channelID), slog.String("user_id", userID))
+		if err := data.RemoveFromTurn(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
+			logger.From(ctx).Error("failed to remove reviewer from PR's attention state",
+				slog.Any("error", err), slog.String("pr_url", prURL), slog.String("user_id", id))
+			errs = append(errs, err)
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
@@ -109,6 +152,7 @@ func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
 	}
 
 	logger.From(ctx).Info("renamed Slack channel", slog.String("channel_id", channelID), slog.String("new_name", name))
+	data.LogSlackChannelRenamed(ctx, channelID, name)
 	return false, nil
 }
 

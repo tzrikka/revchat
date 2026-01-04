@@ -22,7 +22,7 @@ func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) erro
 	if user := event.Assignee; user != nil {
 		switch event.Action {
 		case "assigned":
-			err = c.addChannelMember(ctx, channelID, *user, event.Sender, "assignee")
+			err = c.addChannelMember(ctx, channelID, event.PullRequest.HTMLURL, *user, event.Sender, "assignee")
 		case "unassigned":
 			err = c.removeChannelMember(ctx, channelID, *user, event.Sender, "assignee")
 		}
@@ -32,7 +32,7 @@ func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) erro
 	if user := event.RequestedReviewer; user != nil {
 		switch event.Action {
 		case "review_requested":
-			err = c.addChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
+			err = c.addChannelMember(ctx, channelID, event.PullRequest.HTMLURL, *user, event.Sender, "reviewer")
 		case "review_request_removed":
 			err = c.removeChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
 		}
@@ -51,14 +51,13 @@ func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) erro
 	return err
 }
 
-func (c Config) addChannelMember(ctx workflow.Context, channelID string, reviewer, sender User, role string) error {
+func (c Config) addChannelMember(ctx workflow.Context, channelID, prURL string, reviewer, sender User, role string) error {
 	slackUserID := c.announceUser(ctx, channelID, reviewer, sender, role, "added")
 	if slackUserID == "" {
 		return nil
 	}
 
-	err := activities.InviteUsersToChannel(ctx, channelID, []string{slackUserID})
-
+	err := activities.InviteUsersToChannel(ctx, channelID, prURL, []string{slackUserID})
 	if reviewer.Login == sender.Login {
 		return err // No need to also DM the user if they added themselves.
 	}
