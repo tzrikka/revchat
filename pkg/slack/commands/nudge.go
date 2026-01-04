@@ -81,8 +81,6 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 
 	ok, err := data.Nudge(ctx, url, user.Email)
 	if err != nil {
-		logger.From(ctx).Error("failed to nudge user", slog.Any("error", err),
-			slog.String("pr_url", url), slog.String("user_id", userID))
 		PostEphemeralError(ctx, event, fmt.Sprintf("internal data error while nudging <@%s>.", userID))
 		return ok // May be true despite the error: a valid reviewer, but failed to save it.
 	}

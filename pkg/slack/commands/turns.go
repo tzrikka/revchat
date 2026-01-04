@@ -2,13 +2,11 @@ package commands
 
 import (
 	"fmt"
-	"log/slog"
 	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -22,8 +20,6 @@ func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []st
 
 	emails, err := data.GetCurrentTurn(ctx, url[0])
 	if err != nil {
-		logger.From(ctx).Error("failed to get current turn for PR",
-			slog.Any("error", err), slog.String("pr_url", url[0]))
 		PostEphemeralError(ctx, event, "failed to read internal data about the PR.")
 		return "", nil, data.User{}, err
 	}
@@ -55,24 +51,18 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 	ok, err := data.Nudge(ctx, url, user.Email)
 	if err != nil {
-		logger.From(ctx).Error("failed to self-nudge", slog.Any("error", err),
-			slog.String("pr_url", url), slog.String("email", user.Email))
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 	}
 	if !ok {
 		msg = ":thinking_face: I didn't think you're supposed to review this PR, thanks for letting me know!\n\n"
 
-		if err := data.AddReviewerToPR(ctx, url, user.Email); err != nil {
-			logger.From(ctx).Error("failed to add reviewer to PR", slog.Any("error", err),
-				slog.String("pr_url", url), slog.String("email", user.Email))
+		if err := data.AddReviewerToTurns(ctx, url, user.Email); err != nil {
 			PostEphemeralError(ctx, event, "failed to write internal data about this.")
 		}
 	}
 
 	emails, err = data.GetCurrentTurn(ctx, url)
 	if err != nil {
-		logger.From(ctx).Error("failed to get current turn for PR after switching",
-			slog.Any("error", err), slog.String("pr_url", url))
 		PostEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
 	}
@@ -103,8 +93,6 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 	newTurn, err := data.GetCurrentTurn(ctx, url)
 	if err != nil {
-		logger.From(ctx).Error("failed to get current turn for PR after switching",
-			slog.Any("error", err), slog.String("pr_url", url))
 		PostEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
 	}
@@ -121,7 +109,6 @@ func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 
 	ok, err := data.FreezeTurn(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID))
 	if err != nil {
-		logger.From(ctx).Error("failed to freeze PR turn", slog.Any("error", err), slog.String("pr_url", url[0]))
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}
@@ -141,7 +128,6 @@ func UnfreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 
 	ok, err := data.UnfreezeTurn(ctx, url[0])
 	if err != nil {
-		logger.From(ctx).Error("failed to unfreeze PR turn", slog.Any("error", err), slog.String("pr_url", url[0]))
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}

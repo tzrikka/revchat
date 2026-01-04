@@ -235,12 +235,8 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 	switch event.Type {
 	case "approved":
 		msg += "approved this PR. :+1:"
-		err = data.RemoveFromTurn(ctx, prURL, email)
-		if err != nil {
-			logger.From(ctx).Error("failed to remove user from Bitbucket PR's attention state", slog.Any("error", err),
-				slog.String("pr_url", prURL), slog.String("email", email), slog.String("account_id", event.Actor.AccountID))
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
-		}
+		err = data.RemoveReviewerFromTurns(ctx, prURL, email)
+		// Don't abort - it's more important to announce this, even if our internal state is stale.
 
 	case "unapproved":
 		msg += "unapproved this PR. :-1:"

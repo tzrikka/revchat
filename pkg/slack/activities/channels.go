@@ -75,9 +75,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, userIDs
 	var errs []error
 	var dontInvite []string
 	for _, id := range userIDs {
-		if err := data.AddReviewerToPR(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
-			logger.From(ctx).Error("failed to add reviewer to PR's attention state",
-				slog.Any("error", err), slog.String("pr_url", prURL))
+		if err := data.AddReviewerToTurns(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
 			dontInvite = append(dontInvite, id)
 			errs = append(errs, err)
 		}
@@ -128,9 +126,7 @@ func KickUsersFromChannel(ctx workflow.Context, channelID, prURL string, userIDs
 			}
 		}
 
-		if err := data.RemoveFromTurn(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
-			logger.From(ctx).Error("failed to remove reviewer from PR's attention state",
-				slog.Any("error", err), slog.String("pr_url", prURL), slog.String("user_id", id))
+		if err := data.RemoveReviewerFromTurns(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
 			errs = append(errs, err)
 		}
 	}

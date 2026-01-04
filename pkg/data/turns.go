@@ -57,10 +57,10 @@ func DeleteTurns(ctx workflow.Context, url string) {
 	}
 }
 
-// AddReviewerToPR adds a new reviewer to the attention state of a specific PR.
+// AddReviewerToTurns adds a new reviewer to the attention state of a specific PR.
 // This function is idempotent: if a reviewer already exists, or is the PR author,
 // it does nothing. It also ignores empty or "bot" email addresses.
-func AddReviewerToPR(ctx workflow.Context, url, email string) error {
+func AddReviewerToTurns(ctx workflow.Context, url, email string) error {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
@@ -72,6 +72,8 @@ func AddReviewerToPR(ctx workflow.Context, url, email string) error {
 
 	t, err := readTurnFile(ctx, url)
 	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state to add reviewer",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
 		return err
 	}
 
@@ -80,7 +82,13 @@ func AddReviewerToPR(ctx workflow.Context, url, email string) error {
 	}
 	t.Reviewers[email] = true
 
-	return writeTurnFile(ctx, url, t)
+	if err := writeTurnFile(ctx, url, t); err != nil {
+		logger.From(ctx).Error("failed to write PR attention state to add reviewer",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
+		return err
+	}
+
+	return nil
 }
 
 // GetCurrentTurn returns the email addresses of all the users whose turn it is to
@@ -94,6 +102,8 @@ func GetCurrentTurn(ctx workflow.Context, url string) ([]string, error) {
 
 	t, err := readTurnFile(ctx, url)
 	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state of current turn",
+			slog.Any("error", err), slog.String("pr_url", url))
 		return nil, err
 	}
 
@@ -118,11 +128,11 @@ func GetCurrentTurn(ctx workflow.Context, url string) ([]string, error) {
 	return slices.Compact(emails), nil
 }
 
-// RemoveFromTurn completely removes a reviewer from the attention state of a specific PR.
+// RemoveReviewerFromTurns completely removes a reviewer from the attention state of a specific PR.
 // This is used when that reviewer approves the PR, or is unassigned from the PR.
 // This function is idempotent: if the reviewer does not exist, it does nothing.
 // It also ignores empty or "bot" email addresses.
-func RemoveFromTurn(ctx workflow.Context, url, email string) error {
+func RemoveReviewerFromTurns(ctx workflow.Context, url, email string) error {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
@@ -134,6 +144,8 @@ func RemoveFromTurn(ctx workflow.Context, url, email string) error {
 
 	t, err := readTurnFile(ctx, url)
 	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state to remove reviewer",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
 		return err
 	}
 
@@ -142,7 +154,14 @@ func RemoveFromTurn(ctx workflow.Context, url, email string) error {
 	}
 
 	delete(t.Reviewers, email)
-	return writeTurnFile(ctx, url, t)
+
+	if err := writeTurnFile(ctx, url, t); err != nil {
+		logger.From(ctx).Error("failed to write PR attention state to remove reviewer",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
+		return err
+	}
+
+	return nil
 }
 
 // FreezeTurn marks the attention state of a specific PR as frozen by a specific user.
@@ -155,6 +174,8 @@ func FreezeTurn(ctx workflow.Context, url, email string) (bool, error) {
 
 	t, err := readTurnFile(ctx, url)
 	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state to freeze turn",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
 		return false, err
 	}
 
@@ -165,7 +186,13 @@ func FreezeTurn(ctx workflow.Context, url, email string) (bool, error) {
 	t.FrozenAt = time.Now().UTC().Format(time.RFC3339)
 	t.FrozenBy = email
 
-	return true, writeTurnFile(ctx, url, t)
+	if err := writeTurnFile(ctx, url, t); err != nil {
+		logger.From(ctx).Error("failed to write PR attention state to freeze turn",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
+		return false, err
+	}
+
+	return true, nil
 }
 
 // UnfreezeTurn is the inverse of [FreezeTurn].
@@ -177,6 +204,8 @@ func UnfreezeTurn(ctx workflow.Context, url string) (bool, error) {
 
 	t, err := readTurnFile(ctx, url)
 	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state to unfreeze turn",
+			slog.Any("error", err), slog.String("pr_url", url))
 		return false, err
 	}
 
@@ -187,7 +216,13 @@ func UnfreezeTurn(ctx workflow.Context, url string) (bool, error) {
 	t.FrozenAt = ""
 	t.FrozenBy = ""
 
-	return true, writeTurnFile(ctx, url, t)
+	if err := writeTurnFile(ctx, url, t); err != nil {
+		logger.From(ctx).Error("failed to write PR attention state to unfreeze turn",
+			slog.Any("error", err), slog.String("pr_url", url))
+		return false, err
+	}
+
+	return true, nil
 }
 
 // SwitchTurn switches the turn of a specific user in a specific PR.
@@ -206,7 +241,7 @@ func SwitchTurn(ctx workflow.Context, url, email string) error {
 
 	t, err := readTurnFile(ctx, url)
 	if err != nil {
-		logger.From(ctx).Error("failed to read PR's attention state to switch turns",
+		logger.From(ctx).Error("failed to read PR attention state to switch turns",
 			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
 		return err
 	}
@@ -227,7 +262,7 @@ func SwitchTurn(ctx workflow.Context, url, email string) error {
 	}
 
 	if err := writeTurnFile(ctx, url, t); err != nil {
-		logger.From(ctx).Error("failed to write PR's attention state to switch turns",
+		logger.From(ctx).Error("failed to write PR attention state to switch turns",
 			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
 		return err
 	}
@@ -250,6 +285,8 @@ func Nudge(ctx workflow.Context, url, email string) (bool, error) {
 
 	t, err := readTurnFile(ctx, url)
 	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state to nudge user",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
 		return false, err
 	}
 
@@ -272,7 +309,14 @@ func Nudge(ctx workflow.Context, url, email string) (bool, error) {
 
 	// Valid nudge that requires a state change.
 	t.Reviewers[email] = true
-	return true, writeTurnFile(ctx, url, t)
+
+	if err := writeTurnFile(ctx, url, t); err != nil {
+		logger.From(ctx).Error("failed to write PR attention state to nudge user",
+			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
+		return false, err
+	}
+
+	return true, nil
 }
 
 // readTurnFile expects the caller to hold the appropriate mutex.
@@ -285,7 +329,7 @@ func readTurnFile(ctx workflow.Context, url string) (*PRTurn, error) {
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return resetTurn(ctx, url)
+			return resetTurns(ctx, url)
 		}
 		return nil, err
 	}
@@ -293,10 +337,10 @@ func readTurnFile(ctx workflow.Context, url string) (*PRTurn, error) {
 
 	t := new(PRTurn)
 	if err := json.NewDecoder(f).Decode(&t); err != nil {
-		return resetTurn(ctx, url)
+		return resetTurns(ctx, url)
 	}
 	if t.Author == "" {
-		return resetTurn(ctx, url)
+		return resetTurns(ctx, url)
 	}
 
 	normalizeEmailAddresses(t)
@@ -344,9 +388,9 @@ func writeTurnFileActivity(_ context.Context, url string, t *PRTurn) error {
 	return e.Encode(t)
 }
 
-// resetTurn recreates the attention state file for a specific PR, based on the current
+// resetTurns recreates the attention state file for a specific PR, based on the current
 // PR snapshot. This is a fallback for when the turn file is missing or corrupted.
-func resetTurn(ctx workflow.Context, url string) (*PRTurn, error) {
+func resetTurns(ctx workflow.Context, url string) (*PRTurn, error) {
 	logger.From(ctx).Warn("resetting PR attention state file", slog.String("pr_url", url))
 
 	snapshot, err := LoadBitbucketPR(ctx, url)

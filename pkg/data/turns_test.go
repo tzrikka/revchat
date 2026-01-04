@@ -35,9 +35,9 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Add reviewers.
-	err = AddReviewerToPR(nil, url, "rev1")
+	err = AddReviewerToTurns(nil, url, "rev1")
 	if err != nil {
-		t.Fatalf("AddReviewerToPR() error = %v", err)
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
 	got, err = GetCurrentTurn(nil, url)
 	if err != nil {
@@ -48,9 +48,9 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = AddReviewerToPR(nil, url, "rev2")
+	err = AddReviewerToTurns(nil, url, "rev2")
 	if err != nil {
-		t.Fatalf("AddReviewerToPR() error = %v", err)
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
 	got, err = GetCurrentTurn(nil, url)
 	if err != nil {
@@ -61,9 +61,9 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = AddReviewerToPR(nil, url, "rev2") // should be a no-op.
+	err = AddReviewerToTurns(nil, url, "rev2") // should be a no-op.
 	if err != nil {
-		t.Fatalf("AddReviewerToPR() error = %v", err)
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
 	got, err = GetCurrentTurn(nil, url)
 	if err != nil {
@@ -74,9 +74,9 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = AddReviewerToPR(nil, url, "author") // should be a no-op.
+	err = AddReviewerToTurns(nil, url, "author") // should be a no-op.
 	if err != nil {
-		t.Fatalf("AddReviewerToPR() error = %v", err)
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
 	got, err = GetCurrentTurn(nil, url)
 	if err != nil {
@@ -159,9 +159,9 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = RemoveFromTurn(nil, url, "rev1")
+	err = RemoveReviewerFromTurns(nil, url, "rev1")
 	if err != nil {
-		t.Fatalf("RemoveFromTurn() error = %v", err)
+		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
 	got, err = GetCurrentTurn(nil, url)
 	if err != nil {
@@ -172,9 +172,9 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = RemoveFromTurn(nil, url, "rev1") // Should be a no-op.
+	err = RemoveReviewerFromTurns(nil, url, "rev1") // Should be a no-op.
 	if err != nil {
-		t.Fatalf("RemoveFromTurn() error = %v", err)
+		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
 	got, err = GetCurrentTurn(nil, url)
 	if err != nil {
@@ -223,11 +223,11 @@ func TestNudge(t *testing.T) {
 
 	// Initialize state.
 	InitTurns(nil, url, "author")
-	if err := AddReviewerToPR(nil, url, "rev1"); err != nil {
-		t.Fatalf("AddReviewerToPR() error = %v", err)
+	if err := AddReviewerToTurns(nil, url, "rev1"); err != nil {
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
-	if err := AddReviewerToPR(nil, url, "rev2"); err != nil {
-		t.Fatalf("AddReviewerToPR() error = %v", err)
+	if err := AddReviewerToTurns(nil, url, "rev2"); err != nil {
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
 
 	got, err := GetCurrentTurn(nil, url)
@@ -317,8 +317,8 @@ func TestNudge(t *testing.T) {
 
 	// Rev1 approves, and gets removed from the turn --> it's rev2's turn
 	// (not the author, because it's currently the turn of "all the remaining reviewers").
-	if err := RemoveFromTurn(nil, url, "rev1"); err != nil {
-		t.Fatalf("RemoveFromTurn() error = %v", err)
+	if err := RemoveReviewerFromTurns(nil, url, "rev1"); err != nil {
+		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
 
 	got, err = GetCurrentTurn(nil, url)

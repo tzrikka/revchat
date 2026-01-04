@@ -13,7 +13,6 @@ func TestAccountIDs(t *testing.T) {
 	}{
 		{
 			name: "empty",
-			want: []string{},
 		},
 		{
 			name: "single",

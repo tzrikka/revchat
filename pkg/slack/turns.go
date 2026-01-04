@@ -38,8 +38,6 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 		url := "https://" + strings.TrimSuffix(path, "_turn.json")
 		emails, err := data.GetCurrentTurn(ctx, url)
 		if err != nil {
-			logger.From(ctx).Error("failed to get current attention state for PR",
-				slog.Any("error", err), slog.String("pr_url", url))
 			return nil // Continue walking.
 		}
 
@@ -51,7 +49,7 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 			}
 			logger.From(ctx).Warn("Slack email lookup error - removing from turn",
 				slog.String("missing_email", email), slog.String("pr_url", url))
-			_ = data.RemoveFromTurn(ctx, url, email) // Example: user deactivated after being added to the PR.
+			_ = data.RemoveReviewerFromTurns(ctx, url, email) // Example: user deactivated after being added to the PR.
 		}
 
 		slackUserIDs[url] = slackIDs
