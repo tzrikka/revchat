@@ -20,7 +20,7 @@ const (
 )
 
 // LookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
-func LookupChannel(ctx workflow.Context, eventType, prURL string) (string, bool) {
+func LookupChannel(ctx workflow.Context, prURL string) (string, bool) {
 	if prURL == "" {
 		return "", false
 	}

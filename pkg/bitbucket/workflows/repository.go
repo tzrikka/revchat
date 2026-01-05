@@ -51,7 +51,7 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	prURL := bitbucket.HTMLURL(pr.Links)
-	channelID, found := activities.LookupChannel(ctx, event.Type, prURL)
+	channelID, found := activities.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}

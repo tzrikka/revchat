@@ -107,7 +107,7 @@ func lookupChannel(ctx workflow.Context, pr github.PullRequest) (string, bool) {
 		logger.From(ctx).Debug("ignoring GitHub event - the PR is closed", slog.String("pr_url", pr.HTMLURL))
 		return "", false
 	}
-	return activities.LookupChannel(ctx, "", pr.HTMLURL)
+	return activities.LookupChannel(ctx, pr.HTMLURL)
 }
 
 // prClosed archives a PR's Slack channel when the PR is closed.

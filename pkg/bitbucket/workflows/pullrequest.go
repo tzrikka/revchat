@@ -70,7 +70,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := activities.LookupChannel(ctx, event.Type, prURL)
+	channelID, found := activities.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
@@ -107,7 +107,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	pr := event.PullRequest
 	prURL := bitbucket.HTMLURL(pr.Links)
-	channelID, found := activities.LookupChannel(ctx, event.Type, prURL)
+	channelID, found := activities.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
@@ -224,7 +224,7 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	pr := event.PullRequest
 	prURL := bitbucket.HTMLURL(pr.Links)
-	channelID, found := activities.LookupChannel(ctx, event.Type, prURL)
+	channelID, found := activities.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
