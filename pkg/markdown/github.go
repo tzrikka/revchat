@@ -45,7 +45,7 @@ func GitHubToSlack(ctx workflow.Context, text, prURL string) string {
 		}
 
 		profile := fmt.Sprintf("%s://%s/%s", u.Scheme, u.Host, username)
-		slackRef := users.GitHubToSlackRef(ctx, username, profile)
+		slackRef := users.GitHubIDToSlackRef(ctx, username, profile)
 		text = strings.ReplaceAll(text, ghRef, slackRef)
 	}
 

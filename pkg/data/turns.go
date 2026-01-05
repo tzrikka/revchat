@@ -398,7 +398,7 @@ func resetTurns(ctx workflow.Context, url string) (*PRTurn, error) {
 		return nil, err
 	}
 
-	author := bitbucketIDToEmail(ctx, snapshot["author"])
+	author := userEmail(ctx, snapshot["author"])
 
 	reviewers := map[string]bool{}
 	jsonList, ok := snapshot["reviewers"].([]any)
@@ -406,17 +406,17 @@ func resetTurns(ctx workflow.Context, url string) (*PRTurn, error) {
 		jsonList = []any{}
 	}
 	for _, r := range jsonList {
-		reviewers[bitbucketIDToEmail(ctx, r)] = true
+		reviewers[userEmail(ctx, r)] = true
 	}
 
 	t := &PRTurn{Author: author, Reviewers: reviewers}
 	return t, writeTurnFile(ctx, url, t)
 }
 
-// bitbucketIDToEmail converts the "account_id" value in the given PR data
-// map to the user's email address, based on RevChat's own user database.
-func bitbucketIDToEmail(ctx workflow.Context, snapshot any) string {
-	m, ok := snapshot.(map[string]any)
+// userEmail extracts the Bitbucket account ID from user details map, and converts
+// it into the user's email address, based on RevChat's own user database.
+func userEmail(ctx workflow.Context, detailsMap any) string {
+	m, ok := detailsMap.(map[string]any)
 	if !ok {
 		return ""
 	}

@@ -1,5 +1,6 @@
 package github
 
+/*
 import (
 	"fmt"
 	"regexp"
@@ -108,3 +109,4 @@ func withArticle(role string) string {
 	}
 	return article + role
 }
+*/

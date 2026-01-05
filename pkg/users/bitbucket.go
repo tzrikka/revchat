@@ -55,7 +55,7 @@ func BitbucketIDToEmail(ctx workflow.Context, accountID string) string {
 func BitbucketIDToSlackID(ctx workflow.Context, accountID string, checkOptIn bool) string {
 	user := data.SelectUserByBitbucketID(ctx, accountID)
 	if user.SlackID == "" {
-		// Workaround in case the user's Bitbucket account ID isn't stored, but the rest is.
+		// Workaround in case only the user's Bitbucket account ID isn't stored yet, but the rest is.
 		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID))
 	}
 
@@ -71,7 +71,7 @@ func BitbucketIDToSlackID(ctx workflow.Context, accountID string, checkOptIn boo
 func BitbucketIDToSlackRef(ctx workflow.Context, accountID, displayName string) string {
 	user := data.SelectUserByBitbucketID(ctx, accountID)
 	if user.SlackID == "" {
-		// Workaround in case the user's Bitbucket account ID isn't stored, but the rest is.
+		// Workaround in case only the user's Bitbucket account ID isn't stored yet, but the rest is.
 		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID))
 	}
 

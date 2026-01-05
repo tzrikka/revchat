@@ -1,4 +1,4 @@
-package github
+package workflows
 
 import (
 	"fmt"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/config"
+	"github.com/tzrikka/revchat/pkg/github"
 	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
@@ -40,6 +41,7 @@ func newConfig(cmd *cli.Command) *Config {
 // from Timpani, to trigger event handling workflows.
 //
 // This is based on:
+//   - https://docs.github.com/en/webhooks/webhook-events-and-payloads
 //   - https://github.com/tzrikka/revchat/blob/main/docs/setup/github.md#subscribe-to-event
 //   - https://github.com/tzrikka/timpani/blob/main/pkg/listeners/github/webhook.go
 var Signals = []string{
@@ -54,17 +56,17 @@ var Signals = []string{
 // RegisterWorkflows maps event-handling workflow functions to [Signals].
 func RegisterWorkflows(cmd *cli.Command, w worker.Worker) {
 	c := newConfig(cmd)
-	w.RegisterWorkflowWithOptions(c.pullRequestWorkflow, workflow.RegisterOptions{Name: Signals[0]})
-	w.RegisterWorkflowWithOptions(c.prReviewWorkflow, workflow.RegisterOptions{Name: Signals[1]})
-	w.RegisterWorkflowWithOptions(c.prReviewCommentWorkflow, workflow.RegisterOptions{Name: Signals[2]})
-	w.RegisterWorkflowWithOptions(c.prReviewThreadWorkflow, workflow.RegisterOptions{Name: Signals[3]})
-	w.RegisterWorkflowWithOptions(c.issueCommentWorkflow, workflow.RegisterOptions{Name: Signals[4]})
+	w.RegisterWorkflowWithOptions(c.PullRequestWorkflow, workflow.RegisterOptions{Name: Signals[0]})
+	w.RegisterWorkflowWithOptions(PullRequestReviewWorkflow, workflow.RegisterOptions{Name: Signals[1]})
+	w.RegisterWorkflowWithOptions(PullRequestReviewCommentWorkflow, workflow.RegisterOptions{Name: Signals[2]})
+	w.RegisterWorkflowWithOptions(PullRequestReviewThreadWorkflow, workflow.RegisterOptions{Name: Signals[3]})
+	w.RegisterWorkflowWithOptions(IssueCommentWorkflow, workflow.RegisterOptions{Name: Signals[4]})
 }
 
 // RegisterSignals routes [Signals] to their registered workflows.
 func RegisterSignals(ctx workflow.Context, sel workflow.Selector) {
 	sel.AddReceive(workflow.GetSignalChannel(ctx, Signals[0]), func(ch workflow.ReceiveChannel, _ bool) {
-		payload := new(PullRequestEvent)
+		payload := new(github.PullRequestEvent)
 		ch.Receive(ctx, payload)
 
 		signal := ch.Name()
@@ -90,10 +92,10 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector) {
 		}
 	})
 
-	addReceive[PullRequestReviewEvent](ctx, sel, Signals[1])
-	addReceive[PullRequestReviewCommentEvent](ctx, sel, Signals[2])
-	addReceive[PullRequestReviewThreadEvent](ctx, sel, Signals[3])
-	addReceive[IssueCommentEvent](ctx, sel, Signals[4])
+	addReceive[github.PullRequestReviewEvent](ctx, sel, Signals[1])
+	addReceive[github.PullRequestReviewCommentEvent](ctx, sel, Signals[2])
+	addReceive[github.PullRequestReviewThreadEvent](ctx, sel, Signals[3])
+	addReceive[github.IssueCommentEvent](ctx, sel, Signals[4])
 }
 
 func addReceive[T any](ctx workflow.Context, sel workflow.Selector, signalName string) {
@@ -117,12 +119,11 @@ func addReceive[T any](ctx workflow.Context, sel workflow.Selector, signalName s
 // for their corresponding workflow executions to complete in order.
 // This is called in preparation for resetting the dispatcher workflow's history.
 func DrainSignals(ctx workflow.Context) bool {
-	totalEvents := receiveAsync[PullRequestEvent](ctx, Signals[0])
-	totalEvents += receiveAsync[PullRequestReviewEvent](ctx, Signals[1])
-	totalEvents += receiveAsync[PullRequestReviewCommentEvent](ctx, Signals[2])
-	totalEvents += receiveAsync[PullRequestReviewThreadEvent](ctx, Signals[3])
-	totalEvents += receiveAsync[IssueCommentEvent](ctx, Signals[4])
-
+	totalEvents := receiveAsync[github.PullRequestEvent](ctx, Signals[0])
+	totalEvents += receiveAsync[github.PullRequestReviewEvent](ctx, Signals[1])
+	totalEvents += receiveAsync[github.PullRequestReviewCommentEvent](ctx, Signals[2])
+	totalEvents += receiveAsync[github.PullRequestReviewThreadEvent](ctx, Signals[3])
+	totalEvents += receiveAsync[github.IssueCommentEvent](ctx, Signals[4])
 	return totalEvents > 0
 }
 
@@ -156,27 +157,29 @@ func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) str
 	id := ""
 	switch signal {
 	case Signals[0]:
-		if event, ok := any(payload).(*PullRequestEvent); ok {
+		if event, ok := any(payload).(*github.PullRequestEvent); ok {
 			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.PullRequest.HTMLURL))
 		}
 	case Signals[1]:
-		if event, ok := any(payload).(*PullRequestReviewEvent); ok {
+		if event, ok := any(payload).(*github.PullRequestReviewEvent); ok {
 			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Review.HTMLURL))
 		}
 	case Signals[2]:
-		if event, ok := any(payload).(*PullRequestReviewCommentEvent); ok {
+		if event, ok := any(payload).(*github.PullRequestReviewCommentEvent); ok {
 			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Comment.HTMLURL))
 		}
 	case Signals[3]:
-		if event, ok := any(payload).(*PullRequestReviewThreadEvent); ok {
+		if event, ok := any(payload).(*github.PullRequestReviewThreadEvent); ok {
 			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix("TODO"))
 		}
 	case Signals[4]:
-		if event, ok := any(payload).(*IssueCommentEvent); ok {
+		if event, ok := any(payload).(*github.IssueCommentEvent); ok {
 			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Comment.HTMLURL))
 		}
-	default:
-		return "" // Fallback in case of unexpected signals: let Temporal use its own default.
+	}
+
+	if id == "" {
+		return "" // Fallback in case of unexpected payloads: let Temporal use its own default.
 	}
 
 	var ts int64
@@ -186,7 +189,7 @@ func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) str
 	if err := encoded.Get(&ts); err != nil {
 		return id // This should never happen, but just in case.
 	}
-	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
+	return fmt.Sprintf("%s__%s", id, strconv.FormatInt(ts, 36))
 }
 
 func trimURLPrefix(rawURL string) string {

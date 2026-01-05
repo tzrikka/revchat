@@ -174,7 +174,7 @@ func SlackMentionToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackU
 	userID := slackUserRef[2 : len(slackUserRef)-1]
 	user, _, _ := data.SelectUserBySlackID(ctx, userID)
 	if user.BitbucketID == "" {
-		// Workaround in case the user's Slack ID isn't stored, but the rest is.
+		// Workaround in case only the user's Slack ID isn't stored yet, but the rest is.
 		user = data.SelectUserByEmail(ctx, SlackIDToEmail(ctx, userID))
 	}
 

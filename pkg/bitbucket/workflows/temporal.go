@@ -267,7 +267,7 @@ func prChildWorkflowID(ctx workflow.Context, event *bitbucket.PullRequestEvent) 
 	if err := encoded.Get(&ts); err != nil {
 		return "" // This should never happen, but just in case: let Temporal use its own default.
 	}
-	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
+	return fmt.Sprintf("%s__%s", id, strconv.FormatInt(ts, 36))
 }
 
 func repoChildWorkflowID(ctx workflow.Context, event *bitbucket.RepositoryEvent) string {
@@ -283,5 +283,5 @@ func repoChildWorkflowID(ctx workflow.Context, event *bitbucket.RepositoryEvent)
 	if err := encoded.Get(&ts); err != nil {
 		return id // This should never happen, but just in case: let Temporal use its own default.
 	}
-	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
+	return fmt.Sprintf("%s__%s", id, strconv.FormatInt(ts, 36))
 }

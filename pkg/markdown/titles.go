@@ -1,4 +1,4 @@
-package bitbucket
+package markdown
 
 import (
 	"fmt"
@@ -13,33 +13,33 @@ import (
 )
 
 var (
-	linkifyPattern = regexp.MustCompile(`([A-Z]{2,})-(\d+)`)
-	baseURLPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/pull-requests/`)
+	linkifyPattern = regexp.MustCompile(`([A-Z]{2,})-\d+`)
+	baseURLPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/(pull|pull-requests)/`)
 	prIDPattern    = regexp.MustCompile(`(([\w-]+/)?([\w-]+))?#(\d+)`)
 )
 
-// LinkifyTitle finds IDs in the text and tries to linkify them - in the same repo, a nearby one, or based on the
-// configured issue trackers. If no IDs are found, or none are recognized, it returns the input text unchanged.
+// LinkifyTitle finds IDs in the given title of a pull/merge request and tries to replace them with
+// Slack links: in the same repository, a nearby one, or based on RevChat's configuration of issue
+// trackers. If no IDs are found, or none are recognized, it returns the input text unchanged.
 func LinkifyTitle(ctx workflow.Context, cfg map[string]string, prURL, title string) string {
 	done := map[string]bool{}
 
 	for _, id := range linkifyPattern.FindAllStringSubmatch(title, -1) {
-		if url := linkifyID(ctx, cfg, id); url != "" && !done[id[0]] {
-			title = strings.ReplaceAll(title, id[0], fmt.Sprintf("<%s|%s>", url, id[0]))
+		if link := linkifyID(ctx, cfg, id); link != "" && !done[id[0]] {
+			title = strings.ReplaceAll(title, id[0], fmt.Sprintf("<%s|%s>", link, id[0]))
 			done[id[0]] = true
 		}
 	}
 
-	baseURL := baseURLPattern.FindAllStringSubmatch(prURL, -1)
-	if len(baseURL) == 0 || len(baseURL[0]) < 4 {
+	baseURL := baseURLPattern.FindStringSubmatch(prURL)
+	if len(baseURL) < 5 {
 		return title
 	}
 	for _, id := range prIDPattern.FindAllStringSubmatch(title, -1) {
-		if len(id) < 5 || done[id[0]] {
-			continue
+		if len(id) == 5 && !done[id[0]] {
+			title = strings.ReplaceAll(title, id[0], linkifyPR(baseURL, id))
+			done[id[0]] = true
 		}
-		title = strings.ReplaceAll(title, id[0], linkifyPR(baseURL[0], id))
-		done[id[0]] = true
 	}
 
 	return title
@@ -47,7 +47,7 @@ func LinkifyTitle(ctx workflow.Context, cfg map[string]string, prURL, title stri
 
 // linkifyID recognizes specific case-sensitive ID keys, but can also use a generic "default" ID key.
 func linkifyID(ctx workflow.Context, cfg map[string]string, id []string) string {
-	if len(id) < 3 {
+	if len(id) < 2 {
 		return ""
 	}
 
@@ -71,7 +71,8 @@ func buildLink(ctx workflow.Context, base, id string) string {
 	return link
 }
 
-// linkifyPR recognizes "[[proj/]repo]#123" as PR references in/near the current repo.
+// linkifyPR recognizes "[[org/]repo]#123" as PR references in/near the current repo.
+// Note that in GitHub's case this works for repo issues as well as PRs.
 func linkifyPR(baseURL, id []string) string {
 	if id[2] == "" {
 		id[2] = baseURL[2]
@@ -83,5 +84,5 @@ func linkifyPR(baseURL, id []string) string {
 		id[3] = baseURL[3]
 	}
 
-	return fmt.Sprintf("<https://%s/%s/%s/pull-requests/%s|%s>", baseURL[1], id[2], id[3], id[4], id[0])
+	return fmt.Sprintf("<https://%s/%s/%s/%s/%s|%s>", baseURL[1], id[2], id[3], baseURL[4], id[4], id[0])
 }

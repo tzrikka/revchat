@@ -14,6 +14,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
+	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
@@ -26,8 +27,9 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	pr.CommitCount = len(bitbucket.Commits(ctx, event))
 
 	maxLen, prefix, private := c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix, c.SlackChannelsArePrivate
-	channelID, err := bitbucket.CreateSlackChannel(ctx, pr, maxLen, prefix, private)
+	channelID, err := slack.CreateChannel(ctx, pr.ID, pr.Title, prURL, maxLen, prefix, private)
 	if err != nil {
+		// True = send this DM only if the user is opted-in.
 		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
 			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
 		}
@@ -41,14 +43,15 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	activities.SetChannelDescription(ctx, channelID, pr.Title, prURL)
 	bitbucket.SetChannelBookmarks(ctx, channelID, prURL, pr)
 
-	msg := "%s created this PR: " + bitbucket.LinkifyTitle(ctx, c.LinkifyMap, prURL, pr.Title)
-	if desc := strings.TrimSpace(pr.Description); desc != "" {
+	msg := "%s created this PR: " + markdown.LinkifyTitle(ctx, c.LinkifyMap, prURL, pr.Title)
+	if desc := strings.TrimSpace(pr.Description); desc != "" && desc != pr.Title {
 		msg += "\n\n" + markdown.BitbucketToSlack(ctx, desc, prURL)
 	}
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 
 	err = activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr))
 	if err != nil {
+		// True = send this DM only if the user is opted-in.
 		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
 			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
 		}
@@ -76,22 +79,21 @@ func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequest
 	// (e.g. a PR closure comment) before archiving the channel.
 	_ = workflow.Sleep(ctx, 3*time.Second)
 
-	state := "closed this PR"
+	msg := "%s closed this PR"
 	if event.Type == "fulfilled" {
-		state = "merged this PR"
+		msg = "%s merged this PR"
 	}
 	if reason := event.PullRequest.Reason; reason != "" {
-		state = fmt.Sprintf("%s with this reason: `%s`", state, reason)
+		msg = fmt.Sprintf("%s with this reason: `%s`", msg, reason)
 	} else {
-		state += "."
+		msg += "."
 	}
-	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+state)
-
+	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 	data.CleanupPRData(ctx, channelID, prURL)
 
 	if err := activities.ArchiveChannel(ctx, channelID, prURL); err != nil {
-		state = strings.Replace(state, " this PR", "", 1)
-		_ = activities.PostMessage(ctx, channelID, ":boom: Failed to archive this channel, even though its PR was "+state)
+		msg = strings.Replace(msg, " this PR", "", 1)
+		_ = activities.PostMessage(ctx, channelID, ":boom: Failed to archive this channel, even though its PR was "+msg)
 		return err
 	}
 
@@ -103,16 +105,17 @@ func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequest
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Updated.2
 func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
+	pr := event.PullRequest
+	prURL := bitbucket.HTMLURL(pr.Links)
 	channelID, found := activities.LookupChannel(ctx, event.Type, prURL)
 	if !found {
 		return nil
 	}
 
 	commits := bitbucket.Commits(ctx, event)
-	event.PullRequest.CommitCount = len(commits)
+	pr.CommitCount = len(commits)
 
-	snapshot, err := bitbucket.SwitchSnapshot(ctx, prURL, event.PullRequest)
+	snapshot, err := bitbucket.SwitchSnapshot(ctx, prURL, pr)
 	if err != nil {
 		return err
 	}
@@ -128,26 +131,26 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	var errs []error
 
 	// Announce transitions between draft and ready-to-review modes.
-	if !snapshot.Draft && event.PullRequest.Draft {
+	if !snapshot.Draft && pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
-	} else if snapshot.Draft && !event.PullRequest.Draft {
+	} else if snapshot.Draft && !pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
-		errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, event.PullRequest)))
+		errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr)))
 	}
 
 	// Title edited.
-	if snapshot.Title != event.PullRequest.Title {
-		msg := ":pencil2: %s edited the PR title: " + bitbucket.LinkifyTitle(ctx, c.LinkifyMap, prURL, event.PullRequest.Title)
+	if snapshot.Title != pr.Title {
+		msg := ":pencil2: %s edited the PR title: " + markdown.LinkifyTitle(ctx, c.LinkifyMap, prURL, pr.Title)
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
-		activities.SetChannelDescription(ctx, channelID, event.PullRequest.Title, prURL)
-		err := bitbucket.RenameSlackChannel(ctx, event.PullRequest, channelID, c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix)
+		activities.SetChannelDescription(ctx, channelID, pr.Title, prURL)
+		err := slack.RenameChannel(ctx, pr.ID, pr.Title, prURL, channelID, c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix)
 		errs = append(errs, err)
 	}
 
 	// Description edited.
-	if snapshot.Description != event.PullRequest.Description {
+	if snapshot.Description != pr.Description {
 		msg := ":pencil2: %s deleted the PR description."
-		if text := strings.TrimSpace(event.PullRequest.Description); text != "" {
+		if text := strings.TrimSpace(pr.Description); text != "" {
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, prURL)
 		}
 
@@ -155,19 +158,19 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	}
 
 	// Reviewers added/removed.
-	added, removed := bitbucket.ReviewersDiff(*snapshot, event.PullRequest)
+	added, removed := bitbucket.ReviewersDiff(*snapshot, pr)
 	if len(added)+len(removed) > 0 {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, bitbucket.ReviewerMentions(ctx, added, removed))
-		if !event.PullRequest.Draft {
+		if !pr.Draft {
 			errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.BitbucketToSlackIDs(ctx, added)))
 		}
 		errs = append(errs, activities.KickUsersFromChannel(ctx, channelID, prURL, bitbucket.BitbucketToSlackIDs(ctx, removed)))
 	}
 
 	// Commit(s) pushed to the PR branch.
-	if event.PullRequest.CommitCount > 0 && snapshot.Source.Commit.Hash != event.PullRequest.Source.Commit.Hash {
+	if pr.CommitCount > 0 && snapshot.Source.Commit.Hash != pr.Source.Commit.Hash {
 		if err := data.UpdateBitbucketDiffstat(prURL, bitbucket.Diffstat(ctx, event)); err != nil {
-			logger.From(ctx).Error("failed to update Bitbucket PR's diffstat",
+			logger.From(ctx).Error("failed to update Bitbucket PR diffstat",
 				slog.Any("error", err), slog.String("pr_url", prURL))
 			errs = append(errs, err)
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
@@ -176,11 +179,11 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		slices.Reverse(commits) // Switch from reverse order to chronological order.
 
 		prevCount := snapshot.CommitCount
-		if prevCount >= event.PullRequest.CommitCount {
+		if prevCount >= pr.CommitCount {
 			// Handle the unlikely ">" case where RevChat missed a commit push,
 			// but more likely the "==" case where the user force-pushed a new head
 			// (i.e. same number of commits) - by announcing just the last commit.
-			prevCount = event.PullRequest.CommitCount - 1
+			prevCount = pr.CommitCount - 1
 		}
 		commits = commits[prevCount:]
 
@@ -201,7 +204,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	// Retargeted destination branch.
 	oldBranch := snapshot.Destination.Branch.Name
-	newBranch := event.PullRequest.Destination.Branch.Name
+	newBranch := pr.Destination.Branch.Name
 	if oldBranch != newBranch {
 		repoURL := bitbucket.HTMLURL(event.Repository.Links)
 		msg := "changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."

@@ -19,16 +19,16 @@ const (
 	maxBookmarkTitleLen = 200
 )
 
-func SetChannelBookmarks(ctx workflow.Context, channelID, url string, pr PullRequest) {
-	files := data.ReadBitbucketDiffstatLength(url)
+func SetChannelBookmarks(ctx workflow.Context, channelID, prURL string, pr PullRequest) {
+	files := data.ReadBitbucketDiffstatLength(prURL)
 
-	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Reviewers (%d)", len(accountIDs(pr.Reviewers))), url+"/overview", ":eyes:")
-	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), url+"/overview", ":speech_balloon:")
-	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), url+"/overview", ":white_check_mark:")
-	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), url+"/overview", ":+1:")
-	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.CommitCount), url+"/commits", ":pushpin:")
-	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Files changed (%d)", files), url+"/diff", ":open_file_folder:")
-	_ = slack.BookmarksAdd(ctx, channelID, "Builds: no results", url+"/overview", ":vertical_traffic_light:")
+	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Reviewers (%d)", len(accountIDs(pr.Reviewers))), prURL+"/overview", ":eyes:")
+	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Comments (%d)", pr.CommentCount), prURL+"/overview", ":speech_balloon:")
+	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Tasks (%d)", pr.TaskCount), prURL+"/overview", ":white_check_mark:")
+	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Approvals (%d)", countApprovals(pr)), prURL+"/overview", ":+1:")
+	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Commits (%d)", pr.CommitCount), prURL+"/commits", ":pushpin:")
+	_ = slack.BookmarksAdd(ctx, channelID, fmt.Sprintf("Files changed (%d)", files), prURL+"/diff", ":open_file_folder:")
+	_ = slack.BookmarksAdd(ctx, channelID, "Builds: no results", prURL+"/overview", ":vertical_traffic_light:")
 }
 
 // UpdateChannelBookmarks updates the bookmarks in the PR's Slack channel, based on the latest PR event.
@@ -101,7 +101,7 @@ func UpdateChannelBookmarks(ctx workflow.Context, event PullRequestEvent, channe
 
 // UpdateChannelBuildsBookmark updates the "Builds" bookmark in the PR's Slack channel, based on the latest repository
 // event. This is a deferred call that doesn't return an error, because handling the event itself is more important.
-func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
+func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, prURL string) {
 	bookmarks, err := slack.BookmarksList(ctx, channelID)
 	if err != nil {
 		logger.From(ctx).Error("failed to list Slack channel's bookmarks", slog.Any("error", err))
@@ -111,7 +111,7 @@ func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, url string) {
 		return
 	}
 
-	results := data.ReadBitbucketBuilds(ctx, url)
+	results := data.ReadBitbucketBuilds(ctx, prURL)
 	if results == nil {
 		return
 	}

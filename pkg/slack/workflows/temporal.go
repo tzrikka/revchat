@@ -211,7 +211,7 @@ func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) str
 	if err := encoded.Get(&ts); err != nil {
 		return id // This should never happen, but just in case: let Temporal use its own default.
 	}
-	return fmt.Sprintf("%s_%s", id, strconv.FormatInt(ts, 36))
+	return fmt.Sprintf("%s__%s", id, strconv.FormatInt(ts, 36))
 }
 
 // CreateSchedule starts a scheduled workflow that runs every 30 minutes, to send daily reminders.

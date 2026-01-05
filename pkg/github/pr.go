@@ -1,81 +1,13 @@
 package github
 
+/*
 import (
-	"errors"
 	"fmt"
-	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/markdown"
 )
-
-// https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request
-// https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests
-func (c Config) pullRequestWorkflow(ctx workflow.Context, event PullRequestEvent) error {
-	switch event.Action {
-	case "opened":
-		return c.prOpened(ctx, event)
-	case "closed":
-		return c.prClosed(ctx, event)
-	case "reopened":
-		return c.prReopened(ctx, event)
-
-	case "converted_to_draft":
-		return c.prConvertedToDraft(ctx, event)
-	case "ready_for_review":
-		return c.prReadyForReview(ctx, event)
-
-	case "review_requested", "review_request_removed", "assigned", "unassigned":
-		return c.prReviewRequests(ctx, event)
-
-	case "edited": // Title, body, base branch.
-		return c.prEdited(ctx, event)
-	case "synchronize": // Head branch.
-		return c.prSynchronized(ctx, event)
-
-	case "locked":
-		return c.prLocked()
-	case "unlocked":
-		return c.prUnlocked()
-
-	// Ignored actions.
-	case "auto_merge_enabled", "auto_merge_disabled":
-	case "enqueued", "dequeued":
-	case "labeled", "unlabeled":
-	case "milestoned", "demilestoned":
-
-	default:
-		logger.From(ctx).Error("unrecognized GitHub PR event action", slog.String("action", event.Action))
-		return errors.New("unrecognized GitHub PR event action: " + event.Action)
-	}
-
-	return nil
-}
-
-// A new PR was created (or reopened, or marked as ready for review).
-// See also [Config.prReopened] and [Config.prReadyForReview] which wrap it.
-func (c Config) prOpened(ctx workflow.Context, event PullRequestEvent) error {
-	// Ignore drafts until they're marked as ready for review.
-	if event.PullRequest.Draft {
-		return nil
-	}
-
-	return c.initChannel(ctx, event)
-}
-
-// A PR (possibly a draft) was closed.
-// If "merged" is false in the webhook payload, the PR was
-// closed with unmerged commits. Otherwise, the PR was merged.
-func (c Config) prClosed(ctx workflow.Context, event PullRequestEvent) error {
-	// Ignore drafts - they don't have an active Slack channel anyway.
-	if event.PullRequest.Draft {
-		return nil
-	}
-
-	return c.archiveChannel(ctx, event)
-}
 
 // A previously closed PR (possibly a draft) was reopened.
 func (c Config) prReopened(ctx workflow.Context, event PullRequestEvent) error {
@@ -152,6 +84,10 @@ func (c Config) prEdited(ctx workflow.Context, event PullRequestEvent) error {
 		if err := c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg); err != nil {
 			return err
 		}
+
+		// TODO: Rename channel.
+		// name = f"{pr.number}_{normalize_channel_name(pr.title)}"
+		// slack_helper.rename_channel(channel, name)
 	}
 
 	return nil
@@ -169,17 +105,26 @@ func (c Config) prSynchronized(ctx workflow.Context, event PullRequestEvent) err
 
 	after := *event.After
 	msg := fmt.Sprintf("pushed commit [`%s`](%s/commits/%s) into the head branch", after[:7], pr.HTMLURL, after)
-	return c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
+	err := c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
+
+	// Why do we post the message before updating the bookmark, and ignore bookmark update errors, instead of
+	// just reversing the order of these operations? Because posting the message is the core of this workflow.
+	// TODO: Update the commits bookmark's title.
+
+	return err
 }
 
 // Conversation on a PR was locked. For more information, see "Locking conversations":
 // https://docs.github.com/en/communities/moderating-comments-and-conversations/locking-conversations
 func (c Config) prLocked() error {
+	// TODO: Implement.
 	return nil
 }
 
 // Conversation on a pull request was unlocked. For more information, see "Locking conversations":
 // https://docs.github.com/en/communities/moderating-comments-and-conversations/locking-conversations
 func (c Config) prUnlocked() error {
+	// TODO: Implement.
 	return nil
 }
+*/

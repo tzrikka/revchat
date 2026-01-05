@@ -13,15 +13,16 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-// InitPRData saves the initial state of a new PR: snapshot of PR metadata,
-// and 2-way ID mapping for syncs between Bitbucket and Slack. If there are
-// errors, they are logged but ignored, as we can try to create the data later.
+// InitPRData saves the initial state of a new PR: snapshots of PR metadata,
+// and a 2-way ID mapping for syncs between Bitbucket and Slack. If there are
+// errors, they are logged but ignored, as we can try to recreate the data later.
 func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) {
 	prURL := HTMLURL(event.PullRequest.Links)
-	data.StoreBitbucketPR(ctx, prURL, event.PullRequest)
+	_ = data.MapURLAndID(ctx, prURL, channelID)
 
+	data.StoreBitbucketPR(ctx, prURL, event.PullRequest)
 	if err := data.UpdateBitbucketDiffstat(prURL, Diffstat(ctx, event)); err != nil {
-		logger.From(ctx).Error("failed to update Bitbucket PR's diffstat",
+		logger.From(ctx).Error("failed to create Bitbucket PR diffstat",
 			slog.Any("error", err), slog.String("pr_url", prURL))
 	}
 
@@ -29,10 +30,10 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 	if email == "" {
 		logger.From(ctx).Error("initializing Bitbucket PR data without author's email",
 			slog.String("pr_url", prURL), slog.String("account_id", event.Actor.AccountID))
+		return
 	}
 
 	data.InitTurns(ctx, prURL, email)
-	_ = data.MapURLAndID(ctx, prURL, channelID)
 }
 
 // accountIDs extracts the IDs from a slice of [Account]s.
