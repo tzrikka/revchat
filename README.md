@@ -63,9 +63,13 @@ This serves 2 different purposes:
   -- but if needed --
 - 1-click switching from the channel to a specific PR view/function
 
+Example for a GitHub PR:
+
+![GitHub bookmarks](/images/readme/bookmarks_github.png)
+
 Example for a Bitbucket PR:
 
-![Bitbucket bookmarks](/images/readme/bookmarks.png)
+![Bitbucket bookmarks](/images/readme/bookmarks_bitbucket.png)
 
 ## Reviewers Sync
 
@@ -142,11 +146,11 @@ Reminders summarize the status and sensitivity of PRs:
 - CI states (green/red), current approvals
 - Count of the files that the reminded user owns
 
-Which PRs are listed? Not necessarily all of them! RevChat tries to guess which PRs require your attention. For more details, see the section [Whose Turn Is It Anyway?](#whose-turn-is-it-anyway) below.
-
 Example:
 
 _(Screenshot)_
+
+Which PRs are listed? Not necessarily all of them! RevChat tries to guess which PRs require your attention. For more details, see the section [Whose Turn Is It Anyway?](#whose-turn-is-it-anyway) below.
 
 ## Slash Commands
 
@@ -155,7 +159,9 @@ General commands:
 - `/revchat opt-in` - opt into being added to PR channels and receiving DMs
 - `/revchat opt-out` - opt out of being added to PR channels and receiving DMs
 - `/revchat reminders at <time in 12h/24h format>` - on weekdays, using your timezone
-- `/revchat status` - show your current PR states, both as an author and a reviewer
+- `/revchat follow <1 or more @users or @groups>` - auto add yourself to PRs they create
+- `/revchat unfollow <1 or more @users or @groups>` - stop following their PR channels
+- `/revchat status` - all the PRs you need to look at, as an author or a reviewer
 
 More commands inside PR channels:
 
@@ -182,7 +188,7 @@ RevChat tracks the state of each PR, remembers who is the author and who are the
 
 When one or more reviewers are added to a PR (when it's created or later), the turn switches from the author to them. However, this does not affect the turns of other existing reviewers, and the author in relation to those existing reviewers.
 
-Reviewers of drafts:
+Reviewers of draft PRs:
 
 - When a PR is marked as a draft, the reviewers who were added **before** that remain in the Slack channel and their turns are still tracked in relation to the author.
 - However, reviewers who are added **while** a PR is in draft mode are not added to the Slack channel and to RevChat's turn tracking; they will be added only when the PR is marked as ready to review.
@@ -195,11 +201,11 @@ State transitions:
 
 However, an easier way for authors and reviewers to trigger state transitions without spamming the PR and the channel is with these slash commands **in the PR's Slack channel**:
 
+- `/revchat who` - or - `/revchat whose turn`
 - `/revchat my turn` - or - `/revchat not my turn`
 - `/revchat freeze [turns]` - or - `/revchat unfreeze [turns]`
-- `/revchat who` - or - `/revchat whose turn`
 
-Note that pushing commits and retargeting branches has no effect on turns because these actions may be work in progress. Only discussions trigger state transitions.
+Note that pushing commits and rebasing/retargeting branches has no effect on turns because these actions may be work in progress. Only replies and slash commands trigger state transitions.
 
 **Final state:** when a reviewer approves a PR, or is unassigned from it, RevChat stops tracking their turn and switches back to the author permanently.
 
