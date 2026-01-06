@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -21,31 +22,31 @@ import (
 // https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request
 func (c Config) PullRequestWorkflow(ctx workflow.Context, event github.PullRequestEvent) error {
 	switch event.Action {
-	case "opened":
+	case "opened", "reopened":
 		return c.prOpened(ctx, event)
 	case "closed":
 		return prClosed(ctx, event)
-	// case "reopened":
-	// 	return c.prReopened(ctx, event)
 
-	// case "converted_to_draft":
-	// 	return c.prConvertedToDraft(ctx, event)
-	// case "ready_for_review":
-	// 	return c.prReadyForReview(ctx, event)
+	case "converted_to_draft":
+		return prConvertedToDraft(ctx, event)
+	case "ready_for_review":
+		return prReadyForReview(ctx, event)
 
-	// case "review_requested", "review_request_removed", "assigned", "unassigned":
-	// 	return c.prReviewRequests(ctx, event)
+	case "review_requested", "review_request_removed", "assigned", "unassigned":
+		return prReviewRequests(ctx, event)
 
-	// case "edited": // Title, body, base branch.
-	// 	return c.prEdited(ctx, event)
-	// case "synchronize": // Head branch.
-	// 	return c.prSynchronized(ctx, event)
+	case "edited": // Title, body, base branch.
+		return c.prEdited(ctx, event)
+	case "synchronize": // Head branch.
+		return prSynchronized(ctx, event)
+
+	case "locked", "unlocked":
+		return prLocked(ctx, event)
 
 	// Ignored actions.
 	case "auto_merge_enabled", "auto_merge_disabled":
 	case "enqueued", "dequeued":
 	case "labeled", "unlabeled":
-	case "locked", "unlocked":
 	case "milestoned", "demilestoned":
 
 	default:
@@ -57,6 +58,12 @@ func (c Config) PullRequestWorkflow(ctx workflow.Context, event github.PullReque
 }
 
 // prOpened initializes a new Slack channel for a newly-created or reopened PR.
+//
+// Why are reopened PRs handled here too? See this Slack bug notice
+// from https://docs.slack.dev/reference/methods/conversations.unarchive:
+// bot tokens ("xoxb-...") cannot currently be used to unarchive conversations. For now,
+// use a user token ("xoxp-...") to unarchive the conversation rather than a bot token. Partial
+// workaround for the Slack unarchive bug: treat this as a new PR. Drawback: lost channel history.
 func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) error {
 	pr := event.PullRequest
 
@@ -101,19 +108,10 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 	return nil
 }
 
-// lookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
-func lookupChannel(ctx workflow.Context, pr github.PullRequest) (string, bool) {
-	if pr.State == "closed" {
-		logger.From(ctx).Debug("ignoring GitHub event - the PR is closed", slog.String("pr_url", pr.HTMLURL))
-		return "", false
-	}
-	return activities.LookupChannel(ctx, pr.HTMLURL)
-}
-
 // prClosed archives a PR's Slack channel when the PR is closed.
 func prClosed(ctx workflow.Context, event github.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
-	channelID, found := lookupChannel(ctx, event.PullRequest)
+	channelID, found := activities.LookupChannel(ctx, event.PullRequest.HTMLURL)
 	if !found {
 		return nil
 	}
@@ -136,5 +134,125 @@ func prClosed(ctx workflow.Context, event github.PullRequestEvent) error {
 		return err
 	}
 
+	return nil
+}
+
+// prConvertedToDraft announces that a PR was converted to a draft.
+// For more information, see "Changing the stage of a pull request":
+// https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request
+func prConvertedToDraft(ctx workflow.Context, event github.PullRequestEvent) error {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	channelID, found := activities.LookupChannel(ctx, event.PullRequest.HTMLURL)
+	if !found {
+		return nil
+	}
+
+	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as a draft. :construction:")
+	return nil
+}
+
+// prReadyForReview announces that a draft PR was marked as ready for review.
+// For more information, see "Changing the stage of a pull request":
+// https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request
+func prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	channelID, found := activities.LookupChannel(ctx, event.PullRequest.HTMLURL)
+	if !found {
+		return nil
+	}
+
+	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as ready for review. :eyes:")
+	return activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest))
+}
+
+// lookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
+func lookupChannel(ctx workflow.Context, pr github.PullRequest) (string, bool) {
+	if pr.State == "closed" {
+		logger.From(ctx).Debug("ignoring GitHub event - the PR is closed", slog.String("pr_url", pr.HTMLURL))
+		return "", false
+	}
+	return activities.LookupChannel(ctx, pr.HTMLURL)
+}
+
+// Review by a person or team was requested for or removed from a PR, or un/assigned
+// to/from a specific person. For more information, see "Requesting a pull request review":
+// https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/requesting-a-pull-request-review
+func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	_, found := lookupChannel(ctx, event.PullRequest)
+	if !found {
+		return nil
+	}
+
+	return nil
+}
+
+// prEdited announces that the title or body of a PR was edited, or the base branch was changed.
+func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) error {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	pr := event.PullRequest
+	channelID, found := lookupChannel(ctx, pr)
+	if !found {
+		return nil
+	}
+
+	// Base branch was changed.
+	if event.Changes.Base != nil {
+		msg := "changed the base branch from <%s/tree/%s|`%s`> to <%s/tree/%s|`%s`>."
+		repoURL, oldBranch, newBranch := pr.Base.Repo.HTMLURL, event.Changes.Base.Ref, pr.Base.Ref
+		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
+		github.MentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
+	}
+
+	// Description body was changed.
+	if event.Changes.Body != nil {
+		msg := ":pencil2: %s deleted the PR description."
+		if text := strings.TrimSpace(*pr.Body); text != "" {
+			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, pr.HTMLURL)
+		}
+		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
+	}
+
+	// Title was changed.
+	if event.Changes.Title != nil {
+		msg := ":pencil2: %s edited the PR title: " + markdown.LinkifyTitle(ctx, c.LinkifyMap, pr.HTMLURL, pr.Title)
+		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
+
+		activities.SetChannelDescription(ctx, channelID, pr.Title, pr.HTMLURL)
+
+		maxLen, prefix := c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix
+		if err := slack.RenameChannel(ctx, pr.Number, pr.Title, pr.HTMLURL, channelID, maxLen, prefix); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// prSynchronized announces that a PR's head branch was updated. For example, the head
+// branch was updated from the base branch or new commits were pushed to the head branch.
+func prSynchronized(ctx workflow.Context, event github.PullRequestEvent) error {
+	// If we're not tracking this PR, there's no need/way to announce this event.
+	channelID, found := lookupChannel(ctx, event.PullRequest)
+	if !found {
+		return nil
+	}
+
+	if event.After == nil {
+		logger.From(ctx).Warn("'after' field in GitHub PR synchronize event is nil")
+		return nil
+	}
+
+	after := *event.After
+	msg := fmt.Sprintf("pushed commit [`%s`](%s/commits/%s) into the head branch", after[:7], event.PullRequest.HTMLURL, after)
+	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
+
+	return nil
+}
+
+// prLocked announces that conversation on a PR was locked or unlocked. For more information, see "Locking conversations":
+// https://docs.github.com/en/communities/moderating-comments-and-conversations/locking-conversations
+func prLocked(ctx workflow.Context, event github.PullRequestEvent) error {
+	logger.From(ctx).Warn(fmt.Sprintf("GitHub PR %s event - not implemented yet", event.Action))
 	return nil
 }
