@@ -14,10 +14,8 @@ import (
 //   - https://docs.slack.dev/reference/events/channel_archive/
 //   - https://docs.slack.dev/reference/events/group_archive/
 func ChannelArchivedWorkflow(ctx workflow.Context, event archiveEventWrapper) error {
-	if selfTriggeredEvent(ctx, event.Authorizations, event.InnerEvent.User) {
-		return nil
-	}
-	if !isRevChatChannel(ctx, event.InnerEvent.Channel) {
+	e := event.InnerEvent
+	if selfTriggeredEvent(ctx, event.Authorizations, e.User) || !isRevChatChannel(ctx, e.Channel) {
 		return nil
 	}
 

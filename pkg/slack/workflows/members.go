@@ -15,21 +15,15 @@ import (
 // are opted-in: https://docs.slack.dev/reference/events/member_joined_channel/
 func MemberJoinedWorkflow(ctx workflow.Context, event memberEventWrapper) error {
 	e := event.InnerEvent
-	if !isRevChatChannel(ctx, e.Channel) || selfTriggeredMemberEvent(ctx, event.Authorizations, e) {
+	if selfTriggeredMemberEvent(ctx, event.Authorizations, e) || !isRevChatChannel(ctx, e.Channel) {
 		return nil
 	}
 
-	_, optedIn, err := data.SelectUserBySlackID(ctx, e.User)
-	if err != nil {
-		return err
+	if _, optedIn, err := data.SelectUserBySlackID(ctx, e.User); err != nil || optedIn {
+		return err // Nil if user is opted-in.
 	}
 
-	// If a user was added by someone else, check if the invitee is opted-in.
-	if optedIn {
-		return nil
-	}
-
-	// If not, send them an ephemeral message explaining how to opt-in.
+	// If not, send them a DM explaining how to opt-in.
 	logger.From(ctx).Warn("user joined Slack channel but is not opted-in",
 		slog.String("user_id", e.User), slog.String("channel_id", e.Channel))
 	msg := ":wave: Hi <@%s>! You have joined a RevChat channel, but you have to opt-in for this to work! Please run "
@@ -40,7 +34,7 @@ func MemberJoinedWorkflow(ctx workflow.Context, event memberEventWrapper) error 
 // https://docs.slack.dev/reference/events/member_left_channel/
 func MemberLeftWorkflow(ctx workflow.Context, event memberEventWrapper) error {
 	e := event.InnerEvent
-	if !isRevChatChannel(ctx, e.Channel) || selfTriggeredMemberEvent(ctx, event.Authorizations, e) {
+	if selfTriggeredMemberEvent(ctx, event.Authorizations, e) || !isRevChatChannel(ctx, e.Channel) {
 		return nil
 	}
 

@@ -38,7 +38,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 
 	bitbucket.InitPRData(ctx, event, channelID)
 
-	// Channel cosmetics.
+	// Channel cosmetics (before inviting users).
 	activities.SetChannelTopic(ctx, channelID, prURL)
 	activities.SetChannelDescription(ctx, channelID, pr.Title, prURL)
 	bitbucket.SetChannelBookmarks(ctx, channelID, prURL, pr)
@@ -167,6 +167,16 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		errs = append(errs, activities.KickUsersFromChannel(ctx, channelID, prURL, bitbucket.BitbucketToSlackIDs(ctx, removed)))
 	}
 
+	// Retargeted destination branch.
+	oldBranch := snapshot.Destination.Branch.Name
+	newBranch := pr.Destination.Branch.Name
+	if oldBranch != newBranch {
+		repoURL := bitbucket.HTMLURL(event.Repository.Links)
+		msg := "changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
+		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
+		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
+	}
+
 	// Commit(s) pushed to the PR branch.
 	if pr.CommitCount > 0 && snapshot.Source.Commit.Hash != pr.Source.Commit.Hash {
 		if err := data.UpdateBitbucketDiffstat(prURL, bitbucket.Diffstat(ctx, event)); err != nil {
@@ -200,16 +210,6 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		}
 
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg.String())
-	}
-
-	// Retargeted destination branch.
-	oldBranch := snapshot.Destination.Branch.Name
-	newBranch := pr.Destination.Branch.Name
-	if oldBranch != newBranch {
-		repoURL := bitbucket.HTMLURL(event.Repository.Links)
-		msg := "changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
-		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
-		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
 	}
 
 	return errors.Join(errs...)

@@ -2,17 +2,41 @@
 
 ## Messages
 
-## Reactions
+### Message Created
 
-### Reaction Added
+- If the channel isn't mapped to a PR - ignore this event
+- Determine who created the message, and load their Bitbucket/GitHub auth token (abort on errors)
+- Convert Slack markdown to Bitbucket/GitHub markdown
+- Append an invisible watermark to show that RevChat synced this message (to prevent an endless sync loop when RevChat receives a subsequent Bitbucket/GitHub comment creation event)
+- Create a PR comment on behalf of the user
+- Save a 2-way mapping between the Slack channel/thread/message IDs and the PR comment's URL
+- (The subsequent Bitbucket/GitHub comment event will trigger bookmark updates in the channel)
 
-### Reaction Removed
+### Message Changed
+
+- If the channel isn't mapped to a PR - ignore this event
+- Determine who edited the message, and load their Bitbucket/GitHub auth token (abort on errors)
+- Convert Slack markdown to Bitbucket or GitHub markdown
+- Identify the corresponding PR comment, and update it
+
+### Message Deleted
+
+- If the channel isn't mapped to a PR - ignore this event
+- Determine who deleted the message, and load their Bitbucket/GitHub auth token (abort on errors)
+- Identify the corresponding PR comment, and delete it
+- Delete the 2-way mapping between the Slack channel/thread/message IDs and the PR comment's URL
+- (The subsequent Bitbucket/GitHub comment event will trigger bookmark updates in the channel)
 
 ## Channel
 
+### Channel Archived
+
+- If the event was triggered by RevChat, or the channel isn't mapped to a PR - ignore it
+- Clean up all of RevChat's data about this channel's PR
+
 ### Member Joined
 
-### Member Left
+- If the joining user isn't opted-in (i.e. added to the channel by someone other than RevChat), send them a DM with opt-in instructions
 
 ## Slash Command
 
@@ -37,9 +61,9 @@
 ### Set Weekday Reminder Time
 
 - Parse, normalize, and check the specified time (RevChat supports several 12h and 24h formats)
-  - `1` = `01` = `1:00` = `01:00` = `1a` = `01:00 AM`
+  - `1` = `01` = `1:00` = `01:00` = `1a` = `1am` = `01:00 AM`
   - `13` = `13:00` = `1:00 p` = `01:00pm`, etc.
-- Get the user's timezone from their Slack profile (e.g. `"America/Los_Angeles"`)
+- Get the user's current timezone from their Slack profile
 - Save the time and the current timezone
 
 ### Status
@@ -54,12 +78,11 @@
   - Load all the reminder times of all the RevChat users
   - Intersect these 2 mappings to keep only the users whose reminder time is now
   - For each such user, construct and send a Slack DM summarizing the details of the PRs in which it's their turn to take action
-    - Title
-    - Bitbucket/GitHub URL
+    - Title + PR link
     - Slack channel reference
     - PR details
       - Creation and last update times
-      - Latest build results (if there are any)
+      - Latest check results (if there are any)
       - Approvals (if there are any)
     - User-specific details
       - When was the last time you reviewed this PR?
