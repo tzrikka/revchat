@@ -185,6 +185,8 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 		return nil
 	}
 
+	defer github.UpdateChannelBookmarks(ctx, event.PullRequest, channelID)
+
 	prURL := event.PullRequest.HTMLURL
 	var err error
 
@@ -253,6 +255,8 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 		return nil
 	}
 
+	defer github.UpdateChannelBookmarks(ctx, pr, channelID)
+
 	// Title was changed.
 	var err error
 	if event.Changes.Title != nil {
@@ -293,6 +297,8 @@ func prSynchronized(ctx workflow.Context, event github.PullRequestEvent) error {
 	if !found {
 		return nil
 	}
+
+	defer github.UpdateChannelBookmarks(ctx, event.PullRequest, channelID)
 
 	if event.After == nil {
 		logger.From(ctx).Warn("'after' field in GitHub PR synchronize event is nil")

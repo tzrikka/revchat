@@ -32,7 +32,7 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 		return nil
 	}
 
-	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
+	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	// Don't abort if this fails - it's more important to post the comment.
 	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
@@ -78,12 +78,13 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 // [10-minute window]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
 func (c Config) CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
-	channelID, found := sact.LookupChannel(ctx, bitbucket.HTMLURL(event.PullRequest.Links))
+	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
+	channelID, found := sact.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
 
-	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
+	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	return c.updateCommentInWorkflow(ctx, event.Comment)
 }
@@ -125,19 +126,20 @@ func (c Config) updateCommentInWorkflow(ctx workflow.Context, comment *bitbucket
 	// Unlike comment creation, even if mirroring this update in Slack fails, we still need to poll for updates.
 	c.pollCommentForUpdates(ctx, comment.User.AccountID, commentURL, comment.Content.Raw)
 
-	return bitbucket.EditMsg(ctx, commentURL, msg)
+	return bitbucket.EditSlackMsg(ctx, commentURL, msg)
 }
 
 // CommentDeletedWorkflow mirrors the deletion of a PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-deleted
 func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
-	channelID, found := sact.LookupChannel(ctx, bitbucket.HTMLURL(event.PullRequest.Links))
+	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
+	channelID, found := sact.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
 
-	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
+	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	commentURL := bitbucket.HTMLURL(event.Comment.Links)
 	defer c.stopPollingComment(ctx, commentURL)
@@ -146,19 +148,20 @@ func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.Pul
 		sact.DeleteFile(ctx, fileID)
 	}
 
-	return bitbucket.DeleteMsg(ctx, commentURL)
+	return bitbucket.DeleteSlackMsg(ctx, commentURL)
 }
 
 // CommentResolvedWorkflow mirrors the resolution of a PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-resolved
 func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := sact.LookupChannel(ctx, bitbucket.HTMLURL(event.PullRequest.Links))
+	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
+	channelID, found := sact.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
 
-	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
+	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
 	sact.AddOKReaction(ctx, url) // The mention below is more important than this reaction.
@@ -169,12 +172,13 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-reopened
 func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
-	channelID, found := sact.LookupChannel(ctx, bitbucket.HTMLURL(event.PullRequest.Links))
+	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
+	channelID, found := sact.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
 
-	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
+	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
 	sact.RemoveOKReaction(ctx, url) // The mention below is more important than this reaction.

@@ -182,7 +182,7 @@ func impersonateUser(ctx workflow.Context, user Account) (displayName, icon stri
 	return users.SlackIDToDisplayName(ctx, id), users.SlackIDToIcon(ctx, id)
 }
 
-func DeleteMsg(ctx workflow.Context, url string) error {
+func DeleteSlackMsg(ctx workflow.Context, url string) error {
 	ids, err := msgIDsForCommentURL(ctx, url)
 	if err != nil || ids == nil {
 		return err
@@ -193,7 +193,7 @@ func DeleteMsg(ctx workflow.Context, url string) error {
 	return activities.DeleteMessage(ctx, ids[0], ids[len(ids)-1])
 }
 
-func EditMsg(ctx workflow.Context, url, msg string) error {
+func EditSlackMsg(ctx workflow.Context, url, msg string) error {
 	ids, err := msgIDsForCommentURL(ctx, url)
 	if err != nil || ids == nil {
 		return err

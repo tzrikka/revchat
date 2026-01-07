@@ -126,7 +126,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		return nil
 	}
 
-	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, snapshot)
+	defer bitbucket.UpdateChannelBookmarks(ctx, pr, prURL, channelID)
 
 	var errs []error
 
@@ -229,7 +229,7 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 		return nil
 	}
 
-	defer bitbucket.UpdateChannelBookmarks(ctx, event, channelID, nil)
+	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
 	msg := "%s "
