@@ -52,47 +52,47 @@ func ReviewersDiff(prev, curr PullRequest) (added, removed []string) {
 
 // ReviewerMentions returns a Slack message mentioning all the newly added/removed reviewers.
 func ReviewerMentions(ctx workflow.Context, added, removed []string) string {
-	var sb strings.Builder
-	sb.WriteString(":bust_in_silhouette: %s ")
+	var msg strings.Builder
+	msg.WriteString(":bust_in_silhouette: %s ")
 
 	switch len(added) {
 	case 0:
 		// Do nothing.
 	case 1:
-		sb.WriteString("added this reviewer:")
-		sb.WriteString(bitbucketAccountIDsToSlackMentions(ctx, added))
+		msg.WriteString("added this reviewer:")
+		msg.WriteString(accountIDsToSlackMentions(ctx, added))
 	default:
-		sb.WriteString("added these reviewers:")
-		sb.WriteString(bitbucketAccountIDsToSlackMentions(ctx, added))
+		msg.WriteString("added these reviewers:")
+		msg.WriteString(accountIDsToSlackMentions(ctx, added))
 	}
 
 	if len(added) > 0 && len(removed) > 0 {
-		sb.WriteString(", and ")
+		msg.WriteString(", and ")
 	}
 
 	switch len(removed) {
 	case 0:
 		// Do nothing.
 	case 1:
-		sb.WriteString("removed this reviewer:")
-		sb.WriteString(bitbucketAccountIDsToSlackMentions(ctx, removed))
+		msg.WriteString("removed this reviewer:")
+		msg.WriteString(accountIDsToSlackMentions(ctx, removed))
 	default:
-		sb.WriteString("removed these reviewers:")
-		sb.WriteString(bitbucketAccountIDsToSlackMentions(ctx, removed))
+		msg.WriteString("removed these reviewers:")
+		msg.WriteString(accountIDsToSlackMentions(ctx, removed))
 	}
 
-	sb.WriteString(".")
-	return sb.String()
+	msg.WriteString(".")
+	return msg.String()
 }
 
-func bitbucketAccountIDsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
-	var sb strings.Builder
+func accountIDsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
+	var msg strings.Builder
 	for _, id := range accountIDs {
 		if mention := users.BitbucketIDToSlackRef(ctx, id, ""); mention != "" {
-			sb.WriteString(" " + mention)
+			msg.WriteString(" " + mention)
 		}
 	}
-	return sb.String()
+	return msg.String()
 }
 
 func BitbucketToSlackIDs(ctx workflow.Context, accountIDs []string) []string {

@@ -24,8 +24,8 @@ func GitHubIDToEmail(ctx workflow.Context, username string) string {
 }
 
 // GitHubIDToSlackID converts a GitHub username into a Slack user ID. This
-// function returns an empty string if the username is not found, or if it belongs to
-// a GitHub team or app. It uses persistent data storage, or API calls as a fallback.
+// function returns an empty string if the username is not found, or if it belongs
+// to a GitHub team. It uses persistent data storage, or API calls as a fallback.
 func GitHubIDToSlackID(ctx workflow.Context, username string, checkOptIn bool) string {
 	// Don't even check GitHub teams, only individual users.
 	if strings.Contains(username, "/") {
@@ -51,7 +51,7 @@ func GitHubIDToSlackID(ctx workflow.Context, username string, checkOptIn bool) s
 
 // GitHubIDToSlackRef converts a GitHub user into a Slack user reference. This function returns
 // a GitHub profile link (in Slack markdown format) if the user is not found in Slack, or if
-// it's a GitHub team or app. It uses persistent data storage, or API calls as a fallback.
+// it's a GitHub team. It uses persistent data storage, or API calls as a fallback.
 func GitHubIDToSlackRef(ctx workflow.Context, username, url string) string {
 	// Exception: GitHub teams can only be mentioned by their GitHub name and link.
 	if strings.Contains(username, "/") {
@@ -62,6 +62,6 @@ func GitHubIDToSlackRef(ctx workflow.Context, username, url string) string {
 		return fmt.Sprintf("<@%s>", id)
 	}
 
-	// Fallback: if there's no Slack user ID, linkify the GitHub user profile.
-	return fmt.Sprintf("<%s|@%s>", url, username)
+	// Fallback: if there's no Slack profile, linkify the GitHub user profile.
+	return fmt.Sprintf("<%s?preview=no|@%s>", url, username)
 }

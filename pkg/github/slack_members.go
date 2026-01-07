@@ -1,112 +1,70 @@
 package github
 
-/*
 import (
-	"fmt"
-	"regexp"
+	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
-	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
-func (c Config) updateMembers(ctx workflow.Context, event PullRequestEvent) error {
-	// Already confirmed the Slack channel exists before calling this function.
-	channelID, _ := lookupChannel(ctx, event.PullRequest)
-	var err error
+// ChannelMembers returns a list of opted-in Slack user IDs who are PR authors/reviewers/followers.
+// The output is guaranteed to be sorted, without repetitions, and not contain teams.
+func ChannelMembers(ctx workflow.Context, pr PullRequest) []string {
+	us := []User{pr.User}
 
-	// Individual assignee.
-	if user := event.Assignee; user != nil {
-		switch event.Action {
-		case "assigned":
-			err = c.addChannelMember(ctx, channelID, event.PullRequest.HTMLURL, *user, event.Sender, "assignee")
-		case "unassigned":
-			err = c.removeChannelMember(ctx, channelID, *user, event.Sender, "assignee")
+	if !pr.Draft {
+		us = append(append(us, pr.RequestedReviewers...), pr.Assignees...)
+	}
+
+	slackIDs := LoginsToSlackIDs(ctx, userLogins(us))
+	slackIDs = append(slackIDs, data.SelectUserByGitHubID(ctx, pr.User.Login).Followers...)
+
+	slices.Sort(slackIDs)
+	return slices.Compact(slackIDs)
+}
+
+// ReviewerMentions returns a Slack message mentioning 1 or more added or removed reviewers.
+func ReviewerMentions(ctx workflow.Context, action, role string, reviewers []User) string {
+	var msg strings.Builder
+	msg.WriteString(":bust_in_silhouette: %s ")
+
+	msg.WriteString(action)
+	switch len(reviewers) {
+	case 1:
+		msg.WriteString(" this ")
+	default:
+		msg.WriteString(" these ")
+	}
+
+	msg.WriteString(role)
+	if len(reviewers) > 1 {
+		msg.WriteString("s")
+	}
+
+	msg.WriteString(":")
+	for _, user := range reviewers {
+		if mention := users.GitHubIDToSlackRef(ctx, user.Login, user.HTMLURL); mention != "" {
+			msg.WriteString(" " + mention)
 		}
 	}
 
-	// Individual reviewer.
-	if user := event.RequestedReviewer; user != nil {
-		switch event.Action {
-		case "review_requested":
-			err = c.addChannelMember(ctx, channelID, event.PullRequest.HTMLURL, *user, event.Sender, "reviewer")
-		case "review_request_removed":
-			err = c.removeChannelMember(ctx, channelID, *user, event.Sender, "reviewer")
+	msg.WriteString(".")
+	return msg.String()
+}
+
+func LoginsToSlackIDs(ctx workflow.Context, logins []string) []string {
+	slackIDs := make([]string, 0, len(logins))
+	for _, githubID := range logins {
+		// True = don't include opted-out users. They will still be mentioned
+		// in the channel, but as non-members they won't be notified about it.
+		if slackID := users.GitHubIDToSlackID(ctx, githubID, true); slackID != "" {
+			slackIDs = append(slackIDs, slackID)
 		}
 	}
 
-	// Reviewing team.
-	action := "added"
-	if event.Action == "review_request_removed" {
-		action = "removed"
-	}
-	if team := event.RequestedTeam; team != nil {
-		msg := fmt.Sprintf("%s the <%s|%s> team as a reviewer", action, team.HTMLURL, team.Name)
-		err = c.mentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
-	}
-
-	return err
+	slices.Sort(slackIDs)
+	return slices.Compact(slackIDs)
 }
-
-func (c Config) addChannelMember(ctx workflow.Context, channelID, prURL string, reviewer, sender User, role string) error {
-	slackUserID := c.announceUser(ctx, channelID, reviewer, sender, role, "added")
-	if slackUserID == "" {
-		return nil
-	}
-
-	err := activities.InviteUsersToChannel(ctx, channelID, prURL, []string{slackUserID})
-	if reviewer.Login == sender.Login {
-		return err // No need to also DM the user if they added themselves.
-	}
-
-	// Send a DM to the reviewer with a reference to the Slack channel.
-	msg := fmt.Sprintf("added you as %s to a PR: <#%s>", role, channelID)
-	_ = c.mentionUserInMsg(ctx, slackUserID, sender, "%s "+msg)
-
-	return err
-}
-
-func (c Config) removeChannelMember(ctx workflow.Context, channelID string, reviewer, sender User, role string) error {
-	slackUserID := c.announceUser(ctx, channelID, reviewer, sender, role, "removed")
-	if slackUserID == "" {
-		return nil
-	}
-
-	return tslack.ConversationsKick(ctx, channelID, slackUserID)
-}
-
-func (c Config) announceUser(ctx workflow.Context, channelID string, reviewer, sender User, role, action string) string {
-	slackRef := users.GitHubToSlackRef(ctx, reviewer.Login, reviewer.HTMLURL)
-
-	person := slackRef
-	if reviewer.Login == sender.Login {
-		person = "themselves"
-	}
-	msg := fmt.Sprintf("%s %s as %s", action, person, withArticle(role))
-	_ = c.mentionUserInMsg(ctx, channelID, sender, "%s "+msg)
-
-	if !strings.HasPrefix(slackRef, "<@") {
-		return "" // Not a real Slack user ID - can't add it to the Slack channel.
-	}
-
-	slackID := strings.TrimSuffix(strings.TrimPrefix(slackRef, "<@"), ">")
-	user, optedIn, _ := data.SelectUserBySlackID(ctx, slackID)
-	if user.SlackID == "" || !optedIn {
-		return ""
-	}
-
-	return slackID // Continue to add/remove the user to/from the Slack channel.
-}
-
-func withArticle(role string) string {
-	article := "a "
-	if regexp.MustCompile(`^[AEIOUaeiou]`).MatchString(role) {
-		article = "an "
-	}
-	return article + role
-}
-*/

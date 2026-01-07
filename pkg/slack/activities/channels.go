@@ -62,10 +62,6 @@ func CreateChannel(ctx workflow.Context, name, prURL string, private bool) (id s
 // and PR attention state (the given users are expected to be opted-in).
 // This is an idempotent function, unlike the underlying Slack API call.
 func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, userIDs []string) error {
-	if len(userIDs) == 0 {
-		return nil
-	}
-
 	if len(userIDs) > 1000 { // API limitation.
 		logger.From(ctx).Warn("trying to add more than 1000 users to Slack channel - truncating",
 			slog.String("channel_id", channelID), slog.Int("users_len", len(userIDs)))
@@ -75,6 +71,10 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, userIDs
 	var errs []error
 	var dontInvite []string
 	for _, id := range userIDs {
+		if id == "" {
+			dontInvite = append(dontInvite, id)
+			continue
+		}
 		if err := data.AddReviewerToTurns(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
 			dontInvite = append(dontInvite, id)
 			errs = append(errs, err)
@@ -85,6 +85,9 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, userIDs
 	for _, id := range dontInvite {
 		i := slices.Index(userIDs, id)
 		userIDs = slices.Delete(userIDs, i, i+1)
+	}
+	if len(userIDs) == 0 {
+		return errors.Join(errs...)
 	}
 
 	if err := slack.ConversationsInvite(ctx, channelID, userIDs, true); err != nil {
@@ -110,6 +113,10 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, userIDs
 func KickUsersFromChannel(ctx workflow.Context, channelID, prURL string, userIDs []string) error {
 	var errs []error
 	for _, id := range userIDs {
+		if id == "" {
+			continue
+		}
+
 		err := slack.ConversationsKick(ctx, channelID, id)
 		if err != nil {
 			msg := "failed to remove user from Slack channel"
