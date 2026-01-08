@@ -66,16 +66,18 @@ func PostReplyAsUser(ctx workflow.Context, channelID, timestamp, name, icon, msg
 	return resp, nil
 }
 
-func PostDMWithImage(ctx workflow.Context, userID, msg, imageURL, altText string) error {
+func PostDMWithImage(ctx workflow.Context, senderID, recipientID, msg, imageURL, altText string) error {
+	name := users.SlackIDToDisplayName(ctx, senderID)
+
 	if imageURL == "" {
-		_, err := PostReplyAsUser(ctx, userID, "", users.SlackIDToDisplayName(ctx, userID), users.SlackIDToIcon(ctx, userID), msg)
+		_, err := PostReplyAsUser(ctx, recipientID, "", name, users.SlackIDToIcon(ctx, senderID), msg)
 		return err
 	}
 
 	_, err := slack.ChatPostMessage(ctx, slack.ChatPostMessageRequest{
-		Channel:  userID,
-		Username: strings.TrimPrefix(users.SlackIDToDisplayName(ctx, userID), "@"),
-		IconURL:  users.SlackIDToIcon(ctx, userID),
+		Channel:  recipientID,
+		Username: strings.TrimPrefix(name, "@"),
+		IconURL:  users.SlackIDToIcon(ctx, senderID),
 		Blocks: []map[string]any{
 			{
 				"type": "section",
@@ -93,7 +95,7 @@ func PostDMWithImage(ctx workflow.Context, userID, msg, imageURL, altText string
 	})
 	if err != nil {
 		logger.From(ctx).Error("failed to post Slack DM with image", slog.Any("error", err),
-			slog.String("user_id", userID), slog.String("image_url", imageURL))
+			slog.String("user_id", recipientID), slog.String("image_url", imageURL))
 		return err
 	}
 	return nil

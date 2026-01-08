@@ -41,7 +41,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 
 		msg := fmt.Sprintf(":pleading_face: Please take a look at <#%s> :pray:", event.ChannelID)
 		altText := "Tip: click the collapse arrow above this image to hide it, as a self-reminder after completing this task"
-		if err := activities.PostDMWithImage(ctx, userID, msg, imageURL(ctx, imagesHTTPServer), altText); err != nil {
+		if err := activities.PostDMWithImage(ctx, event.UserID, userID, msg, imageURL(ctx, imagesHTTPServer), altText); err != nil {
 			PostEphemeralError(ctx, event, fmt.Sprintf("failed to send a %s to <@%s>.", parts[0], userID))
 			continue
 		}
