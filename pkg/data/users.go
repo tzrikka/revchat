@@ -492,28 +492,20 @@ func selectUserActivity(ctx context.Context, indexType int, id string) (User, er
 }
 
 func readUsersFile() (*Users, error) {
-	path, err := cachedDataPath(usersFile, "")
+	path, err := cachedDataPath(usersFile)
 	if err != nil {
 		return nil, err
 	}
 
-	// Special case: empty files can't be parsed as JSON, but this initial state is valid.
-	fi, err := os.Stat(path)
+	f, err := os.Open(path) //gosec:disable G304 // Specified by admin by design.
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	u := &Users{entries: []User{}}
-	if fi.Size() > 0 {
-		f, err := os.Open(path) //gosec:disable G304 // Specified by admin by design.
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-
-		if err := json.NewDecoder(f).Decode(&u.entries); err != nil {
-			return nil, err
-		}
+	if err := json.NewDecoder(f).Decode(&u.entries); err != nil {
+		return nil, err
 	}
 
 	// Build indexes for fast lookups.
@@ -550,7 +542,7 @@ func readUsersFile() (*Users, error) {
 }
 
 func (u *Users) writeUsersFile() error {
-	path, err := cachedDataPath(usersFile, "")
+	path, err := cachedDataPath(usersFile)
 	if err != nil {
 		return err
 	}

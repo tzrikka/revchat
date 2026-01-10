@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	diffstatFileSuffix = "_diffstat"
+	diffstatFileSuffix = "_diffstat.json"
 )
 
 var prDiffstatMutexes RWMutexMap
@@ -32,12 +32,12 @@ func UpdateBitbucketDiffstat(url string, ds []bitbucket.Diffstat) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	path, err := cachedDataPath(url, diffstatFileSuffix)
+	path, err := cachedDataPath(url + diffstatFileSuffix)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
 		return err
 	}
@@ -54,11 +54,11 @@ func DeleteDiffstat(ctx workflow.Context, url string) {
 	defer mu.Unlock()
 
 	if ctx == nil { // For unit testing.
-		_ = deletePRFileActivity(context.Background(), url, diffstatFileSuffix)
+		_ = deletePRFileActivity(context.Background(), url+diffstatFileSuffix)
 		return
 	}
 
-	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, url, diffstatFileSuffix); err != nil {
+	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, url+diffstatFileSuffix); err != nil {
 		logger.From(ctx).Warn("failed to delete PR diffstat", slog.Any("error", err), slog.String("pr_url", url))
 	}
 }
@@ -68,12 +68,12 @@ func readBitbucketDiffstat(url string) []bitbucket.Diffstat {
 	mu.RLock()
 	defer mu.RUnlock()
 
-	path, err := cachedDataPath(url, diffstatFileSuffix)
+	path, err := cachedDataPath(url + diffstatFileSuffix)
 	if err != nil {
 		return nil
 	}
 
-	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
 		return nil
 	}

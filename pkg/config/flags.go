@@ -32,6 +32,11 @@ const (
 // configFile returns the path to the app's configuration file.
 // It also creates an empty file if it doesn't already exist.
 func configFile() altsrc.StringSourcer {
+	path, _ := xdg.FindConfigFile(DirName, ConfigFileName)
+	if path != "" {
+		return altsrc.StringSourcer(path)
+	}
+
 	path, err := xdg.CreateFile(xdg.ConfigHome, DirName, ConfigFileName)
 	if err != nil {
 		logger.Fatal("failed to create config file", err)

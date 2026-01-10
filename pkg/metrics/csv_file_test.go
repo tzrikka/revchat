@@ -3,7 +3,6 @@ package metrics
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"regexp"
 	"testing"
@@ -19,7 +18,7 @@ func TestIncrementSignalCounter(t *testing.T) {
 	incrementSignalCounterAsSideEffect(nil, "signal1")
 
 	_, err := os.ReadFile(path) //gosec:disable G304 // Unit test with fake files.
-	if !errors.Is(err, fs.ErrNotExist) {
+	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
 

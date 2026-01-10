@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -29,7 +28,7 @@ func CommitCommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Reposito
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-created
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-updated
 func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
-	// Commit status --> commit hash --> PR snapshot (JSON map) --> [PullRequest] struct.
+	// Commit status --> commit hash --> PR snapshot (JSON map) --> [bitbucket.PullRequest] struct.
 	cs := event.CommitStatus
 	m, err := findPRByCommit(ctx, cs.Commit.Hash)
 	if err != nil {
@@ -91,20 +90,24 @@ func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent)
 }
 
 func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, err error) {
-	root := filepath.Join(xdg.MustDataHome(), config.DirName)
+	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
+	if err != nil {
+		return nil, err
+	}
+
 	err = fs.WalkDir(os.DirFS(root), ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if d.IsDir() || !strings.HasSuffix(d.Name(), "_snapshot.json") {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), data.BitbucketPRSnapshotFileSuffix) {
 			return nil
 		}
 
-		url := "https://" + strings.TrimSuffix(path, "_snapshot.json")
-		snapshot, err := data.LoadBitbucketPR(ctx, url)
+		prURL := "https://" + strings.TrimSuffix(path, data.BitbucketPRSnapshotFileSuffix)
+		snapshot, err := data.LoadBitbucketPR(ctx, prURL)
 		if err != nil {
-			return nil // Continue walking.
+			return nil
 		}
 
 		prHash, ok := prCommitHash(snapshot)
@@ -116,7 +119,7 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 			if pr != nil {
 				logger.From(ctx).Warn("commit hash collision", slog.String("hash", eventHash),
 					slog.String("existing_pr", urlFromPR(pr)), slog.String("new_pr", urlFromPR(snapshot)))
-				return nil // Continue walking.
+				return nil
 			}
 			pr = snapshot
 		}

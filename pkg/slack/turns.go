@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"maps"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -21,38 +20,41 @@ import (
 	"github.com/tzrikka/xdg"
 )
 
+// LoadPRTurns scans all stored PR turn files, and returns a map of
+// Slack user IDs to all the PR URLs they need to be reminded about.
 func LoadPRTurns(ctx workflow.Context) map[string][]string {
-	// Walk through all stored PR states to find which users need to be reminded.
-	root := filepath.Join(xdg.MustDataHome(), config.DirName)
-	slackUserIDs := map[string][]string{}
+	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
+	if err != nil {
+		return nil
+	}
 
-	err := fs.WalkDir(os.DirFS(root), ".", func(path string, d fs.DirEntry, err error) error {
+	usersToPRs := map[string][]string{}
+	err = fs.WalkDir(os.DirFS(root), ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if d.IsDir() || !strings.HasSuffix(d.Name(), "_turn.json") {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), data.TurnFileSuffix) {
 			return nil
 		}
 
-		url := "https://" + strings.TrimSuffix(path, "_turn.json")
-		emails, err := data.GetCurrentTurn(ctx, url)
+		prURL := "https://" + strings.TrimSuffix(path, data.TurnFileSuffix)
+		emails, err := data.GetCurrentTurn(ctx, prURL)
 		if err != nil {
-			return nil // Continue walking.
+			return nil
 		}
 
-		slackIDs := make([]string, 0, len(emails))
 		for _, email := range emails {
 			if id := users.EmailToSlackID(ctx, email); id != "" {
-				slackIDs = append(slackIDs, id)
+				usersToPRs[id] = append(usersToPRs[id], prURL)
 				continue
 			}
 			logger.From(ctx).Warn("Slack email lookup error - removing from turn",
-				slog.String("missing_email", email), slog.String("pr_url", url))
-			_ = data.RemoveReviewerFromTurns(ctx, url, email) // Example: user deactivated after being added to the PR.
+				slog.String("missing_email", email), slog.String("pr_url", prURL))
+
+			_ = data.RemoveReviewerFromTurns(ctx, prURL, email) // Example: user deactivated after being added to the PR.
 		}
 
-		slackUserIDs[url] = slackIDs
 		return nil
 	})
 	if err != nil {
@@ -60,15 +62,7 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 		return nil
 	}
 
-	// Invert the map to be keyed by Slack user IDs instead of PR URLs.
-	prs := map[string][]string{}
-	for url, ids := range slackUserIDs {
-		for _, id := range ids {
-			prs[id] = append(prs[id], url)
-		}
-	}
-
-	return prs
+	return usersToPRs
 }
 
 func PRDetails(ctx workflow.Context, url, userID string) string {

@@ -3,8 +3,6 @@ package data
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"io/fs"
 	"log/slog"
 	"os"
 
@@ -28,7 +26,7 @@ type CommitStatus struct {
 }
 
 const (
-	statusFileSuffix = "_status"
+	buildsFileSuffix = "_status.json"
 )
 
 var prStatusMutexes RWMutexMap
@@ -69,11 +67,11 @@ func DeleteBitbucketBuilds(ctx workflow.Context, prURL string) {
 	defer mu.Unlock()
 
 	if ctx == nil { // For unit testing.
-		_ = deletePRFileActivity(context.Background(), prURL, statusFileSuffix)
+		_ = deletePRFileActivity(context.Background(), prURL+buildsFileSuffix)
 		return
 	}
 
-	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, prURL, statusFileSuffix); err != nil {
+	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, prURL+buildsFileSuffix); err != nil {
 		logger.From(ctx).Warn("failed to delete Bitbucket PR's build states",
 			slog.Any("error", err), slog.String("pr_url", prURL))
 	}
@@ -90,10 +88,7 @@ func readBitbucketBuildsActivity(_ context.Context, url string) (*PRStatus, erro
 func updateBitbucketBuildsActivity(ctx context.Context, url, commitHash, key string, cs CommitStatus) error {
 	pr, err := readStatusFile(url)
 	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-		pr = &PRStatus{CommitHash: "not found"}
+		return err
 	}
 
 	if pr.CommitHash != commitHash {
@@ -102,12 +97,12 @@ func updateBitbucketBuildsActivity(ctx context.Context, url, commitHash, key str
 	}
 
 	pr.Builds[key] = cs
-	path, err := cachedDataPath(url, statusFileSuffix)
+	path, err := cachedDataPath(url + buildsFileSuffix)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
 		return err
 	}
@@ -119,12 +114,12 @@ func updateBitbucketBuildsActivity(ctx context.Context, url, commitHash, key str
 }
 
 func readStatusFile(url string) (*PRStatus, error) {
-	path, err := cachedDataPath(url, statusFileSuffix)
+	path, err := cachedDataPath(url + buildsFileSuffix)
 	if err != nil {
 		return nil, err
 	}
 
-	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
 		return nil, err
 	}

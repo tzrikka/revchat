@@ -3,8 +3,6 @@ package data
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"io/fs"
 	"log/slog"
 	"os"
 	"slices"
@@ -28,7 +26,7 @@ type PRTurn struct {
 }
 
 const (
-	turnFileSuffix = "_turn"
+	TurnFileSuffix = "_turn.json"
 )
 
 var prTurnMutexes RWMutexMap
@@ -48,11 +46,11 @@ func DeleteTurns(ctx workflow.Context, url string) {
 	defer mu.Unlock()
 
 	if ctx == nil { // For unit testing.
-		_ = deletePRFileActivity(context.Background(), url, turnFileSuffix)
+		_ = deletePRFileActivity(context.Background(), url+TurnFileSuffix)
 		return
 	}
 
-	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, url, turnFileSuffix); err != nil {
+	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, url+TurnFileSuffix); err != nil {
 		logger.From(ctx).Warn("failed to delete PR attention state", slog.Any("error", err), slog.String("pr_url", url))
 	}
 }
@@ -321,16 +319,13 @@ func Nudge(ctx workflow.Context, url, email string) (bool, error) {
 
 // readTurnFile expects the caller to hold the appropriate mutex.
 func readTurnFile(ctx workflow.Context, url string) (*PRTurn, error) {
-	path, err := cachedDataPath(url, turnFileSuffix)
+	path, err := cachedDataPath(url + TurnFileSuffix)
 	if err != nil {
 		return nil, err
 	}
 
-	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return resetTurns(ctx, url)
-		}
 		return nil, err
 	}
 	defer f.Close()
@@ -370,12 +365,12 @@ func writeTurnFile(ctx workflow.Context, url string, t *PRTurn) error {
 
 // writeTurnFileActivity runs as a local activity and expects the caller to hold the appropriate mutex.
 func writeTurnFileActivity(_ context.Context, url string, t *PRTurn) error {
-	path, err := cachedDataPath(url, turnFileSuffix)
+	path, err := cachedDataPath(url + TurnFileSuffix)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party.
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
 		return err
 	}
@@ -406,7 +401,9 @@ func resetTurns(ctx workflow.Context, url string) (*PRTurn, error) {
 		jsonList = []any{}
 	}
 	for _, r := range jsonList {
-		reviewers[userEmail(ctx, r)] = true
+		if email := userEmail(ctx, r); email != "" {
+			reviewers[email] = true
+		}
 	}
 
 	t := &PRTurn{Author: author, Reviewers: reviewers}
@@ -444,7 +441,7 @@ func BitbucketIDToEmail(ctx workflow.Context, accountID string) string {
 	// We use the Jira API as a fallback because the Bitbucket API doesn't expose email addresses.
 	jiraUser, err := jira.UsersGet(ctx, accountID)
 	if err != nil {
-		logger.From(ctx).Error("failed to retrieve Jira user info",
+		logger.From(ctx).Warn("failed to retrieve Jira user info",
 			slog.Any("error", err), slog.String("account_id", accountID))
 		return ""
 	}

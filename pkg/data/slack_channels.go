@@ -45,7 +45,7 @@ func LogSlackChannelRenamed(ctx workflow.Context, channelID, name string) {
 }
 
 func timestampAndPath(ctx workflow.Context) (now, path string, err error) {
-	path, err = cachedDataPath(slackChannelsFile, "")
+	path, err = cachedDataPath(slackChannelsFile)
 	if err != nil {
 		logger.From(ctx).Error("failed to find/create Slack channel log file",
 			slog.Any("error", err), slog.String("filename", slackChannelsFile))
