@@ -80,7 +80,7 @@ func (c *Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 			return workflow.NewContinueAsNewError(ctx, EventDispatcher)
 
 		case c.shutdownSignal != "":
-			encoded := workflow.SideEffect(ctx, func(ctx workflow.Context) any {
+			encoded := workflow.SideEffect(ctx, func(_ workflow.Context) any {
 				c.shutdownDone <- "done"
 				return ""
 			})

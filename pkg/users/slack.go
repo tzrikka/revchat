@@ -170,7 +170,7 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 // SlackMentionToBitbucketRef converts a Slack user mention ("<@U123>") into a Bitbucket
 // account ID ("@{account:uuid}"). This function returns the user's full/display name if
 // the user is not found. It uses persistent data storage, or API calls as a fallback.
-func SlackMentionToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackUserRef string) string {
+func SlackMentionToBitbucketRef(ctx workflow.Context, slackUserRef string) string {
 	userID := slackUserRef[2 : len(slackUserRef)-1]
 	user, _, _ := data.SelectUserBySlackID(ctx, userID)
 	if user.BitbucketID == "" {
@@ -183,7 +183,7 @@ func SlackMentionToBitbucketRef(ctx workflow.Context, bitbucketWorkspace, slackU
 	}
 
 	// Fallback 1: slower but better, based on the user's email address.
-	if accountID := EmailToBitbucketID(ctx, bitbucketWorkspace, SlackIDToEmail(ctx, userID)); accountID != "" {
+	if accountID := EmailToBitbucketID(ctx, SlackIDToEmail(ctx, userID)); accountID != "" {
 		return fmt.Sprintf("@{%s}", accountID)
 	}
 

@@ -46,7 +46,7 @@ func (c *Config) createMessageBitbucket(ctx workflow.Context, event MessageEvent
 		return err
 	}
 
-	msg := markdown.SlackToBitbucket(ctx, c.BitbucketWorkspace, event.Text) + c.fileLinks(ctx, event.Files)
+	msg := markdown.SlackToBitbucket(ctx, event.Text) + c.fileLinks(ctx, event.Files)
 	msg += "\n\n[This comment was created by RevChat]: #"
 
 	newCommentURL, err := activities.CreatePullRequestComment(ctx, linkID, url[1], url[2], url[3], url[5], msg)

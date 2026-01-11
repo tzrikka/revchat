@@ -85,7 +85,7 @@ func readBitbucketBuildsActivity(_ context.Context, url string) (*PRStatus, erro
 
 // updateBitbucketBuildsActivity runs as a Temporal local activity (using
 // [executeLocalActivity]) and expects the caller to hold the appropriate mutex.
-func updateBitbucketBuildsActivity(ctx context.Context, url, commitHash, key string, cs CommitStatus) error {
+func updateBitbucketBuildsActivity(_ context.Context, url, commitHash, key string, cs CommitStatus) error {
 	pr, err := readStatusFile(url)
 	if err != nil {
 		return err

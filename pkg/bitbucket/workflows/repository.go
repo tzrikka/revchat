@@ -19,7 +19,7 @@ import (
 
 // CommitCommentCreatedWorkflow (will) handle (in the future) this event:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Commit-comment-created
-func CommitCommentCreatedWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
+func CommitCommentCreatedWorkflow(ctx workflow.Context, _ bitbucket.RepositoryEvent) error {
 	logger.From(ctx).Debug("Bitbucket commit comment created event - not implemented yet")
 	return nil
 }

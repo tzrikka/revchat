@@ -40,7 +40,7 @@ linters:
     - predeclared
     - protogetter
     - recvcheck
-    # - revive
+    - revive
     - sloglint
     - staticcheck
     - thelper
@@ -54,7 +54,7 @@ linters:
       - linters:
           - errcheck
         source: "defer .*Close()"
-  
+
   settings:
     errcheck:
       check-type-assertions: true
@@ -70,6 +70,13 @@ linters:
       locale: US
     predeclared:
       qualified-name: true
+    revive:
+      enable-default-rules: true
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
     sloglint:
       attr-only: true
       key-naming-case: snake

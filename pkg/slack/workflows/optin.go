@@ -73,16 +73,17 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashComman
 	err = c.waitForThrippyLinkCreds(ctx, linkID)
 	if err != nil {
 		_ = c.deleteThrippyLink(ctx, linkID)
-		if err.Error() == errLinkAuthzTimeout { // For some reason errors.Is() doesn't work across Temporal?
+
+		if err.Error() == errLinkAuthzTimeout { // For some reason [errors.Is] doesn't work across Temporal?
 			logger.From(ctx).Warn("user did not complete Thrippy OAuth flow in time", slog.String("email", user.Email))
 			commands.PostEphemeralError(ctx, event, "Bitbucket authorization timed out - please try opting in again.")
 			return nil // Not a server error as far as we're concerned.
-		} else {
-			logger.From(ctx).Error("failed to authorize Bitbucket user",
-				slog.Any("error", err), slog.String("email", user.Email))
-			commands.PostEphemeralError(ctx, event, "failed to authorize you in Bitbucket.")
-			return err
 		}
+
+		logger.From(ctx).Error("failed to authorize Bitbucket user",
+			slog.Any("error", err), slog.String("email", user.Email))
+		commands.PostEphemeralError(ctx, event, "failed to authorize you in Bitbucket.")
+		return err
 	}
 
 	if err := data.UpsertUser(ctx, user.Email, user.RealName, "", "", user.SlackID, linkID); err != nil {

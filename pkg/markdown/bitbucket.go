@@ -150,7 +150,7 @@ func bitbucketToSlackWhitespaces(text string) string {
 //   - https://docs.slack.dev/messaging/formatting-message-text/
 //   - https://confluence.atlassian.com/bitbucketserver/markdown-syntax-guide-776639995.html
 //   - https://bitbucket.org/tutorials/markdowndemo/src/master/
-func SlackToBitbucket(ctx workflow.Context, bitbucketWorkspace, text string) string {
+func SlackToBitbucket(ctx workflow.Context, text string) string {
 	text = slackToBitbucketEmoji(text)
 
 	// Before the rest because they undo a few whitespace changes.
@@ -159,7 +159,7 @@ func SlackToBitbucket(ctx workflow.Context, bitbucketWorkspace, text string) str
 	text = slackToBitbucketBlocks(text)
 	text = slackToBitbucketLists(text)
 	text = slackToBitbucketTextStyles(text)
-	text = slackToBitbucketReferences(ctx, bitbucketWorkspace, text)
+	text = slackToBitbucketReferences(ctx, text)
 	return slackToBitbucketLinks(text)
 }
 
@@ -211,10 +211,10 @@ func slackToBitbucketLists(text string) string {
 	return regexp.MustCompile(`(?m)(^\s*-.+)\n([^\n\s-])`).ReplaceAllString(text, "${1}\n\n${2}")
 }
 
-func slackToBitbucketReferences(ctx workflow.Context, bitbucketWorkspace, text string) string {
+func slackToBitbucketReferences(ctx workflow.Context, text string) string {
 	// User mentions: "<@U123>" --> "@{account:uuid}" or "Display Name".
 	for _, slackRef := range regexp.MustCompile(`<@[A-Z0-9]+>`).FindAllString(text, -1) {
-		bbRef := users.SlackMentionToBitbucketRef(ctx, bitbucketWorkspace, slackRef)
+		bbRef := users.SlackMentionToBitbucketRef(ctx, slackRef)
 		text = strings.ReplaceAll(text, slackRef, bbRef)
 	}
 

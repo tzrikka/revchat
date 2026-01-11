@@ -15,7 +15,7 @@ import (
 
 // EmailToBitbucketID retrieves a Bitbucket user's account ID based on their email address. This function returns
 // an empty string if the account ID is not found. It uses persistent data storage, or API calls as a fallback.
-func EmailToBitbucketID(ctx workflow.Context, workspace, email string) string {
+func EmailToBitbucketID(ctx workflow.Context, email string) string {
 	if email == "" {
 		return ""
 	}
