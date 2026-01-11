@@ -19,10 +19,6 @@ const (
 
 var prDiffstatMutexes RWMutexMap
 
-func ReadBitbucketDiffstatLength(url string) int {
-	return len(diffstatPaths(readBitbucketDiffstat(url)))
-}
-
 func ReadBitbucketDiffstatPaths(url string) []string {
 	return diffstatPaths(readBitbucketDiffstat(url))
 }

@@ -97,7 +97,7 @@ func TestSwitchSnapshot(t *testing.T) {
 		t.Fatalf("SwitchSnapshot() error = %v", err)
 	}
 	if pr != nil {
-		t.Fatalf("SwitchSnapshot() = %v, want %v", pr, nil)
+		t.Fatalf("SwitchSnapshot() = %#v, want %#v", pr, nil)
 	}
 
 	// Replace initial snapshot.
@@ -107,9 +107,9 @@ func TestSwitchSnapshot(t *testing.T) {
 		t.Fatalf("SwitchSnapshot() error = %v", err)
 	}
 	if pr == nil {
-		t.Fatalf("SwitchSnapshot() = %v, want %v", pr, snapshot2)
+		t.Fatalf("SwitchSnapshot() = %#v, want %#v", pr, snapshot2)
 	}
 	if pr.ID != snapshot1.ID {
-		t.Fatalf("SwitchSnapshot() = %v, want %v", pr.ID, snapshot1.ID)
+		t.Fatalf("SwitchSnapshot() = %#v, want %#v", pr.ID, snapshot1.ID)
 	}
 }

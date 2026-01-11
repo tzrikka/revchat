@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 	"slices"
@@ -326,6 +327,9 @@ func readTurnFile(ctx workflow.Context, url string) (*PRTurn, error) {
 
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return resetTurns(ctx, url)
+		}
 		return nil, err
 	}
 	defer f.Close()

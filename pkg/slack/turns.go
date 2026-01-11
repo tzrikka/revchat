@@ -163,15 +163,11 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 }
 
 func summarizeBuilds(ctx workflow.Context, url string) string {
-	pr := data.ReadBitbucketBuilds(ctx, url)
-	if pr == nil {
-		return ""
-	}
-
-	keys := slices.Sorted(maps.Keys(pr.Builds))
+	prStatus := data.ReadBitbucketBuilds(ctx, url)
+	keys := slices.Sorted(maps.Keys(prStatus.Builds))
 	var summary []string
 	for _, k := range keys {
-		switch s := pr.Builds[k].State; s {
+		switch s := prStatus.Builds[k].State; s {
 		case "INPROGRESS":
 			// Don't show in-progress builds in summary.
 		case "SUCCESSFUL":

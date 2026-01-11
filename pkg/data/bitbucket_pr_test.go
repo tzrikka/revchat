@@ -18,7 +18,7 @@ func TestBitbucket(t *testing.T) {
 		t.Fatalf("LoadBitbucketPR() error = %v", err)
 	}
 	if got != nil {
-		t.Fatalf("LoadBitbucketPR() = %v, want %v", got, nil)
+		t.Fatalf("LoadBitbucketPR() = %#v, want %#v", got, nil)
 	}
 
 	// Initial snapshot.

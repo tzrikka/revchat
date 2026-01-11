@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 
@@ -48,6 +49,9 @@ func LoadBitbucketPR(ctx workflow.Context, url string) (map[string]any, error) {
 
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
 		logger.From(ctx).Error("failed to open Bitbucket PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
 		return nil, err
 	}
@@ -59,6 +63,9 @@ func LoadBitbucketPR(ctx workflow.Context, url string) (map[string]any, error) {
 		return nil, err
 	}
 
+	if len(m) == 0 {
+		return nil, nil
+	}
 	return m, nil
 }
 

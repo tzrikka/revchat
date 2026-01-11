@@ -497,48 +497,51 @@ func readUsersFile() (*Users, error) {
 		return nil, err
 	}
 
+	db := &Users{entries: []User{}}
 	f, err := os.Open(path) //gosec:disable G304 // Specified by admin by design.
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return db, nil
+		}
 		return nil, err
 	}
 	defer f.Close()
 
-	u := &Users{entries: []User{}}
-	if err := json.NewDecoder(f).Decode(&u.entries); err != nil {
+	if err := json.NewDecoder(f).Decode(&db.entries); err != nil {
 		return nil, err
 	}
 
 	// Build indexes for fast lookups.
-	u.emailIndex = map[string]int{}
-	u.bitbucketIndex = map[string]int{}
-	u.githubIndex = map[string]int{}
-	u.slackIndex = map[string]int{}
-	u.nameIndex = map[string]int{}
+	db.emailIndex = map[string]int{}
+	db.bitbucketIndex = map[string]int{}
+	db.githubIndex = map[string]int{}
+	db.slackIndex = map[string]int{}
+	db.nameIndex = map[string]int{}
 
-	for i, user := range u.entries {
+	for i, user := range db.entries {
 		if user.Email != "" && user.Email != "bot" {
 			user.Email = strings.ToLower(user.Email)
-			u.emailIndex[user.Email] = i
+			db.emailIndex[user.Email] = i
 		}
 		if user.BitbucketID != "" {
-			u.bitbucketIndex[user.BitbucketID] = i
+			db.bitbucketIndex[user.BitbucketID] = i
 		}
 		if user.GitHubID != "" {
-			u.githubIndex[user.GitHubID] = i
+			db.githubIndex[user.GitHubID] = i
 		}
 		if user.SlackID != "" {
-			u.slackIndex[user.SlackID] = i
+			db.slackIndex[user.SlackID] = i
 		}
 		if user.RealName != "" {
-			if _, found := u.nameIndex[user.RealName]; found {
-				u.nameIndex[user.RealName] = -1 // Mark this name as non-unique.
+			if _, found := db.nameIndex[user.RealName]; found {
+				db.nameIndex[user.RealName] = -1 // Mark this name as non-unique.
 				continue
 			}
-			u.nameIndex[user.RealName] = i
+			db.nameIndex[user.RealName] = i
 		}
 	}
 
-	return u, nil
+	return db, nil
 }
 
 func (u *Users) writeUsersFile() error {

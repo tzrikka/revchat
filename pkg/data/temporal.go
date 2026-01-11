@@ -147,6 +147,8 @@ func fixEmptyJSONFile(path string) {
 
 	switch {
 	case strings.HasSuffix(path, diffstatFileSuffix):
+		fallthrough
+	case strings.HasSuffix(path, "/users.json"):
 		_ = os.WriteFile(path, []byte("[]\n"), xdg.NewFilePermissions)
 	case strings.HasSuffix(path, ".json"):
 		_ = os.WriteFile(path, []byte("{}\n"), xdg.NewFilePermissions)

@@ -32,7 +32,7 @@ func newBookmarkTitles(pr PullRequest, files int) []string {
 }
 
 func SetChannelBookmarks(ctx workflow.Context, channelID, prURL string, pr PullRequest) {
-	titles := newBookmarkTitles(pr, data.ReadBitbucketDiffstatLength(prURL))
+	titles := newBookmarkTitles(pr, len(data.ReadBitbucketDiffstatPaths(prURL)))
 	_ = slack.BookmarksAdd(ctx, channelID, titles[0], prURL+"/overview", ":eyes:")
 	_ = slack.BookmarksAdd(ctx, channelID, titles[1], prURL+"/overview", ":speech_balloon:")
 	_ = slack.BookmarksAdd(ctx, channelID, titles[2], prURL+"/overview", ":white_check_mark:")
@@ -51,7 +51,7 @@ func UpdateChannelBookmarks(ctx workflow.Context, pr PullRequest, prURL, channel
 		return
 	}
 
-	newTitles := newBookmarkTitles(pr, data.ReadBitbucketDiffstatLength(prURL))
+	newTitles := newBookmarkTitles(pr, len(data.ReadBitbucketDiffstatPaths(prURL)))
 	for i, b := range bookmarks {
 		if t := newTitles[i]; t != "" && t != b.Title {
 			if err := slack.BookmarksEditTitle(ctx, channelID, b.ID, t); err != nil {
@@ -73,24 +73,21 @@ func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, prURL string) 
 		return
 	}
 
-	results := data.ReadBitbucketBuilds(ctx, prURL)
-	if results == nil {
-		return
-	}
+	prStatus := data.ReadBitbucketBuilds(ctx, prURL)
 
 	var sb strings.Builder
 	sb.WriteString("Builds: ")
-	if len(results.Builds) == 0 {
+	if len(prStatus.Builds) == 0 {
 		sb.WriteString("no results")
 	}
 
-	keys := slices.Sorted(maps.Keys(results.Builds))
+	keys := slices.Sorted(maps.Keys(prStatus.Builds))
 	for i, k := range keys {
 		if i > 0 {
 			sb.WriteString(" ")
 		}
 
-		b := results.Builds[k]
+		b := prStatus.Builds[k]
 		desc := regexp.MustCompile(`\.+$`).ReplaceAllString(strings.TrimSpace(b.Desc), "")
 		sb.WriteString(fmt.Sprintf("%s %s", buildState(b.State), desc))
 	}

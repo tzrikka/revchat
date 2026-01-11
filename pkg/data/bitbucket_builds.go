@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 
@@ -31,7 +32,7 @@ const (
 
 var prStatusMutexes RWMutexMap
 
-func ReadBitbucketBuilds(ctx workflow.Context, prURL string) *PRStatus {
+func ReadBitbucketBuilds(ctx workflow.Context, prURL string) PRStatus {
 	mu := prStatusMutexes.Get(prURL)
 	mu.RLock()
 	defer mu.RUnlock()
@@ -41,10 +42,10 @@ func ReadBitbucketBuilds(ctx workflow.Context, prURL string) *PRStatus {
 	if err != nil {
 		logger.From(ctx).Error("failed to read Bitbucket PR's build states",
 			slog.Any("error", err), slog.String("pr_url", prURL))
-		return nil
+		return PRStatus{}
 	}
 
-	return pr
+	return *pr
 }
 
 // UpdateBitbucketBuilds appends the given build status to the given PR,
@@ -119,13 +120,16 @@ func readStatusFile(url string) (*PRStatus, error) {
 		return nil, err
 	}
 
+	pr := new(PRStatus)
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return pr, nil
+		}
 		return nil, err
 	}
 	defer f.Close()
 
-	pr := new(PRStatus)
 	if err := json.NewDecoder(f).Decode(&pr); err != nil {
 		return nil, err
 	}

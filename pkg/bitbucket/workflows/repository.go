@@ -177,7 +177,7 @@ func buildStateEmoji(state string) string {
 
 func allBuildsSuccessful(ctx workflow.Context, url string) bool {
 	prStatus := data.ReadBitbucketBuilds(ctx, url)
-	if prStatus == nil || len(prStatus.Builds) < 2 {
+	if len(prStatus.Builds) < 2 {
 		return false
 	}
 
