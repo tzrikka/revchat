@@ -49,7 +49,8 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	}
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 
-	err = activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr))
+	followerIDs := data.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers
+	err = activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send this DM only if the user is opted-in.
 		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
@@ -135,7 +136,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
 	} else if snapshot.Draft && !pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
-		errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr)))
+		errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), nil))
 	}
 
 	// Title edited.
@@ -162,7 +163,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	if len(added)+len(removed) > 0 {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, bitbucket.ReviewerMentions(ctx, added, removed))
 		if !pr.Draft {
-			errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.BitbucketToSlackIDs(ctx, added)))
+			errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.BitbucketToSlackIDs(ctx, added), nil))
 		}
 		errs = append(errs, activities.KickUsersFromChannel(ctx, channelID, prURL, bitbucket.BitbucketToSlackIDs(ctx, removed)))
 	}
@@ -246,7 +247,7 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 		// If the user isn't opted-in, or isn't a member of the Slack channel, don't add them back to the
 		// PR's attention state (just like the logic in other places, e.g. PR creation and PR updates).
 		if user := data.SelectUserByEmail(ctx, email); user.IsOptedIn() {
-			err = activities.InviteUsersToChannel(ctx, channelID, prURL, []string{users.EmailToSlackID(ctx, email)})
+			err = activities.InviteUsersToChannel(ctx, channelID, prURL, []string{users.EmailToSlackID(ctx, email)}, nil)
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
 

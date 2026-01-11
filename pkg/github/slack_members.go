@@ -6,12 +6,11 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
 // ChannelMembers returns a list of opted-in Slack user IDs who are PR authors/reviewers/followers.
-// The output is guaranteed to be sorted, without repetitions, and not contain teams.
+// The output is guaranteed to be sorted, without repetitions, and not contain (unresolved) teams or bots.
 func ChannelMembers(ctx workflow.Context, pr PullRequest) []string {
 	us := []User{pr.User}
 
@@ -20,7 +19,6 @@ func ChannelMembers(ctx workflow.Context, pr PullRequest) []string {
 	}
 
 	slackIDs := LoginsToSlackIDs(ctx, userLogins(us))
-	slackIDs = append(slackIDs, data.SelectUserByGitHubID(ctx, pr.User.Login).Followers...)
 
 	slices.Sort(slackIDs)
 	return slices.Compact(slackIDs)
@@ -46,7 +44,7 @@ func ReviewerMentions(ctx workflow.Context, action, role string, reviewers []Use
 
 	msg.WriteString(":")
 	for _, user := range reviewers {
-		if mention := users.GitHubIDToSlackRef(ctx, user.Login, user.HTMLURL); mention != "" {
+		if mention := users.GitHubIDToSlackRef(ctx, user.Login, user.HTMLURL, user.Type); mention != "" {
 			msg.WriteString(" " + mention)
 		}
 	}

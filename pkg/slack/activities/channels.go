@@ -61,16 +61,17 @@ func CreateChannel(ctx workflow.Context, name, prURL string, private bool) (id s
 // InviteUsersToChannel adds up to 1,000 users to the given Slack channel
 // and PR attention state (the given users are expected to be opted-in).
 // This is an idempotent function, unlike the underlying Slack API call.
-func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, userIDs []string) error {
-	if len(userIDs) > 1000 { // API limitation.
+func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, participantIDs, followerIDs []string) error {
+	// API limitation, but we don't split into multiple API calls because that many reviewers is undesirable anyway.
+	if len(participantIDs) > 1000 {
 		logger.From(ctx).Warn("trying to add more than 1000 users to Slack channel - truncating",
-			slog.String("channel_id", channelID), slog.Int("users_len", len(userIDs)))
-		userIDs = userIDs[:1000]
+			slog.String("channel_id", channelID), slog.Int("users_len", len(participantIDs)))
+		participantIDs = participantIDs[:1000]
 	}
 
 	var errs []error
 	var dontInvite []string
-	for _, id := range userIDs {
+	for _, id := range participantIDs {
 		if id == "" {
 			dontInvite = append(dontInvite, id)
 			continue
@@ -81,14 +82,20 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, userIDs
 		}
 	}
 
-	// Don't invite users we failed to add to the PR's attention state.
+	// Don't invite users we failed to add to the PR's attention state, for consistency.
 	for _, id := range dontInvite {
-		i := slices.Index(userIDs, id)
-		userIDs = slices.Delete(userIDs, i, i+1)
+		i := slices.Index(participantIDs, id)
+		participantIDs = slices.Delete(participantIDs, i, i+1)
 	}
-	if len(userIDs) == 0 {
+	if len(participantIDs) == 0 {
 		return errors.Join(errs...)
 	}
+
+	// But do invite followers of the PR author, without checking opt-in status (can't
+	// follow without being opted-in) and without adding them to the PR's attention state.
+	userIDs := append(participantIDs, followerIDs...)
+	slices.Sort(userIDs)
+	userIDs = slices.Compact(userIDs)
 
 	if err := slack.ConversationsInvite(ctx, channelID, userIDs, true); err != nil {
 		msg := "failed to add user(s) to Slack channel"

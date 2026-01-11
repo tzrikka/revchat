@@ -6,11 +6,10 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-// ChannelMembers returns a list of opted-in Slack user IDs who are PR authors/reviewers/followers.
+// ChannelMembers returns a list of opted-in Slack user IDs who are PR authors and reviewers.
 // The output is guaranteed to be sorted, without repetitions, and not contain teams/apps.
 func ChannelMembers(ctx workflow.Context, pr PullRequest) []string {
 	accounts := []Account{pr.Author}
@@ -24,7 +23,6 @@ func ChannelMembers(ctx workflow.Context, pr PullRequest) []string {
 	}
 
 	slackIDs := BitbucketToSlackIDs(ctx, accountIDs(accounts))
-	slackIDs = append(slackIDs, data.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers...)
 
 	slices.Sort(slackIDs)
 	return slices.Compact(slackIDs)

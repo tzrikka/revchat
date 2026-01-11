@@ -32,7 +32,9 @@ func (c Config) PullRequestWorkflow(ctx workflow.Context, event github.PullReque
 	case "ready_for_review":
 		return prReadyForReview(ctx, event)
 
-	case "review_requested", "review_request_removed", "assigned", "unassigned":
+	case "assigned", "unassigned":
+		fallthrough
+	case "review_requested", "review_request_removed":
 		return prReviewRequests(ctx, event)
 
 	case "edited": // Title, body, base branch.
@@ -94,7 +96,8 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 	}
 	github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
-	err = activities.InviteUsersToChannel(ctx, channelID, pr.HTMLURL, github.ChannelMembers(ctx, pr))
+	followerIDs := data.SelectUserByGitHubID(ctx, pr.User.Login).Followers
+	err = activities.InviteUsersToChannel(ctx, channelID, pr.HTMLURL, github.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send this DM only if the user is opted-in.
 		if userID := users.GitHubIDToSlackID(ctx, event.Sender.Login, true); userID != "" {
@@ -163,7 +166,7 @@ func prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as ready for review. :eyes:")
-	return activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest))
+	return activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest), nil)
 }
 
 // lookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
@@ -188,7 +191,7 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 	defer github.UpdateChannelBookmarks(ctx, event.PullRequest, channelID)
 
 	prURL := event.PullRequest.HTMLURL
-	var err error
+	var errs []error
 
 	// Individual assignee.
 	if user := event.Assignee; user != nil {
@@ -197,7 +200,8 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 			msg := github.ReviewerMentions(ctx, "set", "assignee", []github.User{*user})
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 			if !event.PullRequest.Draft {
-				err = activities.InviteUsersToChannel(ctx, channelID, prURL, github.LoginsToSlackIDs(ctx, []string{user.Login}))
+				id := github.LoginsToSlackIDs(ctx, []string{user.Login})
+				errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, id, nil))
 			}
 		case "unassigned":
 			msg := github.ReviewerMentions(ctx, "removed", "assignee", []github.User{*user})
@@ -214,12 +218,12 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 			msg := github.ReviewerMentions(ctx, "added", "reviewer", []github.User{*user})
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 			if !event.PullRequest.Draft {
-				err = errors.Join(err, activities.InviteUsersToChannel(ctx, channelID, prURL, ids))
+				errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, ids, nil))
 			}
 		case "review_request_removed":
 			msg := github.ReviewerMentions(ctx, "removed", "reviewer", []github.User{*user})
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
-			err = errors.Join(err, activities.KickUsersFromChannel(ctx, channelID, prURL, ids))
+			errs = append(errs, activities.KickUsersFromChannel(ctx, channelID, prURL, ids))
 		}
 	}
 
@@ -233,17 +237,17 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 			msg = fmt.Sprintf("%s <%s?preview=no|%s>.", msg, team.HTMLURL, team.Name)
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 			if !event.PullRequest.Draft {
-				err = errors.Join(err, activities.InviteUsersToChannel(ctx, channelID, prURL, ids))
+				errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, ids, nil))
 			}
 		case "review_request_removed":
 			msg := ":bust_in_silhouette: %s removed this team as reviewers: "
 			msg = fmt.Sprintf("%s <%s?preview=no|%s>.", msg, team.HTMLURL, team.Name)
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
-			err = errors.Join(err, activities.KickUsersFromChannel(ctx, channelID, prURL, ids))
+			errs = append(errs, activities.KickUsersFromChannel(ctx, channelID, prURL, ids))
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 // prEdited announces that the title or body of a PR was edited, or the base branch was changed.
