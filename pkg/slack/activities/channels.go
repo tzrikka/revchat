@@ -93,7 +93,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, partici
 
 	// But do invite followers of the PR author, without checking opt-in status (can't
 	// follow without being opted-in) and without adding them to the PR's attention state.
-	userIDs := append(participantIDs, followerIDs...)
+	userIDs := slices.Concat(participantIDs, followerIDs)
 	slices.Sort(userIDs)
 	userIDs = slices.Compact(userIDs)
 
