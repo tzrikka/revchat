@@ -239,7 +239,7 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 	switch event.Type {
 	case "approved":
 		msg += "approved this PR. :+1:"
-		err = data.RemoveReviewerFromTurns(ctx, prURL, email)
+		err = data.RemoveReviewerFromTurns(ctx, prURL, email, true)
 		// Don't abort - it's more important to announce this, even if our internal state is stale.
 
 	case "unapproved":

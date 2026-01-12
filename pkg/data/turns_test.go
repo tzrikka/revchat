@@ -159,7 +159,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = RemoveReviewerFromTurns(nil, url, "rev1")
+	err = RemoveReviewerFromTurns(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
@@ -172,7 +172,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = RemoveReviewerFromTurns(nil, url, "rev1") // Should be a no-op.
+	err = RemoveReviewerFromTurns(nil, url, "rev1", false) // Should be a no-op.
 	if err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
@@ -240,12 +240,15 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Nudge a non-reviewer.
-	ok, err := Nudge(nil, url, "non-reviewer")
+	ok, approved, err := Nudge(nil, url, "non-reviewer")
 	if err != nil {
 		t.Fatalf("Nudge() error = %v", err)
 	}
 	if ok {
-		t.Fatalf("Nudge() = %v, want %v", ok, false)
+		t.Fatalf("Nudge() ok = %v, want %v", ok, false)
+	}
+	if approved {
+		t.Fatalf("Nudge() approved = %v, want %v", approved, false)
 	}
 
 	// Rev1 reviews, author nudges rev2.
@@ -253,12 +256,15 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	ok, err = Nudge(nil, url, "rev2")
+	ok, approved, err = Nudge(nil, url, "rev2")
 	if err != nil {
 		t.Fatalf("Nudge() error = %v", err)
 	}
 	if !ok {
 		t.Fatalf("Nudge() = %v, want %v", ok, true)
+	}
+	if approved {
+		t.Fatalf("Nudge() approved = %v, want %v", approved, false)
 	}
 
 	got, err = GetCurrentTurn(nil, url)
@@ -284,12 +290,15 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	ok, err = Nudge(nil, url, "author")
+	ok, approved, err = Nudge(nil, url, "author")
 	if err != nil {
 		t.Fatalf("Nudge() error = %v", err)
 	}
 	if !ok {
 		t.Fatalf("Nudge() = %v, want %v", ok, true)
+	}
+	if approved {
+		t.Fatalf("Nudge() approved = %v, want %v", approved, false)
 	}
 
 	got, err = GetCurrentTurn(nil, url)
@@ -317,7 +326,7 @@ func TestNudge(t *testing.T) {
 
 	// Rev1 approves, and gets removed from the turn --> it's rev2's turn
 	// (not the author, because it's currently the turn of "all the remaining reviewers").
-	if err := RemoveReviewerFromTurns(nil, url, "rev1"); err != nil {
+	if err := RemoveReviewerFromTurns(nil, url, "rev1", true); err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
 
@@ -331,21 +340,27 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Can't nudge rev1 anymore (still a reviewer in Bitbucket, but not tracked by RevChat in this PR).
-	ok, err = Nudge(nil, url, "rev1")
+	ok, approved, err = Nudge(nil, url, "rev1")
 	if err != nil {
 		t.Fatalf("Nudge() error = %v", err)
 	}
 	if ok {
 		t.Fatalf("Nudge() = %v, want %v", ok, false)
 	}
+	if !approved {
+		t.Fatalf("Nudge() approved = %v, want %v", approved, true)
+	}
 
 	// Rev2 nudged the author after some offline discussion.
-	ok, err = Nudge(nil, url, "author")
+	ok, approved, err = Nudge(nil, url, "author")
 	if err != nil {
 		t.Fatalf("NudgeReviewer() error = %v", err)
 	}
 	if !ok {
 		t.Fatalf("NudgeReviewer() = %v, want %v", ok, true)
+	}
+	if approved {
+		t.Fatalf("NudgeReviewer() approved = %v, want %v", approved, false)
 	}
 
 	got, err = GetCurrentTurn(nil, url)

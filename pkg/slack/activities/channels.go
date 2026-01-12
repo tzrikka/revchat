@@ -140,7 +140,7 @@ func KickUsersFromChannel(ctx workflow.Context, channelID, prURL string, userIDs
 			}
 		}
 
-		if err := data.RemoveReviewerFromTurns(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
+		if err := data.RemoveReviewerFromTurns(ctx, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
 			errs = append(errs, err)
 		}
 	}

@@ -52,7 +52,8 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 			logger.From(ctx).Warn("Slack email lookup error - removing from turn",
 				slog.String("missing_email", email), slog.String("pr_url", prURL))
 
-			_ = data.RemoveReviewerFromTurns(ctx, prURL, email) // Example: user deactivated after being added to the PR.
+			// Example: user deactivated after being added to the PR.
+			_ = data.RemoveReviewerFromTurns(ctx, prURL, email, false)
 		}
 
 		return nil

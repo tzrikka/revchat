@@ -49,7 +49,7 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 	msg := "Thanks for letting me know!\n\n"
 
-	ok, err := data.Nudge(ctx, url, user.Email)
+	ok, _, err := data.Nudge(ctx, url, user.Email)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 	}

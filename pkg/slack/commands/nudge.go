@@ -79,17 +79,22 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 		return false
 	}
 
-	ok, err := data.Nudge(ctx, url, user.Email)
+	ok, approved, err := data.Nudge(ctx, url, user.Email)
 	if err != nil {
 		PostEphemeralError(ctx, event, fmt.Sprintf("internal data error while nudging <@%s>.", userID))
 		return ok // May be true despite the error: a valid reviewer, but failed to save it.
 	}
-	if !ok {
-		msg := fmt.Sprintf(":no_good: <@%s> is not a tracked participant in this PR.", userID)
-		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+	if ok {
+		return true
 	}
 
-	return ok
+	// Not a tracked participant in this PR - but why?
+	msg := fmt.Sprintf(":see_no_evil: <@%s> is not a tracked participant in this PR.", userID)
+	if approved {
+		msg = fmt.Sprintf(":+1: <@%s> already approved this PR.", userID)
+	}
+	_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+	return false
 }
 
 // https://github.com/tzrikka/timpani/tree/main/images/nudge

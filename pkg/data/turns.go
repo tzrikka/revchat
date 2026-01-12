@@ -21,6 +21,7 @@ import (
 type PRTurn struct {
 	Author    string          `json:"author"`    // Email address of the PR author.
 	Reviewers map[string]bool `json:"reviewers"` // Email address -> is it their turn?
+	Approvers map[string]bool `json:"approvers,omitempty"`
 
 	FrozenAt string `json:"frozen_at,omitempty"`
 	FrozenBy string `json:"frozen_by,omitempty"`
@@ -131,7 +132,7 @@ func GetCurrentTurn(ctx workflow.Context, url string) ([]string, error) {
 // This is used when that reviewer approves the PR, or is unassigned from the PR.
 // This function is idempotent: if the reviewer does not exist, it does nothing.
 // It also ignores empty or "bot" email addresses.
-func RemoveReviewerFromTurns(ctx workflow.Context, url, email string) error {
+func RemoveReviewerFromTurns(ctx workflow.Context, url, email string, approved bool) error {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
@@ -153,6 +154,9 @@ func RemoveReviewerFromTurns(ctx workflow.Context, url, email string) error {
 	}
 
 	delete(t.Reviewers, email)
+	if approved {
+		t.Approvers[email] = true
+	}
 
 	if err := writeTurnFile(ctx, url, t); err != nil {
 		logger.From(ctx).Error("failed to write PR attention state to remove reviewer",
@@ -270,12 +274,13 @@ func SwitchTurn(ctx workflow.Context, url, email string) error {
 }
 
 // Nudge records that a specific user has been nudged about a specific PR,
-// so it becomes their turn to pay attention to that PR if it wasn't already.
-// It returns true if the nudge is valid (the user is in the current turn list).
-func Nudge(ctx workflow.Context, url, email string) (bool, error) {
+// so it becomes their turn to pay attention to that PR if it wasn't already. The first
+// boolean return value indicates whether the nudge is valid (the user is tracked as a reviewer).
+// The second indicates if the user already approved the PR (in case the first value is false).
+func Nudge(ctx workflow.Context, url, email string) (ok, approved bool, err error) {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
-		return false, nil
+		return false, false, nil
 	}
 
 	mu := prTurnMutexes.Get(url)
@@ -286,7 +291,7 @@ func Nudge(ctx workflow.Context, url, email string) (bool, error) {
 	if err != nil {
 		logger.From(ctx).Error("failed to read PR attention state to nudge user",
 			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
-		return false, err
+		return false, false, err
 	}
 
 	isTheirTurn, foundInTurns := t.Reviewers[email]
@@ -295,14 +300,14 @@ func Nudge(ctx workflow.Context, url, email string) (bool, error) {
 		// For the sake of simplicity, we don't check the other implicit case here
 		// (at least one of the reviewers has a false attention state).
 		if len(t.Reviewers) == 0 || foundInTurns {
-			return true, nil // Valid nudge, but a no-op.
+			return true, false, nil // Valid nudge, but a no-op.
 		}
 	} else {
 		if !foundInTurns {
-			return false, nil // Invalid nudge.
+			return false, t.Approvers[email], nil // Invalid nudge.
 		}
 		if isTheirTurn {
-			return true, nil // Valid nudge, but a no-op.
+			return true, false, nil // Valid nudge, but a no-op.
 		}
 	}
 
@@ -312,10 +317,10 @@ func Nudge(ctx workflow.Context, url, email string) (bool, error) {
 	if err := writeTurnFile(ctx, url, t); err != nil {
 		logger.From(ctx).Error("failed to write PR attention state to nudge user",
 			slog.Any("error", err), slog.String("pr_url", url), slog.String("email", email))
-		return false, err
+		return false, false, err
 	}
 
-	return true, nil
+	return true, false, nil
 }
 
 // readTurnFile expects the caller to hold the appropriate mutex.
@@ -343,6 +348,9 @@ func readTurnFile(ctx workflow.Context, url string) (*PRTurn, error) {
 	}
 
 	normalizeEmailAddresses(t)
+	if t.Approvers == nil {
+		t.Approvers = make(map[string]bool)
+	}
 	return t, nil
 }
 
@@ -355,6 +363,13 @@ func normalizeEmailAddresses(t *PRTurn) {
 		}
 		t.Reviewers[strings.ToLower(reviewer)] = state
 		delete(t.Reviewers, reviewer)
+	}
+	for approver, state := range t.Approvers {
+		if strings.ToLower(approver) == approver {
+			continue
+		}
+		t.Approvers[strings.ToLower(approver)] = state
+		delete(t.Approvers, approver)
 	}
 }
 
@@ -381,6 +396,9 @@ func writeTurnFileActivity(_ context.Context, url string, t *PRTurn) error {
 	defer f.Close()
 
 	normalizeEmailAddresses(t)
+	if len(t.Approvers) == 0 {
+		t.Approvers = nil
+	}
 
 	e := json.NewEncoder(f)
 	e.SetIndent("", "  ")
