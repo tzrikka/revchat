@@ -45,7 +45,7 @@ func ReviewerMentions(ctx workflow.Context, action, role string, reviewers []Use
 	msg.WriteString(":")
 	for _, user := range reviewers {
 		if mention := users.GitHubIDToSlackRef(ctx, user.Login, user.HTMLURL, user.Type); mention != "" {
-			msg.WriteString(" " + mention)
+			msg.WriteString(", " + mention)
 		}
 	}
 

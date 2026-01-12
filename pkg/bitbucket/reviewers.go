@@ -87,7 +87,7 @@ func accountIDsToSlackMentions(ctx workflow.Context, accountIDs []string) string
 	var msg strings.Builder
 	for _, id := range accountIDs {
 		if mention := users.BitbucketIDToSlackRef(ctx, id, ""); mention != "" {
-			msg.WriteString(" " + mention)
+			msg.WriteString(", " + mention)
 		}
 	}
 	return msg.String()
