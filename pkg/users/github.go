@@ -51,15 +51,12 @@ func GitHubIDToSlackID(ctx workflow.Context, username string, checkOptIn bool) s
 
 // GitHubIDToSlackRef converts a GitHub user into a Slack user reference. This function returns
 // a GitHub profile link (in Slack markdown format) if the user is not found in Slack, or if
-// it's a GitHub team. It uses persistent data storage, or API calls as a fallback.
-func GitHubIDToSlackRef(ctx workflow.Context, username, url string) string {
-	// Exception: GitHub teams can only be mentioned by their GitHub name and link.
-	if strings.Contains(username, "/") {
-		return fmt.Sprintf("<%s?preview=no|@%s>", url, username)
-	}
-
-	if id := GitHubIDToSlackID(ctx, username, false); id != "" {
-		return fmt.Sprintf("<@%s>", id)
+// it's a GitHub bot/team. It uses persistent data storage, or API calls as a fallback.
+func GitHubIDToSlackRef(ctx workflow.Context, username, url, userType string) string {
+	if !strings.Contains(username, "/") && userType != "Bot" {
+		if id := GitHubIDToSlackID(ctx, username, false); id != "" {
+			return fmt.Sprintf("<@%s>", id)
+		}
 	}
 
 	// Fallback: if there's no Slack profile, linkify the GitHub user profile.
