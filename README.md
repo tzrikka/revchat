@@ -190,14 +190,14 @@ When one or more reviewers are added to a PR (when it's created or later), the t
 
 Reviewers of draft PRs:
 
-- When a PR is marked as a draft, the reviewers who were added **before** that remain in the Slack channel and their turns are still tracked in relation to the author.
-- However, reviewers who are added **while** a PR is in draft mode are not added to the Slack channel and to RevChat's turn tracking; they will be added only when the PR is marked as ready to review.
+- When a PR is marked as a draft, the reviewers who were added **before** that remain in the Slack channel and their turns are still tracked in relation to the author
+- However, reviewers who are added **while** a PR is in draft mode are not added to the Slack channel and to RevChat's turn tracking; they will be added only when the PR is marked as ready to review
 
 State transitions:
 
-- When a **reviewer** posts one or more new comments / replies / code suggestions, RevChat switches their turn back to the author.
+- When a **reviewer** posts one or more new comments / replies / code suggestions, RevChat switches their turn back to the author
 - This switch does not affect the turns of **other** reviewers, every author-reviewer pair has an isolated state, but...
-- When the **author** posts one or more new comments / replies / code suggestions, RevChat switches their turn back to all the tracked reviewers.
+- When the **author** posts one or more new comments / replies / code suggestions, RevChat switches their turn back to all the tracked reviewers
 
 However, an easier way for authors and reviewers to trigger state transitions without spamming the PR and the channel is with these slash commands **in the PR's Slack channel**:
 
@@ -209,8 +209,8 @@ Note that pushing commits and rebasing/retargeting branches has no effect on tur
 
 **Final state:** when a reviewer approves a PR, or is unassigned from it, RevChat stops tracking their turn and switches back to the author permanently.
 
-- When a reviewer is unassigned, they are also removed from the Slack channel.
-- When a reviewer approves the PR, they remain in the Slack channel (until they leave manually, or until the PR is closed and the channel is auto-archived).
+- When a reviewer is unassigned, they are also removed from the Slack channel
+- When a reviewer approves the PR, they remain in the Slack channel (until they leave manually, or until the PR is closed and the channel is auto-archived)
 
 ## End-User Onboarding
 
