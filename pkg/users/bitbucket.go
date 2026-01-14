@@ -91,7 +91,7 @@ func BitbucketIDToSlackRef(ctx workflow.Context, accountID, displayName string) 
 	}
 
 	// Fallback 2: display name from Bitbucket API.
-	apiUser, err := bitbucket.UsersGet(ctx, accountID, "")
+	apiUser, err := bitbucket.UsersGetByAccountID(ctx, accountID)
 	if err != nil {
 		logger.From(ctx).Error("failed to retrieve Bitbucket user info",
 			slog.Any("error", err), slog.String("account_id", accountID))

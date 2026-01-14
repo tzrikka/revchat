@@ -91,8 +91,8 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 	if event.Action == "reopened" {
 		msg = strings.Replace(msg, "created", "reopened", 1)
 	}
-	if pr.Body != nil && strings.TrimSpace(*pr.Body) != "" && *pr.Body != pr.Title {
-		msg += "\n\n" + markdown.GitHubToSlack(ctx, *pr.Body, pr.HTMLURL)
+	if body := strings.TrimSpace(pr.Body); body != "" && body != pr.Title {
+		msg += "\n\n" + markdown.GitHubToSlack(ctx, body, pr.HTMLURL)
 	}
 	github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
@@ -188,7 +188,7 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 		return nil
 	}
 
-	defer github.UpdateChannelBookmarks(ctx, event.PullRequest, channelID)
+	defer github.UpdateChannelBookmarks(ctx, &event.PullRequest, nil, channelID)
 
 	prURL := event.PullRequest.HTMLURL
 	var errs []error
@@ -259,7 +259,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 		return nil
 	}
 
-	defer github.UpdateChannelBookmarks(ctx, pr, channelID)
+	defer github.UpdateChannelBookmarks(ctx, &pr, nil, channelID)
 
 	// Title was changed.
 	var err error
@@ -276,8 +276,8 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 	// Description body was changed.
 	if event.Changes.Body != nil {
 		msg := ":pencil2: %s deleted the PR description."
-		if text := strings.TrimSpace(*pr.Body); text != "" {
-			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, pr.HTMLURL)
+		if body := strings.TrimSpace(pr.Body); body != "" {
+			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, body, pr.HTMLURL)
 		}
 		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 	}
@@ -302,7 +302,7 @@ func prSynchronized(ctx workflow.Context, event github.PullRequestEvent) error {
 		return nil
 	}
 
-	defer github.UpdateChannelBookmarks(ctx, event.PullRequest, channelID)
+	defer github.UpdateChannelBookmarks(ctx, &event.PullRequest, nil, channelID)
 
 	if event.After == nil {
 		logger.From(ctx).Warn("'after' field in GitHub PR synchronize event is nil")
