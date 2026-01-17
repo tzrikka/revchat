@@ -7,43 +7,43 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
+	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/activities"
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
-func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID string) error {
-	switch {
-	case c.BitbucketWorkspace != "":
-		return deleteMessageBitbucket(ctx, event, userID)
-	default:
-		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
-		return errors.New("neither Bitbucket nor GitHub are configured")
-	}
-}
-
-func deleteMessageBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
+func deleteMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
 	// Don't delete "tombstone" messages (roots of threads).
 	if event.PreviousMessage.Subtype == "tombstone" {
 		return nil
 	}
 
-	// Need to impersonate in Bitbucket the user who deleted the Slack message.
-	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
-	if err != nil || linkID == "" {
+	thrippyID, err := thrippyLinkID(ctx, userID, event.Channel)
+	if err != nil || thrippyID == "" {
 		return err
 	}
 
-	ids := fmt.Sprintf("%s/%s", event.Channel, event.DeletedTS)
+	slackIDs := fmt.Sprintf("%s/%s", event.Channel, event.DeletedTS)
 	if event.PreviousMessage.ThreadTS != "" && event.PreviousMessage.ThreadTS != event.DeletedTS {
-		ids = fmt.Sprintf("%s/%s/%s", event.Channel, event.PreviousMessage.ThreadTS, event.DeletedTS)
+		slackIDs = fmt.Sprintf("%s/%s/%s", event.Channel, event.PreviousMessage.ThreadTS, event.DeletedTS)
 	}
 
-	url, err := urlParts(ctx, ids)
+	url, err := urlParts(ctx, slackIDs)
 	if err != nil {
 		return err
 	}
 
-	data.DeleteURLAndIDMapping(ctx, url[0])
+	if isBitbucket {
+		return deleteMessageInBitbucket(ctx, thrippyID, url)
+	}
+	return deleteMessageInGitHub(ctx, thrippyID, url)
+}
 
-	return activities.DeletePullRequestComment(ctx, linkID, url[1], url[2], url[3], url[5])
+func deleteMessageInBitbucket(ctx workflow.Context, thrippyID string, url []string) error {
+	data.DeleteURLAndIDMapping(ctx, url[0])
+	return bitbucket.DeletePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7])
+}
+
+func deleteMessageInGitHub(ctx workflow.Context, _ string, _ []string) error {
+	logger.From(ctx).Error("delete Slack message in GitHub - not implemented yet")
+	return errors.New("delete Slack message in GitHub - not implemented yet")
 }

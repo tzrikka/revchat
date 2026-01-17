@@ -38,12 +38,10 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
 	_ = data.SwitchTurn(ctx, prURL, email)
 
-	// If the comment was created by RevChat, don't repost it. However, we still
-	// need to poll for updates (comment created in Slack, but edited in Bitbucket).
-	commentURL := bitbucket.HTMLURL(event.Comment.Links)
+	// If the comment was created by RevChat, i.e. mirrored from Slack, don't repost it.
+	// Also, don't poll Bitbucket for updates because we expect them to come from Slack.
 	if strings.HasSuffix(event.Comment.Content.Raw, "\n\n[This comment was created by RevChat]: #") {
 		logger.From(ctx).Debug("ignoring self-triggered Bitbucket event")
-		c.pollCommentForUpdates(ctx, event.Comment.User.AccountID, commentURL, event.Comment.Content.Raw)
 		return nil
 	}
 
@@ -52,6 +50,8 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	if event.Comment.Inline != nil {
 		msg, diff = bitbucket.BeautifyInlineComment(ctx, event.Comment, msg)
 	}
+
+	commentURL := bitbucket.HTMLURL(event.Comment.Links)
 
 	var err error
 	if event.Comment.Parent == nil {
@@ -85,6 +85,13 @@ func (c Config) CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	}
 
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
+
+	// If the comment was edited in Slack, don't try to update it there again there.
+	// Also, don't poll Bitbucket for updates because we expect them to come from Slack.
+	if strings.HasSuffix(event.Comment.Content.Raw, "\n\n[This comment was updated by RevChat]: #") {
+		logger.From(ctx).Debug("ignoring self-triggered Bitbucket event")
+		return nil
+	}
 
 	return c.updateCommentInWorkflow(ctx, event.Comment)
 }
@@ -186,9 +193,16 @@ func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 }
 
 const (
-	CommentPollingInterval = 10 * time.Second
 	CommentPollingWindow   = 10 * time.Minute
+	CommentPollingInterval = 11 * time.Second
+	CommentPollingJitter   = 4 * time.Second
 )
+
+type pollCommentRequest struct {
+	ThrippyID  string `json:"thrippy_id"`
+	CommentURL string `json:"comment_url"`
+	Checksum   string `json:"checksum"`
+}
 
 func checksum(s string) string {
 	h := sha256.New()
@@ -201,9 +215,10 @@ func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentUR
 	user := data.SelectUserByBitbucketID(ctx, accountID)
 
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
-		StartToCloseTimeout: CommentPollingInterval,
+		StartToCloseTimeout: CommentPollingInterval - CommentPollingJitter,
 	})
-	fut := workflow.ExecuteLocalActivity(ctx, c.setScheduleActivity, user.ThrippyLink, commentURL, checksum(rawText))
+	req := pollCommentRequest{ThrippyID: user.ThrippyLink, CommentURL: commentURL, Checksum: checksum(rawText)}
+	fut := workflow.ExecuteLocalActivity(ctx, c.setScheduleActivity, req)
 	_ = fut.Get(ctx, nil)
 }
 
@@ -213,7 +228,7 @@ func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentUR
 // [CommentPollingWindow], or until the comment is deleted.
 //
 // [10-minute window]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
-func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, checksum string) error {
+func (c Config) setScheduleActivity(ctx context.Context, req pollCommentRequest) error {
 	l := activity.GetLogger(ctx)
 	cli, err := client.Dial(c.Opts)
 	if err != nil {
@@ -225,17 +240,15 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 	// Common parameters for the schedule, whether we create or update it.
 	sched := &client.Schedule{
 		Action: &client.ScheduleWorkflowAction{
-			ID:        trimURLPrefix(commentURL),
+			ID:        trimURLPrefix(req.CommentURL),
 			Workflow:  Schedules[0],
-			Args:      []any{linkID, commentURL, checksum},
+			Args:      []any{req},
 			TaskQueue: c.TaskQueue,
 		},
 		Spec: &client.ScheduleSpec{
-			Intervals: []client.ScheduleIntervalSpec{
-				{Every: CommentPollingInterval - time.Second}, // See jitter comment below.
-			},
-			Jitter: 2 * time.Second, // Exactly 10s --> Approximately 9s + (0-2s jitter).
-			EndAt:  time.Now().UTC().Add(CommentPollingWindow).Add(5 * time.Second),
+			Intervals: []client.ScheduleIntervalSpec{{Every: CommentPollingInterval}},
+			Jitter:    CommentPollingJitter,
+			EndAt:     time.Now().UTC().Add(CommentPollingWindow).Add(CommentPollingInterval),
 		},
 		Policy: &client.SchedulePolicies{
 			Overlap:       enums.SCHEDULE_OVERLAP_POLICY_SKIP,
@@ -244,7 +257,7 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 	}
 
 	// Try to update an existing schedule first.
-	handle := cli.ScheduleClient().GetHandle(ctx, trimURLPrefix(commentURL))
+	handle := cli.ScheduleClient().GetHandle(ctx, trimURLPrefix(req.CommentURL))
 	if _, err := handle.Describe(ctx); err == nil {
 		err = handle.Update(ctx, client.ScheduleUpdateOptions{
 			DoUpdate: func(input client.ScheduleUpdateInput) (*client.ScheduleUpdate, error) {
@@ -253,14 +266,14 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 			},
 		})
 		if err == nil {
-			l.Info("restarted Bitbucket PR comment polling schedule", slog.String("comment_url", commentURL))
+			l.Info("restarted Bitbucket PR comment polling schedule", slog.String("comment_url", req.CommentURL))
 			return nil
 		}
 	}
 
 	// If updating failed (regardless of whether that schedule exists or not), create a new schedule.
 	_, err = cli.ScheduleClient().Create(ctx, client.ScheduleOptions{
-		ID:            trimURLPrefix(commentURL),
+		ID:            trimURLPrefix(req.CommentURL),
 		Spec:          *sched.Spec,
 		Action:        sched.Action,
 		Overlap:       sched.Policy.Overlap,
@@ -268,11 +281,11 @@ func (c Config) setScheduleActivity(ctx context.Context, linkID, commentURL, che
 	})
 	if err != nil {
 		l.Error("failed to create Bitbucket PR comment polling schedule",
-			slog.Any("error", err), slog.String("comment_url", commentURL))
+			slog.Any("error", err), slog.String("comment_url", req.CommentURL))
 		return err
 	}
 
-	l.Info("started new Bitbucket PR comment polling schedule", slog.String("comment_url", commentURL))
+	l.Info("started new Bitbucket PR comment polling schedule", slog.String("comment_url", req.CommentURL))
 	return nil
 }
 
@@ -288,21 +301,21 @@ func trimURLPrefix(commentURL string) string {
 // This workflow uses a checksum of the comment's text for privacy and efficiency reasons.
 //
 // [10-minute window]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
-func (c Config) PollCommentWorkflow(ctx workflow.Context, linkID, commentURL, oldChecksum string) error {
-	comment, err := bact.GetPullRequestComment(ctx, linkID, commentURL)
+func (c Config) PollCommentWorkflow(ctx workflow.Context, req pollCommentRequest) error {
+	comment, err := bact.GetPullRequestComment(ctx, req.ThrippyID, req.CommentURL)
 	if err != nil {
 		return err
 	}
 
 	if comment.Deleted {
-		logger.From(ctx).Info("Bitbucket PR comment deleted, stopping polling schedule", slog.String("comment_url", commentURL))
-		c.stopPollingComment(ctx, commentURL)
+		logger.From(ctx).Info("Bitbucket PR comment deleted, stopping polling schedule", slog.String("comment_url", req.CommentURL))
+		c.stopPollingComment(ctx, req.CommentURL)
 		return nil
 	}
 
-	if checksum(comment.Content.Raw) != oldChecksum {
+	if checksum(comment.Content.Raw) != req.Checksum {
 		logger.From(ctx).Info("Bitbucket PR comment text changed, updating Slack message and polling schedule",
-			slog.String("comment_url", commentURL))
+			slog.String("comment_url", req.CommentURL))
 		return c.updateCommentInWorkflow(ctx, comment)
 	}
 

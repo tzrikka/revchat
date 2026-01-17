@@ -13,10 +13,22 @@ import (
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
 )
 
+// urlPattern is a regular expression that supports PR and comment URLs in Bitbucket and GitHub:
+//  1. Hostname (e.g., "bitbucket.org", "github.com")
+//  2. Bitbucket workspace / GitHub owner
+//  3. Repository
+//  4. Partial PR path ("" in GitHub / "-requests" in Bitbucket)
+//  5. PR number
+//  6. Optional suffix for comments
+//  7. Numeric comment ID (if 6 isn't empty)
+var urlPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/pull(-requests)?/(\d+)(.+comment-(\d+))?`)
+
 // MessageWorkflow mirrors Slack message creation/editing/deletion events
 // as/in PR comments: https://docs.slack.dev/reference/events/message/
-func (c *Config) MessageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
-	if !isRevChatChannel(ctx, event.InnerEvent.Channel) {
+func MessageWorkflow(ctx workflow.Context, event messageEventWrapper) error {
+	// Instead of calling ![isRevChatChannel], because we also need the PR's URL below.
+	prURL, _ := data.SwitchURLAndID(ctx, event.InnerEvent.Channel)
+	if prURL == "" {
 		return nil
 	}
 
@@ -25,7 +37,6 @@ func (c *Config) MessageWorkflow(ctx workflow.Context, event messageEventWrapper
 		logger.From(ctx).Error("could not determine who triggered a Slack message event")
 		return errors.New("could not determine who triggered a Slack message event")
 	}
-
 	if selfTriggeredEvent(ctx, event.Authorizations, userID) {
 		return nil
 	}
@@ -38,13 +49,14 @@ func (c *Config) MessageWorkflow(ctx workflow.Context, event messageEventWrapper
 		return nil
 	}
 
+	isBitbucket := strings.HasPrefix(prURL, "https://bitbucket.org/")
 	switch subtype {
 	case "", "bot_message", "file_share", "thread_broadcast":
-		return c.createMessage(ctx, event.InnerEvent, userID)
+		return createMessage(ctx, event.InnerEvent, userID, isBitbucket)
 	case "message_changed":
-		return c.changeMessage(ctx, event.InnerEvent, userID)
+		return changeMessage(ctx, event.InnerEvent, userID, isBitbucket)
 	case "message_deleted":
-		return c.deleteMessage(ctx, event.InnerEvent, userID)
+		return deleteMessage(ctx, event.InnerEvent, userID, isBitbucket)
 	default:
 		return nil
 	}
@@ -83,7 +95,6 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 		logger.From(ctx).Error("failed to load Slack bot's user ID", slog.Any("error", err), slog.String("bot_id", botID))
 		return ""
 	}
-
 	if userID != "" {
 		return userID
 	}
@@ -103,10 +114,8 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 	return bot.UserID
 }
 
-var commentURLPattern = regexp.MustCompile(`^https://[^/]+/([^/]+)/([^/]+)/pull-requests/(\d+)(.+comment-(\d+))?`)
-
-const expectedSubmatches = 6
-
+// urlParts converts the given Slack ID(s) to the corresponding PR or comment
+// URL, and then extracts and returns its parts, based on [urlPattern].
 func urlParts(ctx workflow.Context, ids string) ([]string, error) {
 	url, err := data.SwitchURLAndID(ctx, ids)
 	if err != nil {
@@ -119,11 +128,11 @@ func urlParts(ctx workflow.Context, ids string) ([]string, error) {
 		return nil, errors.New("didn't find Slack message's PR comment URL")
 	}
 
-	parts := commentURLPattern.FindStringSubmatch(url)
-	if len(parts) != expectedSubmatches {
+	parts := urlPattern.FindStringSubmatch(url)
+	if len(parts) != 8 {
 		logger.From(ctx).Error("failed to parse Slack message's PR comment URL",
 			slog.String("slack_ids", ids), slog.String("comment_url", url))
-		return nil, errors.New("invalid Bitbucket PR comment URL: " + url)
+		return nil, errors.New("invalid PR comment URL: " + url)
 	}
 
 	return parts, nil

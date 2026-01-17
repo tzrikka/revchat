@@ -84,7 +84,7 @@ func RegisterWorkflows(ctx context.Context, cmd *cli.Command, w worker.Worker) {
 	w.RegisterWorkflowWithOptions(ChannelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[2]})
 	w.RegisterWorkflowWithOptions(MemberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[3]})
 	w.RegisterWorkflowWithOptions(MemberLeftWorkflow, workflow.RegisterOptions{Name: Signals[4]})
-	w.RegisterWorkflowWithOptions(c.MessageWorkflow, workflow.RegisterOptions{Name: Signals[5]})
+	w.RegisterWorkflowWithOptions(MessageWorkflow, workflow.RegisterOptions{Name: Signals[5]})
 	w.RegisterWorkflowWithOptions(ReactionAddedWorkflow, workflow.RegisterOptions{Name: Signals[6]})
 	w.RegisterWorkflowWithOptions(ReactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[7]})
 	w.RegisterWorkflowWithOptions(c.SlashCommandWorkflow, workflow.RegisterOptions{Name: Signals[8]})

@@ -1,64 +1,77 @@
 package workflows
 
 import (
-	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
+	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/activities"
 	"github.com/tzrikka/revchat/pkg/data"
+	github "github.com/tzrikka/revchat/pkg/github/activities"
 	"github.com/tzrikka/revchat/pkg/markdown"
 )
 
-func (c *Config) createMessage(ctx workflow.Context, event MessageEvent, userID string) error {
-	switch {
-	case c.BitbucketWorkspace != "":
-		return c.createMessageBitbucket(ctx, event, userID)
-	default:
-		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
-		return errors.New("neither Bitbucket nor GitHub are configured")
-	}
-}
-
-// createMessageBitbucket mirrors in Bitbucket the creation of a Slack message/reply.
-// Broadcast replies are treated as normal replies, not as new top-level messages.
-func (c *Config) createMessageBitbucket(ctx workflow.Context, event MessageEvent, userID string) error {
+// createMessageInBitbucket mirrors the creation of a Slack message/reply in Bitbucket or
+// GitHub. Broadcast replies are treated as normal replies, not as new top-level messages.
+func createMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
+	// Impersonating the user who posted the Slack message is not an option with bots.
 	if event.Subtype == "bot_message" {
-		return nil // Slack bot, not a real user.
+		return nil
 	}
 
-	// Need to impersonate in Bitbucket the user who posted the Slack message.
-	linkID, err := thrippyLinkID(ctx, userID, event.Channel)
-	if err != nil || linkID == "" {
+	thrippyID, err := thrippyLinkID(ctx, userID, event.Channel)
+	if err != nil || thrippyID == "" {
 		return err
 	}
 
-	ids := event.Channel
+	slackIDs := event.Channel
 	if event.ThreadTS != "" {
-		ids = fmt.Sprintf("%s/%s", event.Channel, event.ThreadTS)
+		slackIDs = fmt.Sprintf("%s/%s", event.Channel, event.ThreadTS)
 	}
 
-	url, err := urlParts(ctx, ids)
+	url, err := urlParts(ctx, slackIDs)
 	if err != nil {
 		return err
 	}
 
-	msg := markdown.SlackToBitbucket(ctx, event.Text) + c.fileLinks(ctx, event.Files)
+	if isBitbucket {
+		return createMessageInBitbucket(ctx, event, thrippyID, slackIDs, url)
+	}
+	return createMessageInGitHub(ctx, event, thrippyID, slackIDs, url)
+}
+
+func createMessageInBitbucket(ctx workflow.Context, event MessageEvent, thrippyID, slackIDs string, url []string) error {
+	msg := markdown.SlackToBitbucket(ctx, event.Text) + fileLinks(event.Files, true)
 	msg += "\n\n[This comment was created by RevChat]: #"
 
-	newCommentURL, err := activities.CreatePullRequestComment(ctx, linkID, url[1], url[2], url[3], url[5], msg)
+	newCommentURL, err := bitbucket.CreatePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7], msg)
 	if err != nil {
 		return err
 	}
 
-	_ = data.MapURLAndID(ctx, newCommentURL, fmt.Sprintf("%s/%s", ids, event.TS))
-	return nil
+	return data.MapURLAndID(ctx, newCommentURL, fmt.Sprintf("%s/%s", slackIDs, event.TS))
 }
 
-func (c *Config) fileLinks(ctx workflow.Context, files []File) string {
+func createMessageInGitHub(ctx workflow.Context, event MessageEvent, thrippyID, slackIDs string, url []string) error {
+	msg := markdown.SlackToGitHub(ctx, event.Text) + fileLinks(event.Files, false)
+	msg += "\n\n[This comment was created by RevChat]: #"
+
+	prID, err := strconv.Atoi(url[5])
+	if err != nil {
+		return fmt.Errorf("failed to parse PR number %q: %w", url[5], err)
+	}
+
+	newCommentURL, err := github.CreateIssueComment(ctx, thrippyID, url[2], url[3], prID, msg)
+	if err != nil {
+		return err
+	}
+
+	return data.MapURLAndID(ctx, newCommentURL, fmt.Sprintf("%s/%s", slackIDs, event.TS))
+}
+
+func fileLinks(files []File, isBitbucket bool) string {
 	if len(files) == 0 {
 		return ""
 	}
@@ -66,23 +79,14 @@ func (c *Config) fileLinks(ctx workflow.Context, files []File) string {
 	var sb strings.Builder
 	sb.WriteString("\n\nAttached files:\n")
 	for _, f := range files {
-		sb.WriteString(fmt.Sprintf("\n- :%s: [%s](%s)", c.fileTypeEmoji(ctx, f), f.Name, f.Permalink))
+		sb.WriteString(fmt.Sprintf("\n- :%s: [%s](%s)", fileTypeEmoji(f, isBitbucket), f.Name, f.Permalink))
 	}
+
 	return sb.String()
 }
 
-func (c *Config) fileTypeEmoji(ctx workflow.Context, f File) string {
-	switch {
-	case c.BitbucketWorkspace != "":
-		return fileTypeEmojiBitbucket(f)
-	default:
-		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
-		return "paperclip"
-	}
-}
-
 // https://docs.slack.dev/reference/objects/file-object/#types
-func fileTypeEmojiBitbucket(f File) string {
+func fileTypeEmoji(f File, isBitbucket bool) string {
 	switch strings.ToLower(f.FileType) {
 	// Multimedia.
 	case "aac", "m4a", "mp3", "ogg", "wav":
@@ -90,13 +94,19 @@ func fileTypeEmojiBitbucket(f File) string {
 	case "avi", "flv", "mkv", "mov", "mp4", "mpg", "ogv", "webm", "wmv":
 		return "clapper"
 	case "bmp", "dgraw", "eps", "odg", "odi", "psd", "svg", "tiff":
-		return "frame_photo" // This is "frame_with_picture" in Slack.
+		if isBitbucket {
+			return "frame_photo"
+		}
+		return "framed_picture"
 	case "gif", "jpg", "jpeg", "png", "webp":
 		return "camera"
 
 	// Documents.
 	case "text", "csv", "diff", "doc", "docx", "dotx", "gdoc", "json", "markdown", "odt", "rtf", "xml", "yaml":
-		return "pencil"
+		if isBitbucket {
+			return "pencil"
+		}
+		return "memo"
 	case "eml", "epub", "html", "latex", "mhtml", "pdf":
 		return "book"
 	case "gsheet", "ods", "xls", "xlsb", "xlsm", "xlsx", "xltx":
@@ -108,9 +118,12 @@ func fileTypeEmojiBitbucket(f File) string {
 
 	// Source code.
 	case "apk", "c", "csharp", "cpp", "css", "dockerfile", "go", "java", "javascript", "js", "kotlin", "lua":
-		return "robot" // This is "robot_face" in Slack.
+		fallthrough
 	case "powershell", "python", "rust", "sql", "shell":
-		return "robot" // This is "robot_face" in Slack.
+		if isBitbucket {
+			return "code"
+		}
+		return "robot_face"
 
 	// Everything else.
 	default:

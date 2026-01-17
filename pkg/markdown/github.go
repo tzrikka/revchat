@@ -100,3 +100,13 @@ func gitHubToSlackWhitespaces(text string) string {
 
 	return text
 }
+
+// SlackToGitHub converts Slack markdown text into GitHub markdown text.
+//
+// Based on:
+//   - https://docs.slack.dev/messaging/formatting-message-text/
+//   - https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
+//   - https://docs.slack.dev/messaging/formatting-message-text/
+func SlackToGitHub(_ workflow.Context, text string) string {
+	return text
+}
