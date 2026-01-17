@@ -39,7 +39,7 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 	pr, err = bitbucket.PullRequestsGet(ctx, user.ThrippyLink, workspace, repo, url[3])
 	if err != nil {
 		logger.From(ctx).Error("failed to get Bitbucket PR", slog.Any("error", err), slog.String("pr_url", url[0]),
-			slog.String("slack_user_id", event.UserID), slog.String("thrippy_link_id", user.ThrippyLink))
+			slog.String("slack_user_id", event.UserID), slog.String("thrippy_id", user.ThrippyLink))
 		PostEphemeralError(ctx, event, "failed to get current PR details from Bitbucket.")
 		return err
 	}
@@ -50,14 +50,14 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 	// Update the reviewers list in Bitbucket.
 	pr["reviewers"] = make([]map[string]any, len(reviewers))
 	for i, accountID := range reviewers {
-		pr["reviewers"].([]map[string]any)[i] = map[string]any{ //nolint:errcheck // Type assertion always succeeds.
+		pr["reviewers"].([]map[string]any)[i] = map[string]any{ //nolint:errcheck // Type conversion always succeeds.
 			"account_id": accountID,
 		}
 	}
 
 	if _, err := bitbucket.PullRequestsUpdate(ctx, user.ThrippyLink, workspace, repo, url[3], pr); err != nil {
 		logger.From(ctx).Error("failed to update Bitbucket PR", slog.Any("error", err), slog.String("pr_url", url[0]),
-			slog.String("slack_user_id", event.UserID), slog.String("thrippy_link_id", user.ThrippyLink))
+			slog.String("slack_user_id", event.UserID), slog.String("thrippy_id", user.ThrippyLink))
 		PostEphemeralError(ctx, event, "failed to update PR reviewers in Bitbucket.")
 		return err
 	}

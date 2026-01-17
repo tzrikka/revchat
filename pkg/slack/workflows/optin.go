@@ -55,7 +55,7 @@ func (c *Config) OptInSlashCommand(ctx workflow.Context, event commands.SlashCom
 }
 
 func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashCommandEvent, user data.User) error {
-	linkID, nonce, err := c.createThrippyLink(ctx)
+	thrippyID, nonce, err := c.createThrippyLink(ctx)
 	if err != nil {
 		logger.From(ctx).Error("failed to create Thrippy link for Slack user", slog.Any("error", err))
 		commands.PostEphemeralError(ctx, event, "internal authorization failure.")
@@ -63,16 +63,16 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashComman
 	}
 
 	msg := ":point_right: <https://%s/start?id=%s&nonce=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket."
-	msg = fmt.Sprintf(msg, c.ThrippyHTTPAddress, linkID, nonce)
+	msg = fmt.Sprintf(msg, c.ThrippyHTTPAddress, thrippyID, nonce)
 	if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg); err != nil {
 		logger.From(ctx).Error("failed to post ephemeral opt-in message in Slack", slog.Any("error", err))
-		_ = c.deleteThrippyLink(ctx, linkID)
+		_ = c.deleteThrippyLink(ctx, thrippyID)
 		return err
 	}
 
-	err = c.waitForThrippyLinkCreds(ctx, linkID)
+	err = c.waitForThrippyLinkCreds(ctx, thrippyID)
 	if err != nil {
-		_ = c.deleteThrippyLink(ctx, linkID)
+		_ = c.deleteThrippyLink(ctx, thrippyID)
 
 		if err.Error() == errLinkAuthzTimeout { // For some reason [errors.Is] doesn't work across Temporal?
 			logger.From(ctx).Warn("user did not complete Thrippy OAuth flow in time", slog.String("email", user.Email))
@@ -86,14 +86,14 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashComman
 		return err
 	}
 
-	if err := data.UpsertUser(ctx, user.Email, user.RealName, "", "", user.SlackID, linkID); err != nil {
+	if err := data.UpsertUser(ctx, user.Email, user.RealName, "", "", user.SlackID, thrippyID); err != nil {
 		commands.PostEphemeralError(ctx, event, "failed to write internal data about you.")
-		_ = c.deleteThrippyLink(ctx, linkID)
+		_ = c.deleteThrippyLink(ctx, thrippyID)
 		return err
 	}
 
 	if err := commands.SetReminder(ctx, event, DefaultReminderTime, true); err != nil {
-		_ = c.deleteThrippyLink(ctx, linkID)
+		_ = c.deleteThrippyLink(ctx, thrippyID)
 		return err
 	}
 
@@ -122,7 +122,7 @@ func (c *Config) OptOutSlashCommand(ctx workflow.Context, event commands.SlashCo
 
 	if err := c.deleteThrippyLink(ctx, user.ThrippyLink); err != nil {
 		logger.From(ctx).Error("failed to delete Thrippy link for opted-out user",
-			slog.Any("error", err), slog.String("link_id", user.ThrippyLink))
+			slog.Any("error", err), slog.String("thrippy_id", user.ThrippyLink))
 		// This is an internal error, it doesn't concern or affect the user.
 	}
 

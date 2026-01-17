@@ -165,7 +165,7 @@ func (c *Config) deleteThrippyLink(ctx workflow.Context, linkID string) error {
 
 	req := thrippypb.DeleteLinkRequest_builder{LinkId: proto.String(linkID)}.Build()
 	if _, err = client.DeleteLink(grpcCtx, req); err != nil {
-		logger.From(ctx).Error("failed to delete Thrippy link", slog.Any("error", err), slog.String("link_id", linkID))
+		logger.From(ctx).Error("failed to delete Thrippy link", slog.Any("error", err), slog.String("thrippy_id", linkID))
 		return err
 	}
 	return nil

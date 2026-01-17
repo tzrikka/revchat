@@ -32,7 +32,7 @@ func Approve(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace s
 
 	if err != nil {
 		logger.From(ctx).Error("failed to approve PR", slog.Any("error", err), slog.String("pr_url", url[0]),
-			slog.String("slack_user_id", event.UserID), slog.String("thrippy_link_id", user.ThrippyLink))
+			slog.String("slack_user_id", event.UserID), slog.String("thrippy_id", user.ThrippyLink))
 		PostEphemeralError(ctx, event, "failed to approve "+url[0])
 		return err
 	}
@@ -64,7 +64,7 @@ func Unapprove(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace
 
 	if err != nil {
 		logger.From(ctx).Error("failed to unapprove PR", slog.Any("error", err), slog.String("pr_url", url[0]),
-			slog.String("slack_user_id", event.UserID), slog.String("thrippy_link_id", user.ThrippyLink))
+			slog.String("slack_user_id", event.UserID), slog.String("thrippy_id", user.ThrippyLink))
 		PostEphemeralError(ctx, event, "failed to unapprove "+url[0])
 		return err
 	}

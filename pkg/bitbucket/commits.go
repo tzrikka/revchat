@@ -24,7 +24,7 @@ func Commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 	cs, err := bitbucket.PullRequestsListCommits(ctx, user.ThrippyLink, workspace, repo, event.PullRequest.ID)
 	if err != nil {
 		logger.From(ctx).Error("failed to list Bitbucket PR's commits", slog.Any("error", err),
-			slog.String("thrippy_link_id", user.ThrippyLink), slog.String("pr_url", HTMLURL(event.PullRequest.Links)))
+			slog.String("thrippy_id", user.ThrippyLink), slog.String("pr_url", HTMLURL(event.PullRequest.Links)))
 		return nil
 	}
 
