@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -196,6 +197,8 @@ const (
 	CommentPollingWindow   = 10 * time.Minute
 	CommentPollingInterval = 11 * time.Second
 	CommentPollingJitter   = 4 * time.Second
+
+	PollingCleanupTimeout = 5 * time.Minute
 )
 
 type pollCommentRequest struct {
@@ -295,7 +298,7 @@ func trimURLPrefix(commentURL string) string {
 
 // PollCommentWorkflow checks a specific PR comment to detect and mirror edits made within Bitbucket's
 // [10-minute silent window] after its creation or last update, instead of [CommentUpdatedWorkflow].
-// This workflow runs in a Temporal schedule, every [CommentPollingInterval] during
+// This workflow runs in a Temporal schedule, roughly every [CommentPollingInterval] during
 // [CommentPollingWindow], or until the comment is deleted.
 //
 // This workflow uses a checksum of the comment's text for privacy and efficiency reasons.
@@ -349,4 +352,57 @@ func (c Config) unsetScheduleActivity(ctx context.Context, commentURL string) er
 	}
 
 	return nil
+}
+
+// PollingCleanupWorkflow deletes obsolete (i.e. completed) PR comment polling
+// schedules. This workflow runs once an hour in a Temporal schedule.
+func (c Config) PollingCleanupWorkflow(ctx workflow.Context) error {
+	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
+		ScheduleToCloseTimeout: PollingCleanupTimeout,
+	})
+	return workflow.ExecuteLocalActivity(ctx, c.deleteSchedulesActivity).Get(ctx, nil)
+}
+
+func (c Config) deleteSchedulesActivity(ctx context.Context) error {
+	l := activity.GetLogger(ctx)
+	cli, err := client.Dial(c.Opts)
+	if err != nil {
+		l.Error("failed to dial Temporal", slog.Any("error", err))
+		return err
+	}
+	defer cli.Close()
+
+	schedules, err := cli.ScheduleClient().List(ctx, client.ScheduleListOptions{})
+	if err != nil {
+		l.Error("failed to list Bitbucket PR comment polling schedules", slog.Any("error", err))
+		return err
+	}
+
+	deleted := 0
+	now := time.Now().UTC()
+	var deleteErr error
+
+	for schedules.HasNext() {
+		sched, err := schedules.Next()
+		if err != nil {
+			l.Error("failed to get next Bitbucket PR comment polling schedule", slog.Any("error", err))
+			return errors.Join(deleteErr, err)
+		}
+		if sched.WorkflowType.Name != Schedules[0] || sched.Spec.EndAt.IsZero() || sched.Spec.EndAt.After(now) {
+			continue
+		}
+
+		if err := cli.ScheduleClient().GetHandle(ctx, sched.ID).Delete(ctx); err != nil {
+			l.Error("failed to delete obsolete Bitbucket PR comment polling schedule",
+				slog.Any("error", err), slog.String("schedule_id", sched.ID))
+			deleteErr = errors.Join(deleteErr, err)
+			continue
+		}
+		deleted++
+	}
+
+	if deleted > 0 {
+		l.Info("deleted obsolete Bitbucket PR comment polling schedules", slog.Int("count", deleted))
+	}
+	return deleteErr
 }

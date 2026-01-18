@@ -221,7 +221,7 @@ func CreateSchedule(ctx context.Context, c client.Client, taskQueue string) {
 		Spec: client.ScheduleSpec{
 			Calendars: []client.ScheduleCalendarSpec{
 				{
-					Minute:    []client.ScheduleRange{{Start: 0, End: 59, Step: 30}}, // Every 30 minutes.
+					Minute:    []client.ScheduleRange{{Start: 0, End: 30, Step: 30}}, // Every 30 minutes.
 					Hour:      []client.ScheduleRange{{Start: 0, End: 23}},
 					DayOfWeek: []client.ScheduleRange{{Start: 1, End: 5}}, // Monday to Friday.
 				},
@@ -234,7 +234,7 @@ func CreateSchedule(ctx context.Context, c client.Client, taskQueue string) {
 		},
 	})
 	if err != nil {
-		logger.FromContext(ctx).Warn("failed to initialize reminders schedule",
+		logger.FromContext(ctx).Warn("failed to initialize Slack reminders schedule",
 			slog.Any("error", err), slog.String("schedule_id", Schedules[0]))
 	}
 }

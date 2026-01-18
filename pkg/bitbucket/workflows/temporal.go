@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -90,6 +91,7 @@ var RepositorySignals = []string{
 // Temporal schedules (https://docs.temporal.io/develop/go/schedules).
 var Schedules = []string{
 	"bitbucket.schedules.poll_comment",
+	"bitbucket.schedules.polling_cleanup",
 }
 
 // RegisterPullRequestWorkflows maps event-handling workflow functions to [PullRequestSignals].
@@ -117,6 +119,7 @@ func RegisterPullRequestWorkflows(cmd *cli.Command, opts client.Options, taskQue
 
 	// Special case: scheduled workflows.
 	w.RegisterWorkflowWithOptions(c.PollCommentWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
+	w.RegisterWorkflowWithOptions(c.PollingCleanupWorkflow, workflow.RegisterOptions{Name: Schedules[1]})
 }
 
 // RegisterRepositoryWorkflows maps event-handling workflow functions to [RepositorySignals].
@@ -284,4 +287,30 @@ func repoChildWorkflowID(ctx workflow.Context, event *bitbucket.RepositoryEvent)
 		return id // This should never happen, but just in case: let Temporal use its own default.
 	}
 	return fmt.Sprintf("%s__%s", id, strconv.FormatInt(ts, 36))
+}
+
+// CreateSchedule starts a scheduled workflow that runs once an hour,
+// to delete obsolete (i.e. completed) PR comment polling schedules (which were started by
+// [Config.pollCommentForUpdates]) instead of waiting a week for the Temporal server to do it.
+func CreateSchedule(ctx context.Context, c client.Client, taskQueue string) {
+	_, err := c.ScheduleClient().Create(ctx, client.ScheduleOptions{
+		ID: Schedules[1],
+		Spec: client.ScheduleSpec{
+			Calendars: []client.ScheduleCalendarSpec{
+				{
+					Minute: []client.ScheduleRange{{Start: 45, End: 45}},
+					Hour:   []client.ScheduleRange{{Start: 0, End: 23}},
+				},
+			},
+			Jitter: 10 * time.Second,
+		},
+		Action: &client.ScheduleWorkflowAction{
+			Workflow:  Schedules[1],
+			TaskQueue: taskQueue,
+		},
+	})
+	if err != nil {
+		logger.FromContext(ctx).Warn("failed to initialize Bitbucket comment polling cleanup schedule",
+			slog.Any("error", err), slog.String("schedule_id", Schedules[1]))
+	}
 }

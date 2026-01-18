@@ -50,6 +50,7 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	github.RegisterWorkflows(cmd, w)
 	slack.RegisterWorkflows(ctx, cmd, w)
 
+	bitbucket.CreateSchedule(ctx, cli, taskQueue)
 	slack.CreateSchedule(ctx, cli, taskQueue)
 
 	cfg := new(Config)
