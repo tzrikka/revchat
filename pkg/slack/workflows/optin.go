@@ -1,7 +1,6 @@
 package workflows
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -19,6 +18,11 @@ const (
 	DefaultReminderTime = "8:00AM"
 )
 
+// OptInSlashCommand directs the user to authorize RevChat to act on their behalf in the configured SCM (Bitbucket
+// or GitHub) using an OAuth 2.0 3-legged flow, and saves or updates their details in RevChat's user database.
+//
+// This function is in the "workflows" package instead of "commands" because it requires the
+// Thrippy details in [Config], and starts a child workflow to wait for the OAuth flow to complete.
 func (c *Config) OptInSlashCommand(ctx workflow.Context, event commands.SlashCommandEvent) error {
 	user, optedIn, err := commands.UserDetails(ctx, event, event.UserID)
 	if err != nil {
@@ -44,17 +48,11 @@ func (c *Config) OptInSlashCommand(ctx workflow.Context, event commands.SlashCom
 		user.Email = "bot"
 	}
 
-	switch {
-	case c.BitbucketWorkspace != "":
-		return c.optInBitbucket(ctx, event, user)
-	default:
-		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
-		commands.PostEphemeralError(ctx, event, "internal configuration error.")
-		return errors.New("neither Bitbucket nor GitHub are configured")
+	scm := "GitHub"
+	if c.BitbucketWorkspace != "" {
+		scm = "Bitbucket"
 	}
-}
 
-func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashCommandEvent, user data.User) error {
 	thrippyID, nonce, err := c.createThrippyLink(ctx)
 	if err != nil {
 		logger.From(ctx).Error("failed to create Thrippy link for Slack user", slog.Any("error", err))
@@ -62,8 +60,8 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashComman
 		return err
 	}
 
-	msg := ":point_right: <https://%s/start?id=%s&nonce=%s|Click here> to authorize RevChat to act on your behalf in Bitbucket."
-	msg = fmt.Sprintf(msg, c.ThrippyHTTPAddress, thrippyID, nonce)
+	msg := ":point_right: <https://%s/start?id=%s&nonce=%s|Click here> to authorize RevChat to act on your behalf in %s."
+	msg = fmt.Sprintf(msg, c.ThrippyHTTPAddress, thrippyID, nonce, scm)
 	if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg); err != nil {
 		logger.From(ctx).Error("failed to post ephemeral opt-in message in Slack", slog.Any("error", err))
 		_ = c.deleteThrippyLink(ctx, thrippyID)
@@ -76,13 +74,12 @@ func (c *Config) optInBitbucket(ctx workflow.Context, event commands.SlashComman
 
 		if err.Error() == errLinkAuthzTimeout { // For some reason [errors.Is] doesn't work across Temporal?
 			logger.From(ctx).Warn("user did not complete Thrippy OAuth flow in time", slog.String("email", user.Email))
-			commands.PostEphemeralError(ctx, event, "Bitbucket authorization timed out - please try opting in again.")
+			commands.PostEphemeralError(ctx, event, scm+" authorization timed out - please try opting in again.")
 			return nil // Not a server error as far as we're concerned.
 		}
 
-		logger.From(ctx).Error("failed to authorize Bitbucket user",
-			slog.Any("error", err), slog.String("email", user.Email))
-		commands.PostEphemeralError(ctx, event, "failed to authorize you in Bitbucket.")
+		logger.From(ctx).Error("failed to authorize user", slog.Any("error", err), slog.String("email", user.Email))
+		commands.PostEphemeralError(ctx, event, fmt.Sprintf("failed to authorize you in %s.", scm))
 		return err
 	}
 
