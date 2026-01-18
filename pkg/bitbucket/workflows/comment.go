@@ -64,7 +64,7 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 
 	// If the comment posting failed, there's no point in polling for updates (but don't ignore that error).
 	if err == nil {
-		c.pollCommentForUpdates(ctx, event.Comment.User.AccountID, commentURL, event.Comment.Content.Raw)
+		err = c.pollCommentForUpdates(ctx, event.Comment.User.AccountID, commentURL, event.Comment.Content.Raw)
 	}
 	return err
 }
@@ -131,10 +131,10 @@ func (c Config) updateCommentInWorkflow(ctx workflow.Context, comment *bitbucket
 		msg = strings.Replace(bitbucket.ImpersonationToMention(buf.String()), "%s", bitbucket.SlackDisplayName(ctx, comment.User), 1)
 	}
 
-	// Unlike comment creation, even if mirroring this update in Slack fails, we still need to poll for updates.
-	c.pollCommentForUpdates(ctx, comment.User.AccountID, commentURL, comment.Content.Raw)
+	err := bitbucket.EditSlackMsg(ctx, commentURL, msg)
 
-	return bitbucket.EditSlackMsg(ctx, commentURL, msg)
+	// Unlike comment creation, even if mirroring this update in Slack fails, we still need to poll for updates.
+	return errors.Join(err, c.pollCommentForUpdates(ctx, comment.User.AccountID, commentURL, comment.Content.Raw))
 }
 
 // CommentDeletedWorkflow mirrors the deletion of a PR comment in the PR's Slack channel:
@@ -150,13 +150,12 @@ func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	commentURL := bitbucket.HTMLURL(event.Comment.Links)
-	defer c.stopPollingComment(ctx, commentURL)
-
 	if fileID, _ := data.SwitchURLAndID(ctx, commentURL+"/slack_file_id"); fileID != "" {
 		sact.DeleteFile(ctx, fileID)
 	}
 
-	return bitbucket.DeleteSlackMsg(ctx, commentURL)
+	err := bitbucket.DeleteSlackMsg(ctx, commentURL)
+	return errors.Join(err, c.stopPollingComment(ctx, commentURL))
 }
 
 // CommentResolvedWorkflow mirrors the resolution of a PR comment in the PR's Slack channel:
@@ -214,7 +213,7 @@ func checksum(s string) string {
 }
 
 // pollCommentForUpdates is a convenience wrapper for [setScheduleActivity].
-func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentURL, rawText string) {
+func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentURL, rawText string) error {
 	user := data.SelectUserByBitbucketID(ctx, accountID)
 
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
@@ -222,7 +221,7 @@ func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentUR
 	})
 	req := pollCommentRequest{ThrippyID: user.ThrippyLink, CommentURL: commentURL, Checksum: checksum(rawText)}
 	fut := workflow.ExecuteLocalActivity(ctx, c.setScheduleActivity, req)
-	_ = fut.Get(ctx, nil)
+	return fut.Get(ctx, nil)
 }
 
 // setScheduleActivity is a Temporal local activity that creates or updates a Temporal schedule to poll
@@ -326,11 +325,11 @@ func (c Config) PollCommentWorkflow(ctx workflow.Context, req pollCommentRequest
 }
 
 // stopPollingComment is a convenience wrapper for [unsetScheduleActivity].
-func (c Config) stopPollingComment(ctx workflow.Context, commentURL string) {
+func (c Config) stopPollingComment(ctx workflow.Context, commentURL string) error {
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		StartToCloseTimeout: CommentPollingInterval,
 	})
-	_ = workflow.ExecuteLocalActivity(ctx, c.unsetScheduleActivity, commentURL).Get(ctx, nil)
+	return workflow.ExecuteLocalActivity(ctx, c.unsetScheduleActivity, commentURL).Get(ctx, nil)
 }
 
 func (c Config) unsetScheduleActivity(ctx context.Context, commentURL string) error {
@@ -354,8 +353,9 @@ func (c Config) unsetScheduleActivity(ctx context.Context, commentURL string) er
 	return nil
 }
 
-// PollingCleanupWorkflow deletes obsolete (i.e. completed) PR comment polling
-// schedules. This workflow runs once an hour in a Temporal schedule.
+// PollingCleanupWorkflow deletes obsolete (i.e. completed) PR comment
+// polling schedules. This workflow runs once an hour in a Temporal
+// schedule, and is a trivial wrapper for [deleteSchedulesActivity].
 func (c Config) PollingCleanupWorkflow(ctx workflow.Context) error {
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: PollingCleanupTimeout,
