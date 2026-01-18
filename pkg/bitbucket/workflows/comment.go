@@ -200,7 +200,8 @@ const (
 	PollingCleanupTimeout = 5 * time.Minute
 )
 
-type pollCommentRequest struct {
+// PollCommentRequest is the input to [Config.PollCommentWorkflow].
+type PollCommentRequest struct {
 	ThrippyID  string `json:"thrippy_id"`
 	CommentURL string `json:"comment_url"`
 	Checksum   string `json:"checksum"`
@@ -219,7 +220,7 @@ func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentUR
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		StartToCloseTimeout: CommentPollingInterval - CommentPollingJitter,
 	})
-	req := pollCommentRequest{ThrippyID: user.ThrippyLink, CommentURL: commentURL, Checksum: checksum(rawText)}
+	req := PollCommentRequest{ThrippyID: user.ThrippyLink, CommentURL: commentURL, Checksum: checksum(rawText)}
 	fut := workflow.ExecuteLocalActivity(ctx, c.setScheduleActivity, req)
 	return fut.Get(ctx, nil)
 }
@@ -230,7 +231,7 @@ func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentUR
 // [CommentPollingWindow], or until the comment is deleted.
 //
 // [10-minute window]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
-func (c Config) setScheduleActivity(ctx context.Context, req pollCommentRequest) error {
+func (c Config) setScheduleActivity(ctx context.Context, req PollCommentRequest) error {
 	l := activity.GetLogger(ctx)
 	cli, err := client.Dial(c.Opts)
 	if err != nil {
@@ -303,7 +304,7 @@ func trimURLPrefix(commentURL string) string {
 // This workflow uses a checksum of the comment's text for privacy and efficiency reasons.
 //
 // [10-minute window]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
-func (c Config) PollCommentWorkflow(ctx workflow.Context, req pollCommentRequest) error {
+func (c Config) PollCommentWorkflow(ctx workflow.Context, req PollCommentRequest) error {
 	comment, err := bact.GetPullRequestComment(ctx, req.ThrippyID, req.CommentURL)
 	if err != nil {
 		return err
