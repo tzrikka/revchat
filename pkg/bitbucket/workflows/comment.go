@@ -312,8 +312,7 @@ func (c Config) PollCommentWorkflow(ctx workflow.Context, req PollCommentRequest
 
 	if comment.Deleted {
 		logger.From(ctx).Info("Bitbucket PR comment deleted, stopping polling schedule", slog.String("comment_url", req.CommentURL))
-		c.stopPollingComment(ctx, req.CommentURL)
-		return nil
+		return c.stopPollingComment(ctx, req.CommentURL)
 	}
 
 	if checksum(comment.Content.Raw) != req.Checksum {
