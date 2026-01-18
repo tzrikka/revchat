@@ -53,6 +53,9 @@ func UpdateChannelBookmarks(ctx workflow.Context, pr PullRequest, prURL, channel
 
 	newTitles := newBookmarkTitles(pr, len(data.ReadBitbucketDiffstatPaths(prURL)))
 	for i, b := range bookmarks {
+		if i >= len(newTitles) {
+			break
+		}
 		if t := newTitles[i]; t != "" && t != b.Title {
 			if err := slack.BookmarksEditTitle(ctx, channelID, b.ID, t); err != nil {
 				logger.From(ctx).Error("failed to update Slack channel bookmark", slog.Any("error", err), slog.String("title", t))
