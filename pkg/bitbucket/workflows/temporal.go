@@ -298,7 +298,7 @@ func CreateSchedule(ctx context.Context, c client.Client, taskQueue string) {
 		Spec: client.ScheduleSpec{
 			Calendars: []client.ScheduleCalendarSpec{
 				{
-					Minute: []client.ScheduleRange{{Start: 45, End: 45}},
+					Minute: []client.ScheduleRange{{Start: 15, End: 45, Step: 30}}, // Every 30 minutes.
 					Hour:   []client.ScheduleRange{{Start: 0, End: 23}},
 				},
 			},
