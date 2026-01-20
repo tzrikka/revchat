@@ -26,27 +26,26 @@ func createMessage(ctx workflow.Context, event MessageEvent, userID string, isBi
 		return err
 	}
 
+	// Start with the Slack ID(s) of the message's "parent": the channel's PR, or a thread's root comment.
 	slackIDs := event.Channel
 	if event.ThreadTS != "" {
-		slackIDs = fmt.Sprintf("%s/%s", event.Channel, event.ThreadTS)
+		slackIDs = fmt.Sprintf("%s/%s", slackIDs, event.ThreadTS)
 	}
 
-	url, err := urlParts(ctx, slackIDs)
+	parentURL, err := urlParts(ctx, slackIDs)
 	if err != nil {
 		return err
 	}
 
-	if isBitbucket {
-		return createMessageInBitbucket(ctx, event, thrippyID, slackIDs, url)
+	var newCommentURL string
+	switch {
+	case isBitbucket:
+		newCommentURL, err = createCommentInBitbucket(ctx, event, thrippyID, parentURL)
+	case event.ThreadTS == "":
+		newCommentURL, err = createReviewInGitHub(ctx, event, thrippyID, parentURL)
+	default:
+		newCommentURL, err = createReplyInGitHub(ctx, event, thrippyID, parentURL)
 	}
-	return createMessageInGitHub(ctx, event, thrippyID, slackIDs, url)
-}
-
-func createMessageInBitbucket(ctx workflow.Context, event MessageEvent, thrippyID, slackIDs string, url []string) error {
-	msg := markdown.SlackToBitbucket(ctx, event.Text) + fileLinks(event.Files, true)
-	msg += "\n\n[This comment was created by RevChat]: #"
-
-	newCommentURL, err := bitbucket.CreatePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7], msg)
 	if err != nil {
 		return err
 	}
@@ -54,21 +53,40 @@ func createMessageInBitbucket(ctx workflow.Context, event MessageEvent, thrippyI
 	return data.MapURLAndID(ctx, newCommentURL, fmt.Sprintf("%s/%s", slackIDs, event.TS))
 }
 
-func createMessageInGitHub(ctx workflow.Context, event MessageEvent, thrippyID, slackIDs string, url []string) error {
+func createCommentInBitbucket(ctx workflow.Context, event MessageEvent, thrippyID string, url []string) (string, error) {
+	msg := markdown.SlackToBitbucket(ctx, event.Text) + fileLinks(event.Files, true)
+	msg += "\n\n[This comment was created by RevChat]: #"
+
+	return bitbucket.CreatePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7], msg)
+}
+
+func createReviewInGitHub(ctx workflow.Context, event MessageEvent, thrippyID string, url []string) (string, error) {
 	msg := markdown.SlackToGitHub(ctx, event.Text) + fileLinks(event.Files, false)
 	msg += "\n\n[This comment was created by RevChat]: #"
 
 	prID, err := strconv.Atoi(url[5])
 	if err != nil {
-		return fmt.Errorf("failed to parse PR number %q: %w", url[5], err)
+		return "", fmt.Errorf("failed to parse PR number %q: %w", url[5], err)
 	}
 
-	newCommentURL, err := github.CreateIssueComment(ctx, thrippyID, url[2], url[3], prID, msg)
+	return github.CreateFileReviewComment(ctx, thrippyID, url[2], url[3], prID, msg)
+}
+
+func createReplyInGitHub(ctx workflow.Context, event MessageEvent, thrippyID string, url []string) (string, error) {
+	msg := markdown.SlackToGitHub(ctx, event.Text) + fileLinks(event.Files, false)
+	msg += "\n\n[This comment was created by RevChat]: #"
+
+	prID, err := strconv.Atoi(url[5])
 	if err != nil {
-		return err
+		return "", fmt.Errorf("failed to parse PR number %q: %w", url[5], err)
 	}
 
-	return data.MapURLAndID(ctx, newCommentURL, fmt.Sprintf("%s/%s", slackIDs, event.TS))
+	commentID, err := strconv.Atoi(url[7])
+	if err != nil {
+		return "", fmt.Errorf("failed to parse comment ID %q: %w", url[7], err)
+	}
+
+	return github.CreateReviewCommentReply(ctx, thrippyID, url[2], url[3], prID, commentID, msg)
 }
 
 func fileLinks(files []File, isBitbucket bool) string {

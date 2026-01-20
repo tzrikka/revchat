@@ -1,16 +1,16 @@
 module github.com/tzrikka/revchat
 
-go 1.25.5
+go 1.25.6
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/lmittmann/tint v1.1.2
 	github.com/tzrikka/thrippy-api v1.5.0
-	github.com/tzrikka/timpani-api v1.10.0
+	github.com/tzrikka/timpani-api v1.12.0
 	github.com/tzrikka/xdg v1.4.0
 	github.com/urfave/cli-altsrc/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.6.1
+	github.com/urfave/cli/v3 v3.6.2
 	go.temporal.io/api v1.60.0
 	go.temporal.io/sdk v1.39.0
 	google.golang.org/grpc v1.78.0
@@ -34,8 +34,8 @@ require (
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260112192933-99fd39fd28a9 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260112192933-99fd39fd28a9 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260114163908-3f89685c29c3 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260114163908-3f89685c29c3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

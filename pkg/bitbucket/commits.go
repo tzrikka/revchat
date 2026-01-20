@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -21,7 +22,7 @@ func Commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 
 	user := data.SelectUserByBitbucketID(ctx, event.Actor.AccountID)
 
-	cs, err := bitbucket.PullRequestsListCommits(ctx, user.ThrippyLink, workspace, repo, event.PullRequest.ID)
+	cs, err := bitbucket.PullRequestsListCommits(ctx, user.ThrippyLink, workspace, repo, strconv.Itoa(event.PullRequest.ID))
 	if err != nil {
 		logger.From(ctx).Error("failed to list Bitbucket PR's commits", slog.Any("error", err),
 			slog.String("thrippy_id", user.ThrippyLink), slog.String("pr_url", HTMLURL(event.PullRequest.Links)))

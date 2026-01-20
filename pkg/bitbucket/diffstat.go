@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -21,7 +22,7 @@ func Diffstat(ctx workflow.Context, event PullRequestEvent) []bitbucket.Diffstat
 
 	user := data.SelectUserByBitbucketID(ctx, event.Actor.AccountID)
 
-	ds, err := bitbucket.PullRequestsDiffstat(ctx, user.ThrippyLink, workspace, repo, event.PullRequest.ID)
+	ds, err := bitbucket.PullRequestsDiffstat(ctx, user.ThrippyLink, workspace, repo, strconv.Itoa(event.PullRequest.ID))
 	if err != nil {
 		logger.From(ctx).Error("failed to get Bitbucket PR diffstat", slog.Any("error", err),
 			slog.String("thrippy_id", user.ThrippyLink), slog.String("pr_url", HTMLURL(event.PullRequest.Links)))

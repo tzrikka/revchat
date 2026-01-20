@@ -15,7 +15,7 @@ func CreateIssueComment(ctx workflow.Context, thrippyID, owner, repo string, iss
 		return "", errors.New("missing user authentication credentials")
 	}
 
-	resp, err := github.IssuesCommentsCreate(ctx, thrippyID, owner, repo, msg, issue)
+	resp, err := github.IssuesCommentsCreate(ctx, thrippyID, owner, repo, issue, msg)
 	if err != nil {
 		logger.From(ctx).Error("failed to create GitHub issue comment", slog.Any("error", err),
 			slog.String("thrippy_id", thrippyID), slog.String("owner", owner),

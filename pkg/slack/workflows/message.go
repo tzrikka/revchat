@@ -21,7 +21,7 @@ import (
 //  5. PR number
 //  6. Optional suffix for comments
 //  7. Numeric comment ID (if 6 isn't empty)
-var urlPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/pull(-requests)?/(\d+)(.+comment-(\d+))?`)
+var urlPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/pull(-requests)?/(\d+)(\D+(\d+))?`)
 
 // MessageWorkflow mirrors Slack message creation/editing/deletion events
 // as/in PR comments: https://docs.slack.dev/reference/events/message/
