@@ -1,5 +1,7 @@
 # Thrippy
 
+[Thrippy](https://github.com/tzrikka/thrippy) is a microservice that manages secrets & OAuth tokens for a variety of third-party services.
+
 ## Simplest Setup Procedure
 
 1. Download the latest Thrippy CLI for your platform: <https://github.com/tzrikka/thrippy/releases>

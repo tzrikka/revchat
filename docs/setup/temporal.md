@@ -1,5 +1,7 @@
 # Temporal
 
+[Temporal](https://temporal.io/) is an open-source platform for building reliable applications.
+
 RevChat depends on a [custom Temporal search attribute](https://docs.temporal.io/search-attribute#custom-search-attribute):
 
 - Name: `WaitingForSignals`

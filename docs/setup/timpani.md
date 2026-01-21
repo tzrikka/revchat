@@ -1,5 +1,7 @@
 # Timpani
 
+[Timpani](https://github.com/tzrikka/timpani) is a Temporal worker that sends API calls and receives asynchronous event notifications to/from a variety well-known third-party services, on behalf of other Temporal workflows.
+
 > [!IMPORTANT]
 > [Temporal](./temporal.md) and [Thrippy](./thrippy.m) are prerequisites for this section!
 
