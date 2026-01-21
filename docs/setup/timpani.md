@@ -1,7 +1,7 @@
 # Timpani
 
-> [!NOTE]
-> This section depends on the [Temporal](./temporal.md) and [Thrippy](./thrippy.m) sections
+> [!IMPORTANT]
+> [Temporal](./temporal.md) and [Thrippy](./thrippy.m) are prerequisites for this section!
 
 ## Simplest Setup Procedure
 

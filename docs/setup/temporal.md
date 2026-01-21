@@ -29,7 +29,7 @@ temporal operator search-attribute create --name WaitingForSignals --type Keywor
    temporal server start-dev --db-filename ~/sqlite.db --search-attribute WaitingForSignals=KeywordList
    ```
 
-   (Without the `--db-filename` argument, the server will you a temporary in-memory database)
+   (Note: without the `--db-filename` argument, the server will use a temporary in-memory database)
 
 4. Verification: see the dev server's web UI here: <http://localhost:8233/>
 
