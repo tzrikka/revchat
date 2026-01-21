@@ -57,10 +57,10 @@ func ReviewerMentions(ctx workflow.Context, added, removed []string) string {
 	case 0:
 		// Do nothing.
 	case 1:
-		msg.WriteString("added this reviewer:")
+		msg.WriteString("added this reviewer: ")
 		msg.WriteString(accountIDsToSlackMentions(ctx, added))
 	default:
-		msg.WriteString("added these reviewers:")
+		msg.WriteString("added these reviewers: ")
 		msg.WriteString(accountIDsToSlackMentions(ctx, added))
 	}
 
@@ -72,10 +72,10 @@ func ReviewerMentions(ctx workflow.Context, added, removed []string) string {
 	case 0:
 		// Do nothing.
 	case 1:
-		msg.WriteString("removed this reviewer:")
+		msg.WriteString("removed this reviewer: ")
 		msg.WriteString(accountIDsToSlackMentions(ctx, removed))
 	default:
-		msg.WriteString("removed these reviewers:")
+		msg.WriteString("removed these reviewers: ")
 		msg.WriteString(accountIDsToSlackMentions(ctx, removed))
 	}
 
@@ -85,9 +85,12 @@ func ReviewerMentions(ctx workflow.Context, added, removed []string) string {
 
 func accountIDsToSlackMentions(ctx workflow.Context, accountIDs []string) string {
 	var msg strings.Builder
-	for _, id := range accountIDs {
+	for i, id := range accountIDs {
 		if mention := users.BitbucketIDToSlackRef(ctx, id, ""); mention != "" {
-			msg.WriteString(", " + mention)
+			if i > 0 {
+				msg.WriteString(", ")
+			}
+			msg.WriteString(mention)
 		}
 	}
 	return msg.String()
