@@ -5,10 +5,36 @@ RevChat depends on a [custom Temporal search attribute](https://docs.temporal.io
 - Name: `WaitingForSignals`
 - Type: `KeywordList`
 
-Instructions to create it in your Temporal server: <https://docs.temporal.io/self-hosted-guide/visibility#create-custom-search-attributes>
+Instructions to create it: <https://docs.temporal.io/self-hosted-guide/visibility#create-custom-search-attributes>
 
-For example, to create it in a self-hosted server, run this command:
+Example command line:
 
 ```shell
 temporal operator search-attribute create --name WaitingForSignals --type KeywordList
 ```
+
+## Simplest Setup Procedure
+
+1. Download and install the latest Temporal CLI for your platform: <https://temporal.io/setup/install-temporal-cli>
+
+2. Verification:
+
+   ```shell
+   temporal -v
+   ```
+
+3. Start a dev server with a persistent SQLite database and the necessary search attribute:
+
+   ```shell
+   temporal server start-dev --db-filename ~/sqlite.db --search-attribute WaitingForSignals=KeywordList
+   ```
+
+   (Without the `--db-filename` argument, the server will you a temporary in-memory database)
+
+4. Verification: see the dev server's web UI here: <http://localhost:8233/>
+
+## Production Deployment
+
+- Self hosted: <https://docs.temporal.io/self-hosted-guide>
+
+- Temporal Cloud: <https://docs.temporal.io/cloud/overview>
