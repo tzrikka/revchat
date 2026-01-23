@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -164,30 +163,31 @@ func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak 
 	msg.WriteString("I think it's")
 	msg.WriteString(tweak)
 
-	comma := false
-	if i > -1 {
-		msg.WriteString(" *your* turn")
+	if i == -1 {
+		msg.WriteString(" the turn of ")
+	} else {
 		emails = slices.Delete(emails, i, i+1)
+		msg.WriteString(" *your* turn")
 		if len(emails) > 0 {
 			msg.WriteString(", along with")
-			comma = true
 		}
-	} else {
-		msg.WriteString(" the turn of")
+		msg.WriteString(" ")
 	}
 
-	for _, email := range emails {
-		user := data.SelectUserByEmail(ctx, email)
-		if user.SlackID == "" {
-			msg.WriteString(fmt.Sprintf(" `%s`", email))
-			continue
+	for i, email := range emails {
+		if i > 0 {
+			msg.WriteString(", ")
 		}
-		msg.WriteString(fmt.Sprintf(" <@%s>", user.SlackID))
+		switch user := data.SelectUserByEmail(ctx, email); {
+		case user.SlackID != "":
+			msg.WriteString("<@" + user.SlackID + ">")
+		case user.RealName != "":
+			msg.WriteString(user.RealName)
+		default:
+			msg.WriteString(email)
+		}
 	}
 
-	if comma {
-		msg.WriteString(",")
-	}
 	msg.WriteString(" to review this PR.")
 
 	// if i > -1 {
