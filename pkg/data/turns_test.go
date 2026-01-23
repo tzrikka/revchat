@@ -88,7 +88,7 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Update turn states.
-	err = SwitchTurn(nil, url, "rev1")
+	err = SwitchTurn(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
@@ -101,7 +101,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = SwitchTurn(nil, url, "rev2")
+	err = SwitchTurn(nil, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
@@ -114,7 +114,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	err = SwitchTurn(nil, url, "author")
+	err = SwitchTurn(nil, url, "author", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
@@ -142,11 +142,39 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("FreezeTurn() = %v, want %v", ok, false)
 	}
 
-	err = SwitchTurn(nil, url, "rev1")
+	err = SwitchTurn(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	err = SwitchTurn(nil, url, "rev2")
+	err = SwitchTurn(nil, url, "rev2", false)
+	if err != nil {
+		t.Fatalf("SwitchTurn() error = %v", err)
+	}
+	got, err = GetCurrentTurn(nil, url)
+	if err != nil {
+		t.Fatalf("GetCurrentTurn() error = %v", err)
+	}
+	want = []string{"rev1", "rev2"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+	}
+
+	// Force switch while frozen.
+	err = SwitchTurn(nil, url, "rev1", true)
+	if err != nil {
+		t.Fatalf("SwitchTurn() error = %v", err)
+	}
+	got, err = GetCurrentTurn(nil, url)
+	if err != nil {
+		t.Fatalf("GetCurrentTurn() error = %v", err)
+	}
+	want = []string{"author", "rev2"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+	}
+
+	// Add "rev1" back while still frozen.
+	err = SwitchTurn(nil, url, "author", true)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
@@ -200,7 +228,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("UnfreezeTurn() = %v, want %v", ok, false)
 	}
 
-	err = SwitchTurn(nil, url, "rev2")
+	err = SwitchTurn(nil, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
@@ -252,7 +280,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev1 reviews, author nudges rev2.
-	if err := SwitchTurn(nil, url, "rev1"); err != nil {
+	if err := SwitchTurn(nil, url, "rev1", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
@@ -277,7 +305,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev2 reviews -> it's the author's turn --> nudge the author.
-	if err := SwitchTurn(nil, url, "rev2"); err != nil {
+	if err := SwitchTurn(nil, url, "rev2", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
@@ -311,7 +339,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Author responds to comments --> it's rev1 and rev2's turn again.
-	if err := SwitchTurn(nil, url, "author"); err != nil {
+	if err := SwitchTurn(nil, url, "author", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
@@ -373,7 +401,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Author responds to comments --> it's rev2's turn again.
-	if err := SwitchTurn(nil, url, "author"); err != nil {
+	if err := SwitchTurn(nil, url, "author", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
@@ -387,7 +415,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev2 approves too --> it's the author's turn again.
-	if err := SwitchTurn(nil, url, "rev2"); err != nil {
+	if err := SwitchTurn(nil, url, "rev2", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 

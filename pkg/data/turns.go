@@ -232,7 +232,7 @@ func UnfreezeTurn(ctx workflow.Context, url string) (bool, error) {
 // If the user is not found, or if the turn is frozen, this function does nothing.
 // If the user is the PR author, it adds all reviewers to the attention state.
 // If the user is a reviewer, it adds the author to the attention state.
-func SwitchTurn(ctx workflow.Context, url, email string) error {
+func SwitchTurn(ctx workflow.Context, url, email string, force bool) error {
 	email = strings.ToLower(email)
 	if email == "" || email == "bot" {
 		return nil
@@ -249,7 +249,7 @@ func SwitchTurn(ctx workflow.Context, url, email string) error {
 		return err
 	}
 
-	if t.FrozenAt != "" {
+	if t.FrozenAt != "" && !force {
 		return nil
 	}
 

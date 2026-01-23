@@ -85,7 +85,7 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
 
-	if err := data.SwitchTurn(ctx, url, user.Email); err != nil {
+	if err := data.SwitchTurn(ctx, url, user.Email, true); err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}

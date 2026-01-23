@@ -37,7 +37,7 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 
 	// Don't abort if this fails - it's more important to post the comment.
 	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
-	_ = data.SwitchTurn(ctx, prURL, email)
+	_ = data.SwitchTurn(ctx, prURL, email, false)
 
 	// If the comment was created by RevChat, i.e. mirrored from Slack, don't repost it.
 	// Also, don't poll Bitbucket for updates because we expect them to come from Slack.

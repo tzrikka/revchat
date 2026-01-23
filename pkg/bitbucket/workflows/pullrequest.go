@@ -260,7 +260,7 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 				slog.Any("error", err), slog.String("pr_url", prURL), slog.Int("new_count", pr.ChangeRequestCount))
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
-		if err2 := data.SwitchTurn(ctx, prURL, email); err2 != nil {
+		if err2 := data.SwitchTurn(ctx, prURL, email, false); err2 != nil {
 			err = errors.Join(err, err2)
 			// Don't abort - it's more important to announce this, even if our internal state is stale.
 		}
