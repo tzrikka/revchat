@@ -1,8 +1,10 @@
 package commands
 
 import (
+	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -148,6 +150,17 @@ func WhoseTurn(ctx workflow.Context, event SlashCommandEvent) error {
 	}
 
 	msg := whoseTurnText(ctx, emails, user, "")
+
+	if at, by := data.Frozen(ctx, url); !at.IsZero() {
+		id := fmt.Sprintf("<@%s>", users.EmailToSlackID(ctx, by))
+		if id == "<@>" {
+			id = by
+		}
+		unix := at.Unix()
+		dt := at.Format(time.DateTime)
+		msg = fmt.Sprintf("%s\n\n:snowflake: Turn switching was frozen by %s <!date^%d^{ago}|at %s UTC>.", msg, id, unix, dt)
+	}
+
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 

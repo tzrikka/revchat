@@ -242,6 +242,38 @@ func TestTurns(t *testing.T) {
 	}
 }
 
+func TestFrozen(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", d)
+	pathCache.Clear()
+
+	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
+
+	InitTurns(nil, url, "author")
+
+	at, by := Frozen(nil, url)
+	if !at.IsZero() {
+		t.Fatalf("Frozen() at = %v, want zero time", at)
+	}
+	if by != "" {
+		t.Fatalf("Frozen() by = %q, want empty string", by)
+	}
+
+	email := "freezer"
+	_, err := FreezeTurn(nil, url, email)
+	if err != nil {
+		t.Fatalf("FreezeTurn() error = %v", err)
+	}
+
+	at, by = Frozen(nil, url)
+	if at.IsZero() {
+		t.Fatalf("Frozen() at = zero time, want non-zero time")
+	}
+	if by != email {
+		t.Fatalf("Frozen() by = %q, want %q", by, email)
+	}
+}
+
 func TestNudge(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)

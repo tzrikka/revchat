@@ -23,8 +23,8 @@ type PRTurn struct {
 	Reviewers map[string]bool `json:"reviewers"` // Email address -> is it their turn?
 	Approvers map[string]bool `json:"approvers,omitempty"`
 
-	FrozenAt string `json:"frozen_at,omitempty"`
-	FrozenBy string `json:"frozen_by,omitempty"`
+	FrozenAt time.Time `json:"frozen_at,omitzero"`
+	FrozenBy string    `json:"frozen_by,omitempty"`
 }
 
 const (
@@ -182,11 +182,11 @@ func FreezeTurn(ctx workflow.Context, url, email string) (bool, error) {
 		return false, err
 	}
 
-	if t.FrozenAt != "" {
+	if !t.FrozenAt.IsZero() {
 		return false, nil
 	}
 
-	t.FrozenAt = time.Now().UTC().Format(time.RFC3339)
+	t.FrozenAt = time.Now().UTC()
 	t.FrozenBy = email
 
 	if err := writeTurnFile(ctx, url, t); err != nil {
@@ -212,11 +212,11 @@ func UnfreezeTurn(ctx workflow.Context, url string) (bool, error) {
 		return false, err
 	}
 
-	if t.FrozenAt == "" {
+	if t.FrozenAt.IsZero() {
 		return false, nil
 	}
 
-	t.FrozenAt = ""
+	t.FrozenAt = time.Time{}
 	t.FrozenBy = ""
 
 	if err := writeTurnFile(ctx, url, t); err != nil {
@@ -226,6 +226,21 @@ func UnfreezeTurn(ctx workflow.Context, url string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func Frozen(ctx workflow.Context, url string) (time.Time, string) {
+	mu := prTurnMutexes.Get(url)
+	mu.Lock()
+	defer mu.Unlock()
+
+	t, err := readTurnFile(ctx, url)
+	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state to check frozen state",
+			slog.Any("error", err), slog.String("pr_url", url))
+		return time.Time{}, ""
+	}
+
+	return t.FrozenAt, t.FrozenBy
 }
 
 // SwitchTurn switches the turn of a specific user in a specific PR.
@@ -249,7 +264,7 @@ func SwitchTurn(ctx workflow.Context, url, email string, force bool) error {
 		return err
 	}
 
-	if t.FrozenAt != "" && !force {
+	if !t.FrozenAt.IsZero() && !force {
 		return nil
 	}
 
