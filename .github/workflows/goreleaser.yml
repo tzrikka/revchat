@@ -22,9 +22,11 @@ jobs:
         uses: actions/setup-go@v6 # https://github.com/marketplace/actions/setup-go-environment
         with:
           go-version-file: go.mod
+      - name: Git status
+        run: git status
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6 # https://github.com/marketplace/actions/goreleaser-action
         with:
-          args: release --clean
+          args: release --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
