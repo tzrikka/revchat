@@ -163,19 +163,20 @@ func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak 
 	msg.WriteString("I think it's")
 	msg.WriteString(tweak)
 
+	withOthers := false
 	if i == -1 {
 		msg.WriteString(" the turn of ")
 	} else {
 		emails = slices.Delete(emails, i, i+1)
 		msg.WriteString(" *your* turn")
 		if len(emails) > 0 {
-			msg.WriteString(", along with")
+			msg.WriteString(" - along with ")
+			withOthers = true
 		}
-		msg.WriteString(" ")
 	}
 
-	for i, email := range emails {
-		if i > 0 {
+	for j, email := range emails {
+		if j > 0 {
 			msg.WriteString(", ")
 		}
 		switch user := data.SelectUserByEmail(ctx, email); {
@@ -188,6 +189,9 @@ func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak 
 		}
 	}
 
+	if withOthers {
+		msg.WriteString(" -")
+	}
 	msg.WriteString(" to review this PR.")
 
 	// if i > -1 {

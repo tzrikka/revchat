@@ -65,7 +65,7 @@ func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[
 	msg.WriteString(":mag_right: Code owners per file in this PR:")
 
 	for _, p := range paths {
-		msg.WriteString(fmt.Sprintf("\n\n  •  `%s`", p))
+		fmt.Fprintf(&msg, "\n\n  •  `%s`", p)
 		fileOwners := owners[p]
 		if len(fileOwners) == 0 {
 			msg.WriteString("\n          ◦   (No code owners found)")
@@ -102,7 +102,7 @@ func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[
 
 		// Second set of bullets: nested groups expanded.
 		for _, group := range nestedOwners {
-			msg.WriteString(fmt.Sprintf("\n          ◦   %s - ", strings.TrimPrefix(group, "@")))
+			fmt.Fprintf(&msg, "\n          ◦   %s - ", strings.TrimPrefix(group, "@"))
 			for i, member := range groups[group] {
 				if i > 0 {
 					msg.WriteString(", ")
