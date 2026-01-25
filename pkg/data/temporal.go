@@ -23,12 +23,17 @@ import (
 )
 
 const (
-	activityTimeout  = 3 * time.Second
-	activityAttempts = 3
-
 	fileFlags = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
 	filePerms = xdg.NewFilePermissions
 )
+
+var localActivityOpts = workflow.LocalActivityOptions{
+	StartToCloseTimeout: 3 * time.Second,
+	RetryPolicy: &temporal.RetryPolicy{
+		BackoffCoefficient: 1.0,
+		MaximumAttempts:    3,
+	},
+}
 
 // pathCache caches the absolute paths to data files to avoid repeated filesystem operations.
 // Entries expire after 7 days, and the cache is cleaned every about once a day (1,399
@@ -37,13 +42,7 @@ var pathCache = cache.New[string](7*24*time.Hour, 1433*time.Minute)
 
 func executeLocalActivity(ctx workflow.Context, activity, result any, args ...any) error {
 	f := runtime.FuncForPC(reflect.ValueOf(activity).Pointer())
-	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
-		StartToCloseTimeout: activityTimeout,
-		RetryPolicy: &temporal.RetryPolicy{
-			BackoffCoefficient: 1.0,
-			MaximumAttempts:    activityAttempts,
-		},
-	})
+	ctx = workflow.WithLocalActivityOptions(ctx, localActivityOpts)
 
 	start := time.Now()
 	err := workflow.ExecuteLocalActivity(ctx, activity, args...).Get(ctx, result)

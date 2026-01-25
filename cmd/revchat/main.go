@@ -16,14 +16,19 @@ import (
 )
 
 func main() {
-	bi, _ := debug.ReadBuildInfo()
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		fmt.Println("Error reading build info")
+		os.Exit(1)
+	}
+
 	cmd := &cli.Command{
 		Name:    "revchat",
 		Usage:   "Manage code reviews in dedicated chat channels",
 		Version: bi.Main.Version,
 		Flags:   config.Flags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			initLog(cmd.Bool("dev") || cmd.Bool("pretty-log"))
+			initLog(cmd.Bool("dev"), cmd.Bool("pretty-log"), bi)
 
 			mp, err := otel.InitMetrics(ctx, cmd)
 			if err != nil {
@@ -35,7 +40,7 @@ func main() {
 				}
 			}()
 
-			return temporal.Run(ctx, cmd)
+			return temporal.Run(ctx, cmd, bi)
 		},
 	}
 
@@ -47,20 +52,28 @@ func main() {
 
 // initLog initializes the logger for RevChat's Temporal worker,
 // based on whether it's running in development mode or not.
-func initLog(devMode bool) {
+func initLog(dev, prettyLog bool, bi *debug.BuildInfo) {
 	var handler slog.Handler
-	if devMode {
+	switch {
+	case dev: // Including dev && prettyLog.
 		handler = tint.NewHandler(os.Stdout, &tint.Options{
 			Level:      slog.LevelDebug,
 			TimeFormat: "15:04:05.000",
 			AddSource:  true,
 		})
-	} else {
+	case prettyLog: // But not dev.
+		handler = tint.NewHandler(os.Stdout, &tint.Options{
+			Level:      slog.LevelInfo,
+			TimeFormat: "15:04:05.000",
+			AddSource:  true,
+		})
+	default: // Production JSON log.
 		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			Level:     slog.LevelDebug,
+			Level:     slog.LevelInfo,
 			AddSource: true,
 		})
 	}
 
 	slog.SetDefault(slog.New(handler))
+	slog.Info("build versions", slog.String("go", bi.GoVersion), slog.String("main", bi.Main.Version))
 }

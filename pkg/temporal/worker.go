@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 
 	"github.com/urfave/cli/v3"
-	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/worker"
@@ -27,7 +27,7 @@ import (
 // Run initializes the Temporal worker, and blocks to keep it running.
 // This worker exposes (mostly asynchronous) Temporal workflows, and
 // starts the event dispatcher workflow if it's not already running.
-func Run(ctx context.Context, cmd *cli.Command) error {
+func Run(ctx context.Context, cmd *cli.Command, bi *debug.BuildInfo) error {
 	l := logger.FromContext(ctx)
 	addr := cmd.String("temporal-address")
 	l.Info("Temporal server address: " + addr)
@@ -44,7 +44,16 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	defer cli.Close()
 
 	taskQueue := cmd.String("temporal-task-queue-revchat")
-	w := worker.New(cli, taskQueue, worker.Options{})
+	w := worker.New(cli, taskQueue, worker.Options{
+		DeploymentOptions: worker.DeploymentOptions{
+			UseVersioning: true,
+			Version: worker.WorkerDeploymentVersion{
+				DeploymentName: "revchat",
+				BuildID:        bi.Main.Version,
+			},
+			DefaultVersioningBehavior: workflow.VersioningBehaviorAutoUpgrade,
+		},
+	})
 	bitbucket.RegisterPullRequestWorkflows(cmd, copts, taskQueue, w)
 	bitbucket.RegisterRepositoryWorkflows(w)
 	github.RegisterWorkflows(cmd, w)
@@ -53,13 +62,6 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 	bitbucket.CreateSchedule(ctx, cli, taskQueue)
 	slack.CreateSchedule(ctx, cli, taskQueue)
 
-	cfg := new(Config)
-	wopts := client.StartWorkflowOptions{
-		ID:                       EventDispatcher,
-		TaskQueue:                taskQueue,
-		WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
-		WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
-	}
 	temporal.ActivityOptions = &workflow.ActivityOptions{
 		TaskQueue:           cmd.String("temporal-task-queue-timpani"),
 		StartToCloseTimeout: config.StartToCloseTimeout,
@@ -68,8 +70,9 @@ func Run(ctx context.Context, cmd *cli.Command) error {
 		},
 	}
 
+	cfg := new(Config)
 	w.RegisterWorkflowWithOptions(cfg.EventDispatcherWorkflow, workflow.RegisterOptions{Name: EventDispatcher})
-	run, err := cli.ExecuteWorkflow(ctx, wopts, EventDispatcher)
+	run, err := cli.ExecuteWorkflow(ctx, workflowOptions(taskQueue), EventDispatcher)
 	if err != nil {
 		return fmt.Errorf("failed to start event dispatcher workflow: %w", err)
 	}

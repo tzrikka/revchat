@@ -1,11 +1,12 @@
 package temporal
 
 import (
-	"fmt"
 	"log/slog"
 	"slices"
 	"time"
 
+	"go.temporal.io/api/enums/v1"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
@@ -34,6 +35,20 @@ type Config struct {
 	shutdownDone   chan<- any
 }
 
+func workflowOptions(taskQueue string) client.StartWorkflowOptions {
+	// https://docs.temporal.io/develop/go/observability#visibility
+	signals := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals, slack.Signals)
+	attrs := temporal.NewSearchAttributes(temporal.NewSearchAttributeKeyKeywordList(SearchAttribute).ValueSet(signals))
+
+	return client.StartWorkflowOptions{
+		ID:                       EventDispatcher,
+		TaskQueue:                taskQueue,
+		WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
+		WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+		TypedSearchAttributes:    attrs,
+	}
+}
+
 // EventDispatcherWorkflow is an always-running singleton workflow that receives Temporal
 // signals from [Timpani] and spawns event-specific child workflows to handle them. Most
 // of these child workflows run asynchronously, with the exception of PR creation events.
@@ -45,13 +60,6 @@ type Config struct {
 // [Timpani]: https://pkg.go.dev/github.com/tzrikka/timpani/pkg/listeners
 // [continue-as-new]: https://docs.temporal.io/develop/go/continue-as-new
 func (c *Config) EventDispatcherWorkflow(ctx workflow.Context) error {
-	// https://docs.temporal.io/develop/go/observability#visibility
-	sig := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals, slack.Signals)
-	attr := temporal.NewSearchAttributeKeyKeywordList(SearchAttribute).ValueSet(sig)
-	if err := workflow.UpsertTypedSearchAttributes(ctx, attr); err != nil {
-		return fmt.Errorf("failed to set workflow search attribute: %w", err)
-	}
-
 	selector := workflow.NewSelector(ctx)
 	selector.AddReceive(workflow.GetSignalChannel(ctx, shutdownSignal), func(ch workflow.ReceiveChannel, _ bool) {
 		ch.Receive(ctx, &c.shutdownSignal)
