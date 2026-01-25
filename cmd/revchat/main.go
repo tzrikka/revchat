@@ -25,11 +25,15 @@ func main() {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			initLog(cmd.Bool("dev") || cmd.Bool("pretty-log"))
 
-			mp, err := otel.InitMetrics()
+			mp, err := otel.InitMetrics(ctx, cmd)
 			if err != nil {
 				return err
 			}
-			defer mp.Shutdown(ctx) //nolint:errcheck // Too late to handle an error here.
+			defer func() {
+				if mp != nil {
+					_ = mp.Shutdown(ctx)
+				}
+			}()
 
 			return temporal.Run(ctx, cmd)
 		},

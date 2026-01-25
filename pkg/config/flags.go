@@ -16,6 +16,11 @@ const (
 	DirName        = "revchat"
 	ConfigFileName = "config.toml"
 
+	DefaultOTLPEndpoint = "https://localhost:4318"
+	DefaultOTLPTimeout  = 10000 // 10 seconds.
+
+	DefaultThrippyGRPCAddress = "localhost:14460"
+
 	DefaultRevChatTaskQueue = "revchat"
 	DefaultTimpaniTaskQueue = "timpani"
 
@@ -25,8 +30,6 @@ const (
 
 	DefaultChannelNamePrefix    = "_pr"
 	DefaultChannelNameMaxLength = 50 // Slack's hard limit = 80, but that's still too long.
-
-	DefaultThrippyGRPCAddress = "localhost:14460"
 )
 
 // configFile returns the path to the app's configuration file.
@@ -100,6 +103,42 @@ func Flags() []cli.Flag {
 		},
 
 		// https://pkg.go.dev/go.temporal.io/sdk/internal#WorkerOptions
+
+		// https://github.com/open-telemetry/opentelemetry-go/blob/main/exporters/otlp/otlpmetric/otlpmetrichttp/doc.go
+		&cli.BoolFlag{
+			Name:  "otlp-disabled",
+			Usage: "Disable exporting OTLP metrics",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("OTEL_EXPORTER_OTLP_DISABLED"),
+				toml.TOML("otlp.disabled", path),
+			),
+		},
+		&cli.StringFlag{
+			Name:  "otlp-endpoint",
+			Usage: "OTLP endpoint using HTTP",
+			Value: DefaultOTLPEndpoint,
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("OTEL_EXPORTER_OTLP_ENDPOINT"),
+				toml.TOML("otlp.endpoint", path),
+			),
+		},
+		&cli.Int64Flag{
+			Name:  "otlp-timeout-ms",
+			Usage: "OTLP batch export timeout in milliseconds",
+			Value: DefaultOTLPTimeout,
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("OTEL_EXPORTER_OTLP_TIMEOUT_MS"),
+				toml.TOML("otlp.timeout_ms", path),
+			),
+		},
+		&cli.StringFlag{
+			Name:  "otlp-compression",
+			Usage: "OTLP compression method (e.g. gzip)",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("OTEL_EXPORTER_OTLP_COMPRESSION"),
+				toml.TOML("otlp.compression", path),
+			),
+		},
 
 		// Bitbucket.
 		&cli.StringFlag{

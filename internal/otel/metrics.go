@@ -4,12 +4,15 @@ package otel
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/urfave/cli/v3"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	otelmetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -19,11 +22,17 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 )
 
-const name = "github.com/tzrikka/revchat/internal/otel"
+const (
+	name = "github.com/tzrikka/revchat/internal/otel"
+)
 
-var activityOpts = workflow.LocalActivityOptions{
-	ScheduleToCloseTimeout: time.Second,
-}
+var (
+	disabled = false
+
+	activityOpts = workflow.LocalActivityOptions{
+		ScheduleToCloseTimeout: time.Second,
+	}
+)
 
 type activityRequest struct {
 	Name  string
@@ -31,8 +40,27 @@ type activityRequest struct {
 	Attrs map[string]string
 }
 
-func InitMetrics() (*metric.MeterProvider, error) {
-	exporter, err := stdoutmetric.New(stdoutmetric.WithPrettyPrint())
+// InitMetrics initializes OpenTelemetry metrics exporting using OTLP over HTTP.
+func InitMetrics(ctx context.Context, cmd *cli.Command) (*metric.MeterProvider, error) {
+	disabled = cmd.Bool("otlp-disabled")
+	if disabled {
+		return nil, nil
+	}
+
+	opts := []otlpmetrichttp.Option{
+		otlpmetrichttp.WithEndpointURL(cmd.String("otlp-endpoint")),
+		otlpmetrichttp.WithTimeout(time.Duration(cmd.Int("otlp-timeout-ms")) * time.Millisecond),
+	}
+	switch compression := strings.ToLower(cmd.String("otlp-compression")); compression {
+	case "gzip":
+		opts = append(opts, otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression))
+	case "", "none":
+		// Do nothing.
+	default:
+		return nil, errors.New("unrecognized OTLP compression method: " + compression)
+	}
+
+	exporter, err := otlpmetrichttp.New(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +75,10 @@ func InitMetrics() (*metric.MeterProvider, error) {
 
 // IncrementCounter increments a metric counter. Attributes are optional.
 func IncrementCounter(ctx workflow.Context, name string, incr int64, attrs map[string]string) {
+	if disabled {
+		return
+	}
+
 	req := activityRequest{Name: name, Inc: incr, Attrs: attrs}
 	ctx = workflow.WithLocalActivityOptions(ctx, activityOpts)
 	if err := workflow.ExecuteLocalActivity(ctx, incrementCounterActivity, req).Get(ctx, nil); err != nil {
