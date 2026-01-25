@@ -194,7 +194,7 @@ func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 
 const (
 	CommentPollingWindow   = 10 * time.Minute
-	CommentPollingInterval = 11 * time.Second
+	CommentPollingInterval = 19 * time.Second
 	CommentPollingJitter   = 4 * time.Second
 
 	PollingCleanupTimeout = 5 * time.Minute
@@ -218,7 +218,7 @@ func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentUR
 	user := data.SelectUserByBitbucketID(ctx, accountID)
 
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
-		StartToCloseTimeout: CommentPollingInterval - CommentPollingJitter,
+		StartToCloseTimeout: CommentPollingInterval + CommentPollingJitter,
 	})
 	req := PollCommentRequest{ThrippyID: user.ThrippyLink, CommentURL: commentURL, Checksum: checksum(rawText)}
 	fut := workflow.ExecuteLocalActivity(ctx, c.setScheduleActivity, req)
