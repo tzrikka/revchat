@@ -127,19 +127,19 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	ok, err := FreezeTurn(nil, url, "someone")
+	ok, err := FreezeTurns(nil, url, "someone")
 	if err != nil {
-		t.Fatalf("FreezeTurn() error = %v", err)
+		t.Fatalf("FreezeTurns() error = %v", err)
 	}
 	if !ok {
-		t.Fatalf("FreezeTurn() = %v, want %v", ok, true)
+		t.Fatalf("FreezeTurns() = %v, want %v", ok, true)
 	}
-	ok, err = FreezeTurn(nil, url, "someone")
+	ok, err = FreezeTurns(nil, url, "someone")
 	if err != nil {
-		t.Fatalf("FreezeTurn() error = %v", err)
+		t.Fatalf("FreezeTurns() error = %v", err)
 	}
 	if ok {
-		t.Fatalf("FreezeTurn() = %v, want %v", ok, false)
+		t.Fatalf("FreezeTurns() = %v, want %v", ok, false)
 	}
 
 	err = SwitchTurn(nil, url, "rev1", false)
@@ -213,19 +213,19 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
 	}
 
-	ok, err = UnfreezeTurn(nil, url)
+	ok, err = UnfreezeTurns(nil, url)
 	if err != nil {
-		t.Fatalf("UnfreezeTurn() error = %v", err)
+		t.Fatalf("UnfreezeTurns() error = %v", err)
 	}
 	if !ok {
-		t.Fatalf("UnfreezeTurn() = %v, want %v", ok, true)
+		t.Fatalf("UnfreezeTurns() = %v, want %v", ok, true)
 	}
-	ok, err = UnfreezeTurn(nil, url)
+	ok, err = UnfreezeTurns(nil, url)
 	if err != nil {
-		t.Fatalf("UnfreezeTurn() error = %v", err)
+		t.Fatalf("UnfreezeTurns() error = %v", err)
 	}
 	if ok {
-		t.Fatalf("UnfreezeTurn() = %v, want %v", ok, false)
+		t.Fatalf("UnfreezeTurns() = %v, want %v", ok, false)
 	}
 
 	err = SwitchTurn(nil, url, "rev2", false)
@@ -260,9 +260,9 @@ func TestFrozen(t *testing.T) {
 	}
 
 	email := "freezer"
-	_, err := FreezeTurn(nil, url, email)
+	_, err := FreezeTurns(nil, url, email)
 	if err != nil {
-		t.Fatalf("FreezeTurn() error = %v", err)
+		t.Fatalf("FreezeTurns() error = %v", err)
 	}
 
 	at, by = Frozen(nil, url)
@@ -462,7 +462,7 @@ func TestNudge(t *testing.T) {
 }
 
 func TestNormalizeEmailAddresses(t *testing.T) {
-	turn := &PRTurn{
+	turn := &PRTurns{
 		Author:   "AUTHOR",
 		FrozenBy: "FrozenBy",
 		Reviewers: map[string]bool{

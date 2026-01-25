@@ -108,7 +108,7 @@ func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 		return err // May or may not be nil.
 	}
 
-	ok, err := data.FreezeTurn(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID))
+	ok, err := data.FreezeTurns(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID))
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
@@ -127,7 +127,7 @@ func UnfreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 		return err // May or may not be nil.
 	}
 
-	ok, err := data.UnfreezeTurn(ctx, url[0])
+	ok, err := data.UnfreezeTurns(ctx, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
