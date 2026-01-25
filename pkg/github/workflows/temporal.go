@@ -14,9 +14,9 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/internal/otel"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/github"
-	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 type Config struct {
@@ -70,8 +70,7 @@ func RegisterSignals(ctx workflow.Context, sel workflow.Selector) {
 		ch.Receive(ctx, payload)
 
 		signal := ch.Name()
-		logger.From(ctx).Info("received signal", slog.String("signal", signal), slog.String("action", payload.Action))
-		metrics.IncrementSignalCounter(ctx, signal)
+		otel.SignalReceived(ctx, signal, false)
 
 		// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
 		opts := workflow.ChildWorkflowOptions{
@@ -104,8 +103,7 @@ func addReceive[T any](ctx workflow.Context, sel workflow.Selector, signalName s
 		ch.Receive(ctx, payload)
 
 		signal := ch.Name()
-		logger.From(ctx).Info("received signal", slog.String("signal", signal))
-		metrics.IncrementSignalCounter(ctx, signal)
+		otel.SignalReceived(ctx, signal, false)
 
 		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 			WorkflowID:        childWorkflowID(ctx, signal, payload),
@@ -136,8 +134,7 @@ func receiveAsync[T any](ctx workflow.Context, signal string) int {
 			break
 		}
 
-		logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
-		metrics.IncrementSignalCounter(ctx, signal)
+		otel.SignalReceived(ctx, signal, true)
 		signalEvents++
 
 		ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{

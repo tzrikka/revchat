@@ -74,7 +74,7 @@ func MapToStruct(m any, pr *PullRequest) error {
 
 // SwitchSnapshot stores the given new PR snapshot, and returns the previous one (if there is one).
 func SwitchSnapshot(ctx workflow.Context, prURL string, snapshot PullRequest) (*PullRequest, error) {
-	defer func() { data.StoreBitbucketPR(ctx, prURL, snapshot) }()
+	defer data.StoreBitbucketPR(ctx, prURL, snapshot)
 
 	prev, err := data.LoadBitbucketPR(ctx, prURL)
 	if err != nil {

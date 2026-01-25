@@ -162,7 +162,6 @@ func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
 	}
 
 	logger.From(ctx).Info("renamed Slack channel", slog.String("channel_id", channelID), slog.String("new_name", name))
-	data.LogSlackChannelRenamed(ctx, channelID, name)
 	return false, nil
 }
 

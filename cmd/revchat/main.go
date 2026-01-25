@@ -10,13 +10,13 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v3"
 
+	"github.com/tzrikka/revchat/internal/otel"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/temporal"
 )
 
 func main() {
 	bi, _ := debug.ReadBuildInfo()
-
 	cmd := &cli.Command{
 		Name:    "revchat",
 		Usage:   "Manage code reviews in dedicated chat channels",
@@ -24,6 +24,13 @@ func main() {
 		Flags:   config.Flags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			initLog(cmd.Bool("dev") || cmd.Bool("pretty-log"))
+
+			mp, err := otel.InitMetrics()
+			if err != nil {
+				return err
+			}
+			defer mp.Shutdown(ctx) //nolint:errcheck // Too late to handle an error here.
+
 			return temporal.Run(ctx, cmd)
 		},
 	}

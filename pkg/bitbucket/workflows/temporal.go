@@ -15,9 +15,9 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/internal/otel"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/config"
-	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 type Config struct {
@@ -144,8 +144,7 @@ func RegisterPullRequestSignals(ctx workflow.Context, sel workflow.Selector) {
 
 			signal := ch.Name()
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
-			logger.From(ctx).Info("received signal", slog.String("signal", signal))
-			metrics.IncrementSignalCounter(ctx, signal)
+			otel.SignalReceived(ctx, signal, false)
 
 			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
 			opts := workflow.ChildWorkflowOptions{WorkflowID: prChildWorkflowID(ctx, payload)}
@@ -175,8 +174,7 @@ func RegisterRepositorySignals(ctx workflow.Context, sel workflow.Selector) {
 
 			signal := ch.Name()
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
-			logger.From(ctx).Info("received signal", slog.String("signal", signal))
-			metrics.IncrementSignalCounter(ctx, signal)
+			otel.SignalReceived(ctx, signal, false)
 
 			// https://docs.temporal.io/develop/go/child-workflows#parent-close-policy
 			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
@@ -203,8 +201,7 @@ func DrainPullRequestSignals(ctx workflow.Context) bool {
 			}
 
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.pullrequest.")
-			logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
-			metrics.IncrementSignalCounter(ctx, signal)
+			otel.SignalReceived(ctx, signal, true)
 			signalEvents++
 
 			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
@@ -237,8 +234,7 @@ func DrainRepositorySignals(ctx workflow.Context) bool {
 			}
 
 			payload.Type = strings.TrimPrefix(signal, "bitbucket.events.repo.")
-			logger.From(ctx).Info("received signal while draining", slog.String("signal", signal))
-			metrics.IncrementSignalCounter(ctx, signal)
+			otel.SignalReceived(ctx, signal, true)
 			signalEvents++
 
 			ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{

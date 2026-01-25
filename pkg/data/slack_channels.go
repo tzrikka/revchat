@@ -1,14 +1,15 @@
 package data
 
 import (
+	"encoding/csv"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/metrics"
 )
 
 const (
@@ -21,41 +22,48 @@ func LogSlackChannelArchived(ctx workflow.Context, channelID, url string) {
 	slackChannelsMutex.Lock()
 	defer slackChannelsMutex.Unlock()
 
-	if now, path, err := timestampAndPath(ctx); err == nil {
-		appendToCSVFile(ctx, path, []string{now, "archived", channelID, url})
-	}
+	appendToCSVFile(ctx, []string{"archived", channelID, url})
 }
 
 func LogSlackChannelCreated(ctx workflow.Context, channelID, name, url string) {
 	slackChannelsMutex.Lock()
 	defer slackChannelsMutex.Unlock()
 
-	if now, path, err := timestampAndPath(ctx); err == nil {
-		appendToCSVFile(ctx, path, []string{now, "created", channelID, name, url})
-	}
+	appendToCSVFile(ctx, []string{"created", channelID, name, url})
 }
 
-func LogSlackChannelRenamed(ctx workflow.Context, channelID, name string) {
-	slackChannelsMutex.Lock()
-	defer slackChannelsMutex.Unlock()
-
-	if now, path, err := timestampAndPath(ctx); err == nil {
-		appendToCSVFile(ctx, path, []string{now, "renamed", channelID, name})
-	}
-}
-
-func timestampAndPath(ctx workflow.Context) (now, path string, err error) {
-	path, err = cachedDataPath(slackChannelsFile)
+func appendToCSVFile(ctx workflow.Context, record []string) {
+	path, err := cachedDataPath(slackChannelsFile)
 	if err != nil {
-		logger.From(ctx).Error("failed to find/create Slack channel log file",
+		logger.From(ctx).Error("failed to find/create Slack channels log file",
 			slog.Any("error", err), slog.String("filename", slackChannelsFile))
 	}
-	return time.Now().UTC().Format(time.RFC3339), path, err
-}
 
-func appendToCSVFile(ctx workflow.Context, path string, record []string) {
-	if err := metrics.AppendToCSVFile(path, record); err != nil {
-		logger.From(ctx).Error("failed to append to Slack channels log file",
-			slog.Any("error", err), slog.Any("record", record))
-	}
+	now := workflow.Now(ctx).UTC().Format(time.RFC3339)
+	record = append([]string{now}, record...)
+
+	workflow.SideEffect(ctx, func(ctx workflow.Context) any {
+		f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // Hardcoded path.
+		if err != nil {
+			logger.From(ctx).Error("failed to open Slack channels log file",
+				slog.Any("error", err), slog.Any("record", record))
+			return nil
+		}
+		defer f.Close()
+
+		w := csv.NewWriter(f)
+		if err := w.Write(record); err != nil {
+			logger.From(ctx).Error("failed to append to Slack channels log file",
+				slog.Any("error", err), slog.Any("record", record))
+			return nil
+		}
+
+		w.Flush()
+		if err := w.Error(); err != nil {
+			logger.From(ctx).Error("failed to flush Slack channels log file",
+				slog.Any("error", err), slog.Any("record", record))
+		}
+
+		return nil
+	})
 }
