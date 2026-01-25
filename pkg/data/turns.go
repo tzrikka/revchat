@@ -28,7 +28,7 @@ type PRTurn struct {
 }
 
 const (
-	TurnFileSuffix = "_turn.json"
+	TurnsFileSuffix = "_turns.json"
 )
 
 var prTurnMutexes RWMutexMap
@@ -48,11 +48,11 @@ func DeleteTurns(ctx workflow.Context, url string) {
 	defer mu.Unlock()
 
 	if ctx == nil { // For unit testing.
-		_ = deletePRFileActivity(context.Background(), url+TurnFileSuffix)
+		_ = deletePRFileActivity(context.Background(), url+TurnsFileSuffix)
 		return
 	}
 
-	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, url+TurnFileSuffix); err != nil {
+	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, url+TurnsFileSuffix); err != nil {
 		logger.From(ctx).Warn("failed to delete PR attention state", slog.Any("error", err), slog.String("pr_url", url))
 	}
 }
@@ -340,7 +340,7 @@ func Nudge(ctx workflow.Context, url, email string) (ok, approved bool, err erro
 
 // readTurnFile expects the caller to hold the appropriate mutex.
 func readTurnFile(ctx workflow.Context, url string) (*PRTurn, error) {
-	path, err := cachedDataPath(url + TurnFileSuffix)
+	path, err := cachedDataPath(url + TurnsFileSuffix)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ func writeTurnFile(ctx workflow.Context, url string, t *PRTurn) error {
 
 // writeTurnFileActivity runs as a local activity and expects the caller to hold the appropriate mutex.
 func writeTurnFileActivity(_ context.Context, url string, t *PRTurn) error {
-	path, err := cachedDataPath(url + TurnFileSuffix)
+	path, err := cachedDataPath(url + TurnsFileSuffix)
 	if err != nil {
 		return err
 	}

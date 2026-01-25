@@ -34,11 +34,11 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 			return err
 		}
 
-		if d.IsDir() || !strings.HasSuffix(d.Name(), data.TurnFileSuffix) {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), data.TurnsFileSuffix) {
 			return nil
 		}
 
-		prURL := "https://" + strings.TrimSuffix(path, data.TurnFileSuffix)
+		prURL := "https://" + strings.TrimSuffix(path, data.TurnsFileSuffix)
 		emails, err := data.GetCurrentTurn(ctx, prURL)
 		if err != nil {
 			return nil

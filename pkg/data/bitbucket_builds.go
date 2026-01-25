@@ -27,13 +27,13 @@ type CommitStatus struct {
 }
 
 const (
-	buildsFileSuffix = "_status.json"
+	buildsFileSuffix = "_builds.json"
 )
 
-var prStatusMutexes RWMutexMap
+var prBuildsMutexes RWMutexMap
 
 func ReadBitbucketBuilds(ctx workflow.Context, prURL string) PRStatus {
-	mu := prStatusMutexes.Get(prURL)
+	mu := prBuildsMutexes.Get(prURL)
 	mu.RLock()
 	defer mu.RUnlock()
 
@@ -52,7 +52,7 @@ func ReadBitbucketBuilds(ctx workflow.Context, prURL string) PRStatus {
 // unless the new status is based on a different (i.e. newer) commit,
 // in which case this function discards all previous build statuses.
 func UpdateBitbucketBuilds(ctx workflow.Context, prURL, commitHash, key string, cs CommitStatus) {
-	mu := prStatusMutexes.Get(prURL)
+	mu := prBuildsMutexes.Get(prURL)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -63,7 +63,7 @@ func UpdateBitbucketBuilds(ctx workflow.Context, prURL, commitHash, key string, 
 }
 
 func DeleteBitbucketBuilds(ctx workflow.Context, prURL string) {
-	mu := prStatusMutexes.Get(prURL)
+	mu := prBuildsMutexes.Get(prURL)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -81,13 +81,13 @@ func DeleteBitbucketBuilds(ctx workflow.Context, prURL string) {
 // readBitbucketBuildsActivity runs as a Temporal local activity (using
 // [executeLocalActivity]), and expects the caller to hold the appropriate mutex.
 func readBitbucketBuildsActivity(_ context.Context, url string) (*PRStatus, error) {
-	return readStatusFile(url)
+	return readBitbucketBuildsFile(url)
 }
 
 // updateBitbucketBuildsActivity runs as a Temporal local activity (using
 // [executeLocalActivity]) and expects the caller to hold the appropriate mutex.
 func updateBitbucketBuildsActivity(_ context.Context, url, commitHash, key string, cs CommitStatus) error {
-	pr, err := readStatusFile(url)
+	pr, err := readBitbucketBuildsFile(url)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func updateBitbucketBuildsActivity(_ context.Context, url, commitHash, key strin
 	return e.Encode(pr)
 }
 
-func readStatusFile(url string) (*PRStatus, error) {
+func readBitbucketBuildsFile(url string) (*PRStatus, error) {
 	path, err := cachedDataPath(url + buildsFileSuffix)
 	if err != nil {
 		return nil, err
