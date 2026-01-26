@@ -155,10 +155,9 @@ func RemoveReviewerFromTurns(ctx workflow.Context, url, email string, approved b
 	}
 
 	delete(t.Reviewers, email)
-	now := workflow.Now(ctx).UTC()
-	t.Activity[email] = now
+	t.Activity[email] = now(ctx)
 	if approved {
-		t.Approvers[email] = now
+		t.Approvers[email] = now(ctx)
 	}
 
 	if err := writeTurnsFile(ctx, url, t); err != nil {
@@ -189,7 +188,7 @@ func FreezeTurns(ctx workflow.Context, url, email string) (bool, error) {
 		return false, nil
 	}
 
-	t.FrozenAt = workflow.Now(ctx).UTC()
+	t.FrozenAt = now(ctx)
 	t.FrozenBy = email
 
 	if err := writeTurnsFile(ctx, url, t); err != nil {
@@ -281,7 +280,7 @@ func SwitchTurn(ctx workflow.Context, url, email string, force bool) error {
 		}
 	}
 
-	t.Activity[email] = workflow.Now(ctx).UTC() // Record activity regardless of frozen state.
+	t.Activity[email] = now(ctx) // Record activity regardless of frozen state.
 
 	if err := writeTurnsFile(ctx, url, t); err != nil {
 		logger.From(ctx).Error("failed to write PR attention state to switch turns",
@@ -504,4 +503,12 @@ func BitbucketIDToEmail(ctx workflow.Context, accountID string) string {
 	_ = UpsertUser(ctx, email, "", accountID, "", "", "")
 
 	return email
+}
+
+// now returns the current time in UTC, using [workflow.Now] if possible, or [time.Now] in unit testing.
+func now(ctx workflow.Context) time.Time {
+	if ctx != nil {
+		return workflow.Now(ctx).UTC()
+	}
+	return time.Now().UTC() // For unit testing.
 }
