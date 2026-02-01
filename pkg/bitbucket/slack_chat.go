@@ -66,20 +66,23 @@ func SlackDisplayName(ctx workflow.Context, user Account) string {
 	return displayName
 }
 
-func ImpersonateUserInMsg(ctx workflow.Context, url, channelID string, user Account, msg string, diff []byte) error {
-	return impersonateUserInBoth(ctx, url, channelID, "", channelID, msg, user, diff)
+func ImpersonateUserInMsg(ctx workflow.Context, url, channelID, alertsChannel string, user Account, msg string, diff []byte) error {
+	return impersonateUserInBoth(ctx, url, channelID, "", channelID, alertsChannel, msg, user, diff)
 }
 
-func ImpersonateUserInReply(ctx workflow.Context, url, parentURL string, user Account, msg string, diff []byte) error {
+func ImpersonateUserInReply(ctx workflow.Context, url, parentURL, alertsChannel string, user Account, msg string, diff []byte) error {
 	ids, err := msgIDsForCommentURL(ctx, parentURL)
 	if err != nil || ids == nil {
 		return err
 	}
 
-	return impersonateUserInBoth(ctx, url, ids[0], ids[1], fmt.Sprintf("%s/%s", ids[0], ids[1]), msg, user, diff)
+	return impersonateUserInBoth(ctx, url, ids[0], ids[1], fmt.Sprintf("%s/%s", ids[0], ids[1]), alertsChannel, msg, user, diff)
 }
 
-func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPrefix, msg string, user Account, diff []byte) error {
+// impersonateUserInBoth posts a Slack message or reply, impersonating the given user.
+// If diff is non-nil, it uploads it to Slack and modifies the message to reference it.
+// It also sets mappings between all of these, but doesn't return an error if any mapping fails.
+func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPrefix, alertsChannel, msg string, user Account, diff []byte) error {
 	fileID := ""
 	if diff != nil {
 		msg, fileID = uploadDiff(ctx, diff, url, msg)
@@ -90,14 +93,20 @@ func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPre
 		return err
 	}
 
-	_ = data.MapURLAndID(ctx, url, fmt.Sprintf("%s/%s", idPrefix, ts))
+	slackIDs := fmt.Sprintf("%s/%s", idPrefix, ts)
+	_ = activities.AlertError(ctx, alertsChannel, "failed to set mapping between a new Slack message and its Bitbucket URL",
+		data.MapURLAndID(ctx, url, slackIDs), "Comment URL", url, "Slack IDs", slackIDs)
 
 	if fileID == "" {
 		return nil
 	}
 
 	// Also remember to delete diff files later, if we update or delete the message.
-	_ = data.MapURLAndID(ctx, url+"/slack_file_id", fmt.Sprintf("%s/%s/%s", idPrefix, ts, fileID))
+	fakeURL := url + "/slack_file_id"
+	slackIDs = fmt.Sprintf("%s/%s", slackIDs, fileID)
+	_ = activities.AlertError(ctx, alertsChannel, "failed to set mapping between a PR code suggestion and its diff file in Slack",
+		data.MapURLAndID(ctx, fakeURL, slackIDs), "Fake URL", fakeURL, "Slack IDs", slackIDs)
+
 	return nil
 }
 

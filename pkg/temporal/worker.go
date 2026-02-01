@@ -55,7 +55,7 @@ func Run(ctx context.Context, cmd *cli.Command, bi *debug.BuildInfo) error {
 		},
 	})
 	bitbucket.RegisterPullRequestWorkflows(cmd, copts, taskQueue, w)
-	bitbucket.RegisterRepositoryWorkflows(w)
+	bitbucket.RegisterRepositoryWorkflows(cmd, copts, taskQueue, w)
 	github.RegisterWorkflows(cmd, w)
 	slack.RegisterWorkflows(ctx, cmd, w)
 

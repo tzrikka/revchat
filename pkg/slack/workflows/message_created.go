@@ -11,6 +11,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 	github "github.com/tzrikka/revchat/pkg/github/activities"
 	"github.com/tzrikka/revchat/pkg/markdown"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
 // createMessageInBitbucket mirrors the creation of a Slack message/reply in Bitbucket or
@@ -50,7 +51,9 @@ func (c *Config) createMessage(ctx workflow.Context, event MessageEvent, userID 
 		return err
 	}
 
-	return data.MapURLAndID(ctx, newCommentURL, fmt.Sprintf("%s/%s", slackIDs, event.TS))
+	slackIDs = fmt.Sprintf("%s/%s", slackIDs, event.TS)
+	return activities.AlertError(ctx, c.AlertsChannel, "failed to set mapping between a new PR comment and its Slack IDs",
+		data.MapURLAndID(ctx, newCommentURL, slackIDs), "Comment URL", newCommentURL, "Slack IDs", slackIDs)
 }
 
 func createCommentInBitbucket(ctx workflow.Context, event MessageEvent, thrippyID string, url []string) (string, error) {

@@ -80,7 +80,7 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to create Slack channel for "+pr.HTMLURL, err)
 	}
 
-	github.InitPRData(ctx, event, channelID)
+	github.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
 
 	// Channel cosmetics.
 	activities.SetChannelTopic(ctx, channelID, pr.HTMLURL)

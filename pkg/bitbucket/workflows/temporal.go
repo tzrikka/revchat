@@ -125,12 +125,13 @@ func RegisterPullRequestWorkflows(cmd *cli.Command, opts client.Options, taskQue
 }
 
 // RegisterRepositoryWorkflows maps event-handling workflow functions to [RepositorySignals].
-func RegisterRepositoryWorkflows(w worker.Worker) {
+func RegisterRepositoryWorkflows(cmd *cli.Command, opts client.Options, taskQueue string, w worker.Worker) {
+	c := newConfig(cmd, opts, taskQueue)
 	funcs := []repoWorkflowFunc{
 		CommitCommentCreatedWorkflow,
 
-		CommitStatusWorkflow,
-		CommitStatusWorkflow,
+		c.CommitStatusWorkflow,
+		c.CommitStatusWorkflow,
 	}
 	for i, f := range funcs {
 		w.RegisterWorkflowWithOptions(f, workflow.RegisterOptions{Name: RepositorySignals[i]})
