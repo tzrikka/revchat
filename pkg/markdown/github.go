@@ -101,12 +101,17 @@ func gitHubToSlackWhitespaces(text string) string {
 	return text
 }
 
+// stripSlackEmojiSkinTones removes Slack-style emoji skin tone suffixes.
+// Examples:
+//   :thumbsup_tone2:
+//   :thumbsup::skin-tone-3:
+func stripSlackEmojiSkinTones(text string) string {
+	re := regexp.MustCompile(`(_tone[1-6])|(::skin-tone-[1-6])`)
+	return re.ReplaceAllString(text, "")
+}
+
 // SlackToGitHub converts Slack markdown text into GitHub markdown text.
-//
-// Based on:
-//   - https://docs.slack.dev/messaging/formatting-message-text/
-//   - https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
-//   - https://docs.slack.dev/messaging/formatting-message-text/
 func SlackToGitHub(_ workflow.Context, text string) string {
+	text = stripSlackEmojiSkinTones(text)
 	return text
 }
