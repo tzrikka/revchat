@@ -36,7 +36,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to create Slack channel for "+prURL, err)
 	}
 
-	bitbucket.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
+	bitbucket.InitPRData(ctx, event, channelID)
 
 	// Channel cosmetics (before inviting users).
 	activities.SetChannelTopic(ctx, channelID, prURL)
@@ -123,7 +123,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	// Support PR data recovery.
 	if snapshot == nil {
-		bitbucket.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
+		bitbucket.InitPRData(ctx, event, channelID)
 		return nil
 	}
 
