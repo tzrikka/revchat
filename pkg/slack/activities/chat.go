@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"runtime"
 	"strings"
+	"time"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -43,8 +44,15 @@ func alert(ctx workflow.Context, channelName, text string, err error, details ..
 		fmt.Fprintf(msg, ":warning: %s", text)
 	}
 
+	// Workflow info.
+	info := workflow.GetInfo(ctx)
+	t := info.WorkflowStartTime
+	fmt.Fprintf(msg, "\n\nWorkflow:\n  •  ID = `%s`", info.WorkflowExecution.ID)
+	fmt.Fprintf(msg, "\n  •  Start = <!date^%d^{date_long_pretty} {time_secs}|%s>", t.Unix(), t.UTC().Format(time.RFC3339))
+
+	// Extra details (optional).
 	if len(details) > 0 {
-		msg.WriteString("\n\nDetails:")
+		msg.WriteString("\n\nExtra details:")
 	}
 	for i := 0; i < len(details); i += 2 {
 		fmt.Fprintf(msg, "\n  •  %v", details[i])
@@ -53,6 +61,7 @@ func alert(ctx workflow.Context, channelName, text string, err error, details ..
 		}
 	}
 
+	// Stack trace.
 	pcs := make([]uintptr, 10)
 	n := runtime.Callers(3, pcs)
 	frames := runtime.CallersFrames(pcs[:n])
