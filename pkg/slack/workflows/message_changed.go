@@ -12,13 +12,13 @@ import (
 	"github.com/tzrikka/revchat/pkg/markdown"
 )
 
-func changeMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
+func (c *Config) changeMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
 	// Ignore "fake" edit events when a broadcast reply is created/deleted.
 	if event.Message.Text == event.PreviousMessage.Text {
 		return nil
 	}
 
-	thrippyID, err := thrippyLinkID(ctx, userID, event.Channel)
+	thrippyID, err := c.thrippyLinkID(ctx, userID, event.Channel)
 	if err != nil || thrippyID == "" {
 		return err
 	}
@@ -28,7 +28,7 @@ func changeMessage(ctx workflow.Context, event MessageEvent, userID string, isBi
 		slackIDs = fmt.Sprintf("%s/%s/%s", event.Channel, event.Message.ThreadTS, event.Message.TS)
 	}
 
-	url, err := urlParts(ctx, slackIDs)
+	url, err := c.urlParts(ctx, slackIDs)
 	if err != nil {
 		return err
 	}

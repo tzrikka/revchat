@@ -20,6 +20,7 @@ import (
 )
 
 type Config struct {
+	SlackAlertsChannel        string
 	SlackChannelNamePrefix    string
 	SlackChannelNameMaxLength int
 	SlackChannelsArePrivate   bool
@@ -29,6 +30,7 @@ type Config struct {
 
 func newConfig(cmd *cli.Command) *Config {
 	return &Config{
+		SlackAlertsChannel:        cmd.String("slack-alerts-channel"),
 		SlackChannelNamePrefix:    cmd.String("slack-channel-name-prefix"),
 		SlackChannelNameMaxLength: cmd.Int("slack-channel-name-max-length"),
 		SlackChannelsArePrivate:   cmd.Bool("slack-private-channels"),

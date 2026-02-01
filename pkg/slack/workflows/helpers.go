@@ -5,11 +5,20 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
-func isRevChatChannel(ctx workflow.Context, channelID string) bool {
-	url, _ := data.SwitchURLAndID(ctx, channelID)
-	return url != ""
+func (c *Config) isRevChatChannel(ctx workflow.Context, channelID string) bool {
+	url, err := c.switchURLAndID(ctx, channelID)
+	return err == nil && url != ""
+}
+
+func (c *Config) switchURLAndID(ctx workflow.Context, key string) (string, error) {
+	url, err := data.SwitchURLAndID(ctx, key)
+	if err != nil {
+		return "", activities.AlertError(ctx, c.AlertsChannel, "", err, "Key", key)
+	}
+	return url, nil
 }
 
 func selfTriggeredMemberEvent(ctx workflow.Context, auth []eventAuth, event MemberEvent) bool {

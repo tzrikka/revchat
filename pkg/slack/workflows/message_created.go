@@ -15,13 +15,13 @@ import (
 
 // createMessageInBitbucket mirrors the creation of a Slack message/reply in Bitbucket or
 // GitHub. Broadcast replies are treated as normal replies, not as new top-level messages.
-func createMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
+func (c *Config) createMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
 	// Impersonating the user who posted the Slack message is not an option with bots.
 	if event.Subtype == "bot_message" {
 		return nil
 	}
 
-	thrippyID, err := thrippyLinkID(ctx, userID, event.Channel)
+	thrippyID, err := c.thrippyLinkID(ctx, userID, event.Channel)
 	if err != nil || thrippyID == "" {
 		return err
 	}
@@ -32,7 +32,7 @@ func createMessage(ctx workflow.Context, event MessageEvent, userID string, isBi
 		slackIDs = fmt.Sprintf("%s/%s", slackIDs, event.ThreadTS)
 	}
 
-	parentURL, err := urlParts(ctx, slackIDs)
+	parentURL, err := c.urlParts(ctx, slackIDs)
 	if err != nil {
 		return err
 	}

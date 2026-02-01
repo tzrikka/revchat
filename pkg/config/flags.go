@@ -151,6 +151,14 @@ func Flags() []cli.Flag {
 		},
 
 		// Slack.
+		&cli.StringFlag{
+			Name:  "slack-alerts-channel",
+			Usage: "Optional Slack channel for alerts",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("SLACK_ALERTS_CHANNEL"),
+				toml.TOML("slack.alerts_channel", path),
+			),
+		},
 		&cli.IntFlag{
 			Name:  "slack-channel-name-max-length",
 			Usage: "Maximum length of Slack channel names",

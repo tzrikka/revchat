@@ -20,6 +20,8 @@ import (
 )
 
 type Config struct {
+	AlertsChannel string
+
 	BitbucketWorkspace string
 
 	ThrippyGRPCAddress        string
@@ -36,6 +38,8 @@ type Config struct {
 
 func newConfig(cmd *cli.Command) *Config {
 	return &Config{
+		AlertsChannel: cmd.String("slack-alerts-channel"),
+
 		BitbucketWorkspace: cmd.String("bitbucket-workspace"),
 
 		ThrippyGRPCAddress:        cmd.String("thrippy-grpc-address"),
@@ -79,18 +83,18 @@ func RegisterWorkflows(ctx context.Context, cmd *cli.Command, w worker.Worker) {
 	c := newConfig(cmd)
 	c.initThrippyLinks(ctx, cmd.String("thrippy-links-template-id"))
 
-	w.RegisterWorkflowWithOptions(AppRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})
-	w.RegisterWorkflowWithOptions(ChannelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[1]})
-	w.RegisterWorkflowWithOptions(ChannelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[2]})
-	w.RegisterWorkflowWithOptions(MemberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[3]})
-	w.RegisterWorkflowWithOptions(MemberLeftWorkflow, workflow.RegisterOptions{Name: Signals[4]})
-	w.RegisterWorkflowWithOptions(MessageWorkflow, workflow.RegisterOptions{Name: Signals[5]})
+	w.RegisterWorkflowWithOptions(c.AppRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})
+	w.RegisterWorkflowWithOptions(c.ChannelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[1]})
+	w.RegisterWorkflowWithOptions(c.ChannelArchivedWorkflow, workflow.RegisterOptions{Name: Signals[2]})
+	w.RegisterWorkflowWithOptions(c.MemberJoinedWorkflow, workflow.RegisterOptions{Name: Signals[3]})
+	w.RegisterWorkflowWithOptions(c.MemberLeftWorkflow, workflow.RegisterOptions{Name: Signals[4]})
+	w.RegisterWorkflowWithOptions(c.MessageWorkflow, workflow.RegisterOptions{Name: Signals[5]})
 	w.RegisterWorkflowWithOptions(ReactionAddedWorkflow, workflow.RegisterOptions{Name: Signals[6]})
 	w.RegisterWorkflowWithOptions(ReactionRemovedWorkflow, workflow.RegisterOptions{Name: Signals[7]})
 	w.RegisterWorkflowWithOptions(c.SlashCommandWorkflow, workflow.RegisterOptions{Name: Signals[8]})
 
 	// Special case: scheduled workflows.
-	w.RegisterWorkflowWithOptions(RemindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
+	w.RegisterWorkflowWithOptions(c.RemindersWorkflow, workflow.RegisterOptions{Name: Schedules[0]})
 }
 
 // RegisterSignals routes [Signals] to their registered workflows.

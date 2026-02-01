@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -19,7 +20,7 @@ const (
 	dateTimeLayout = time.DateOnly + " " + time.Kitchen
 )
 
-func RemindersWorkflow(ctx workflow.Context) error {
+func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
 
 	prs := slack.LoadPRTurns(ctx)
@@ -29,12 +30,15 @@ func RemindersWorkflow(ctx workflow.Context) error {
 
 	reminders, err := data.ListReminders(ctx)
 	if err != nil {
-		return err
+		return activities.AlertError(ctx, c.AlertsChannel, "", err)
 	}
 
+	var aggregatedErr error
 	for userID, r := range reminders {
 		now, reminderTime, err := reminderTimes(ctx, startTime, userID, r)
 		if err != nil {
+			err = activities.AlertError(ctx, c.AlertsChannel, "", err, "User", fmt.Sprintf("<@%s>", userID))
+			aggregatedErr = errors.Join(aggregatedErr, err)
 			continue
 		}
 
@@ -57,11 +61,11 @@ func RemindersWorkflow(ctx workflow.Context) error {
 			msg.WriteString("\n  •  `/revchat who` / `[not] my turn` / `[un]freeze` - only in PR channels")
 			msg.WriteString("\n  •  `/revchat explain` - who needs to approve each file, and have they?")
 
-			_ = activities.PostMessage(ctx, userID, msg.String())
+			aggregatedErr = errors.Join(aggregatedErr, activities.PostMessage(ctx, userID, msg.String()))
 		}
 	}
 
-	return nil
+	return aggregatedErr
 }
 
 func reminderTimes(ctx workflow.Context, startTime time.Time, userID, reminder string) (parsed, now time.Time, err error) {

@@ -29,14 +29,14 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	maxLen, prefix, private := c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix, c.SlackChannelsArePrivate
 	channelID, err := slack.CreateChannel(ctx, pr.ID, pr.Title, prURL, maxLen, prefix, private)
 	if err != nil {
-		// True = send this DM only if the user is opted-in.
+		// True = send an error DM only if the user is opted-in.
 		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
-			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
+			err = errors.Join(err, activities.PostMessage(ctx, userID, "Failed to create a Slack channel for "+prURL))
 		}
-		return err
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to create Slack channel for "+prURL, err)
 	}
 
-	bitbucket.InitPRData(ctx, event, channelID)
+	bitbucket.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
 
 	// Channel cosmetics (before inviting users).
 	activities.SetChannelTopic(ctx, channelID, prURL)
@@ -52,14 +52,14 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	followerIDs := data.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers
 	err = activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
-		// True = send this DM only if the user is opted-in.
+		// True = send an error DM only if the user is opted-in.
 		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
-			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+prURL)
+			err = errors.Join(err, activities.PostMessage(ctx, userID, "Failed to initialize a Slack channel for "+prURL))
 		}
 		// Undo channel creation and PR data initialization.
-		_ = activities.ArchiveChannel(ctx, channelID, prURL)
+		err = errors.Join(err, activities.ArchiveChannel(ctx, channelID, prURL))
 		data.CleanupPRData(ctx, channelID, prURL)
-		return err
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to invite users to Slack channel for "+prURL, err)
 	}
 
 	return nil
@@ -68,7 +68,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 // PullRequestClosedWorkflow archives a PR's Slack channel when the PR is merged or declined/rejected:
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Merged
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Declined
-func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
+func (c Config) PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
 	channelID, found := activities.LookupChannel(ctx, prURL)
@@ -93,9 +93,9 @@ func PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.PullRequest
 	data.CleanupPRData(ctx, channelID, prURL)
 
 	if err := activities.ArchiveChannel(ctx, channelID, prURL); err != nil {
-		msg = strings.Replace(msg, " this PR", "", 1)
-		_ = activities.PostMessage(ctx, channelID, ":boom: Failed to archive this channel, even though its PR was "+msg)
-		return err
+		msg = ":boom: Failed to archive this channel, even though its PR was " + strings.Replace(msg, " this PR", "", 1)
+		err = errors.Join(err, activities.PostMessage(ctx, channelID, msg))
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to archive Slack channel for "+prURL, err)
 	}
 
 	return nil
@@ -123,7 +123,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	// Support PR data recovery.
 	if snapshot == nil {
-		bitbucket.InitPRData(ctx, event, channelID)
+		bitbucket.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
 		return nil
 	}
 

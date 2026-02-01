@@ -248,14 +248,14 @@ func newClientTLSFromFile(caPath, serverNameOverride string, certs []tls.Certifi
 	return credentials.NewTLS(cfg), nil
 }
 
-func thrippyLinkID(ctx workflow.Context, userID, channelID string) (string, error) {
+func (c *Config) thrippyLinkID(ctx workflow.Context, userID, channelID string) (string, error) {
 	if len(userID) > 0 && userID[0] == 'B' {
 		return "", nil // Slack bot, not a real user.
 	}
 
 	user, optedIn, err := data.SelectUserBySlackID(ctx, userID)
 	if err != nil {
-		return "", err
+		return "", activities.AlertError(ctx, c.AlertsChannel, "", err, "User ID", userID)
 	}
 
 	if !optedIn {

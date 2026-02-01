@@ -21,6 +21,7 @@ import (
 )
 
 type Config struct {
+	SlackAlertsChannel        string
 	SlackChannelNamePrefix    string
 	SlackChannelNameMaxLength int
 	SlackChannelsArePrivate   bool
@@ -33,6 +34,7 @@ type Config struct {
 
 func newConfig(cmd *cli.Command, opts client.Options, taskQueue string) *Config {
 	return &Config{
+		SlackAlertsChannel:        cmd.String("slack-alerts-channel"),
 		SlackChannelNamePrefix:    cmd.String("slack-channel-name-prefix"),
 		SlackChannelNameMaxLength: cmd.Int("slack-channel-name-max-length"),
 		SlackChannelsArePrivate:   cmd.Bool("slack-private-channels"),
@@ -104,8 +106,8 @@ func RegisterPullRequestWorkflows(cmd *cli.Command, opts client.Options, taskQue
 		PullRequestReviewedWorkflow, // Unapproved.
 		PullRequestReviewedWorkflow, // Changes requested.
 		PullRequestReviewedWorkflow, // Changes request removed.
-		PullRequestClosedWorkflow,   // Fulfilled, a.k.a. merged.
-		PullRequestClosedWorkflow,   // Rejected, a.k.a. declined.
+		c.PullRequestClosedWorkflow, // Fulfilled, a.k.a. merged.
+		c.PullRequestClosedWorkflow, // Rejected, a.k.a. declined.
 
 		c.CommentCreatedWorkflow,
 		c.CommentUpdatedWorkflow,

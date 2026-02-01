@@ -25,7 +25,7 @@ func (c Config) PullRequestWorkflow(ctx workflow.Context, event github.PullReque
 	case "opened", "reopened":
 		return c.prOpened(ctx, event)
 	case "closed":
-		return prClosed(ctx, event)
+		return c.prClosed(ctx, event)
 
 	case "converted_to_draft":
 		return prConvertedToDraft(ctx, event)
@@ -73,11 +73,11 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 	maxLen, prefix, private := c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix, c.SlackChannelsArePrivate
 	channelID, err := slack.CreateChannel(ctx, pr.Number, pr.Title, pr.HTMLURL, maxLen, prefix, private)
 	if err != nil {
-		// True = send this DM only if the user is opted-in.
+		// True = send an error DM only if the user is opted-in.
 		if userID := users.GitHubIDToSlackID(ctx, event.Sender.Login, true); userID != "" {
-			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+pr.HTMLURL)
+			err = errors.Join(err, activities.PostMessage(ctx, userID, "Failed to create a Slack channel for "+pr.HTMLURL))
 		}
-		return err
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to create Slack channel for "+pr.HTMLURL, err)
 	}
 
 	github.InitPRData(ctx, event, channelID)
@@ -99,23 +99,24 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 	followerIDs := data.SelectUserByGitHubID(ctx, pr.User.Login).Followers
 	err = activities.InviteUsersToChannel(ctx, channelID, pr.HTMLURL, github.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
-		// True = send this DM only if the user is opted-in.
+		// True = send an error DM only if the user is opted-in.
 		if userID := users.GitHubIDToSlackID(ctx, event.Sender.Login, true); userID != "" {
-			_ = activities.PostMessage(ctx, userID, "Failed to create Slack channel for "+pr.HTMLURL)
+			err = errors.Join(err, activities.PostMessage(ctx, userID, "Failed to initialize a Slack channel for "+pr.HTMLURL))
 		}
 		// Undo channel creation and PR data initialization.
-		_ = activities.ArchiveChannel(ctx, channelID, pr.HTMLURL)
+		err = errors.Join(err, activities.ArchiveChannel(ctx, channelID, pr.HTMLURL))
 		data.CleanupPRData(ctx, channelID, pr.HTMLURL)
-		return err
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to invite users to Slack channel for "+pr.HTMLURL, err)
 	}
 
 	return nil
 }
 
 // prClosed archives a PR's Slack channel when the PR is closed.
-func prClosed(ctx workflow.Context, event github.PullRequestEvent) error {
+func (c Config) prClosed(ctx workflow.Context, event github.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no channel to archive.
-	channelID, found := activities.LookupChannel(ctx, event.PullRequest.HTMLURL)
+	prURL := event.PullRequest.HTMLURL
+	channelID, found := activities.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
@@ -130,12 +131,12 @@ func prClosed(ctx workflow.Context, event github.PullRequestEvent) error {
 	}
 	github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
-	data.CleanupPRData(ctx, channelID, event.PullRequest.HTMLURL)
+	data.CleanupPRData(ctx, channelID, prURL)
 
-	if err := activities.ArchiveChannel(ctx, channelID, event.PullRequest.HTMLURL); err != nil {
-		msg = strings.Replace(msg, " this PR", "", 1)
-		_ = activities.PostMessage(ctx, channelID, ":boom: Failed to archive this channel, even though its PR was "+msg)
-		return err
+	if err := activities.ArchiveChannel(ctx, channelID, prURL); err != nil {
+		msg = ":boom: Failed to archive this channel, even though its PR was " + strings.Replace(msg, " this PR", "", 1)
+		err = errors.Join(err, activities.PostMessage(ctx, channelID, msg))
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to archive Slack channel for "+prURL, err)
 	}
 
 	return nil
@@ -277,7 +278,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 	if event.Changes.Body != nil {
 		msg := ":pencil2: %s deleted the PR description."
 		if body := strings.TrimSpace(pr.Body); body != "" {
-			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, body, pr.HTMLURL)
+			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.GitHubToSlack(ctx, body, pr.HTMLURL)
 		}
 		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 	}

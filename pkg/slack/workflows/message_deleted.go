@@ -11,13 +11,13 @@ import (
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
-func deleteMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
+func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
 	// Don't delete "tombstone" messages (roots of threads).
 	if event.PreviousMessage.Subtype == "tombstone" {
 		return nil
 	}
 
-	thrippyID, err := thrippyLinkID(ctx, userID, event.Channel)
+	thrippyID, err := c.thrippyLinkID(ctx, userID, event.Channel)
 	if err != nil || thrippyID == "" {
 		return err
 	}
@@ -27,7 +27,7 @@ func deleteMessage(ctx workflow.Context, event MessageEvent, userID string, isBi
 		slackIDs = fmt.Sprintf("%s/%s/%s", event.Channel, event.PreviousMessage.ThreadTS, event.DeletedTS)
 	}
 
-	url, err := urlParts(ctx, slackIDs)
+	url, err := c.urlParts(ctx, slackIDs)
 	if err != nil {
 		return err
 	}

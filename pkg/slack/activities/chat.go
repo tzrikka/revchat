@@ -1,8 +1,10 @@
 package activities
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -12,6 +14,64 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
+
+// AlertError posts a Slack message about an error, if the Slack channel is configured.
+// This function returns the original error for convenience, so it can be used inline.
+func AlertError(ctx workflow.Context, channelName, prefix string, err error, details ...any) error {
+	if channelName == "" || err == nil {
+		return err
+	}
+	if prefix != "" {
+		prefix += ": "
+	}
+	return alert(ctx, channelName, prefix, err, details...)
+}
+
+// AlertWarn posts a Slack message with a warning message, if the Slack channel is configured.
+func AlertWarn(ctx workflow.Context, channelName, warning string, details ...any) {
+	if channelName == "" || warning == "" {
+		return
+	}
+	_ = alert(ctx, channelName, warning, nil, details...)
+}
+
+func alert(ctx workflow.Context, channelName, text string, err error, details ...any) error {
+	msg := new(strings.Builder)
+	if err != nil {
+		fmt.Fprintf(msg, ":x: Error: %s%v", text, err)
+	} else {
+		fmt.Fprintf(msg, ":warning: %s", text)
+	}
+
+	if len(details) > 0 {
+		msg.WriteString("\n\nDetails:")
+	}
+	for i := 0; i < len(details); i += 2 {
+		fmt.Fprintf(msg, "\n  •  %v", details[i])
+		if i+1 < len(details) {
+			fmt.Fprintf(msg, " = %v", details[i+1])
+		}
+	}
+
+	pcs := make([]uintptr, 10)
+	n := runtime.Callers(3, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+	var frame runtime.Frame
+	more := n > 0
+	if more {
+		msg.WriteString("\n\nStack trace:\n```")
+	}
+	for more {
+		frame, more = frames.Next()
+		fn := strings.Split(frame.Function, "/")
+		fmt.Fprintf(msg, "%s - line %d\n    %s\n", frame.File, frame.Line, fn[len(fn)-1])
+	}
+	if n > 0 {
+		msg.WriteString("```")
+	}
+
+	return errors.Join(err, PostMessage(ctx, channelName, msg.String()))
+}
 
 func DeleteMessage(ctx workflow.Context, channelID, timestamp string) error {
 	if err := slack.ChatDelete(ctx, channelID, timestamp); err != nil {

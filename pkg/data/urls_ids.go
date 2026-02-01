@@ -47,7 +47,7 @@ func SwitchURLAndID(ctx workflow.Context, key string) (string, error) {
 
 	var val string
 	if err := executeLocalActivity(ctx, getMapEntryActivity, &val, key); err != nil {
-		logger.From(ctx).Warn("failed to get mapping between PR URLs and Slack IDs",
+		logger.From(ctx).Error("failed to get mapping between PR URLs and Slack IDs",
 			slog.Any("error", err), slog.String("key", key))
 		return "", err
 	}

@@ -67,7 +67,7 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 }
 
 func PRDetails(ctx workflow.Context, url, userID string) string {
-	var summary strings.Builder
+	summary := new(strings.Builder)
 
 	// Title.
 	title := fmt.Sprintf("\n\n  •  *<%s>*", url)
@@ -100,21 +100,20 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 
 	// Slack channel link.
 	if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
-		summary.WriteString(fmt.Sprintf("\n          ◦   <#%s>", channelID))
+		fmt.Fprintf(summary, "\n          ◦   <#%s>", channelID)
 	}
 
 	// PR details.
 	now := time.Now().UTC()
 	created := timeSince(now, pr["created_on"])
-	summary.WriteString(fmt.Sprintf("\n          ◦   Created `%s` ago", created))
+	fmt.Fprintf(summary, "\n          ◦   Created `%s` ago", created)
 
 	if updated := timeSince(now, pr["updated_on"]); updated != "" {
-		summary.WriteString(fmt.Sprintf(", updated `%s` ago", updated))
+		fmt.Fprintf(summary, ", updated `%s` ago", updated)
 	}
 
 	if b := summarizeBuilds(ctx, url); b != "" {
-		summary.WriteString(", build states: ")
-		summary.WriteString(b)
+		summary.WriteString(", build states: " + b)
 	}
 
 	// User-specific details.
@@ -132,7 +131,7 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 		summary.WriteString("\n          ◦   ")
 	}
 	if owner > 0 {
-		summary.WriteString(fmt.Sprintf("Code owner: *%d* file", owner))
+		fmt.Fprintf(summary, "Code owner: *%d* file", owner)
 		if owner > 1 {
 			summary.WriteString("s")
 		}
@@ -144,7 +143,7 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 		if owner == 0 {
 			summary.WriteString("H")
 		}
-		summary.WriteString(fmt.Sprintf("igh risk: *%d* file", highRisk))
+		fmt.Fprintf(summary, "igh risk: *%d* file", highRisk)
 		if highRisk > 1 {
 			summary.WriteString("s")
 		}
@@ -155,7 +154,7 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 		} else {
 			summary.WriteString("A")
 		}
-		summary.WriteString(fmt.Sprintf("pprovals: *%d* (%s)", approvals, names))
+		fmt.Fprintf(summary, "pprovals: *%d* (%s)", approvals, names)
 	}
 
 	// list.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
