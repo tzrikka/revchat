@@ -134,8 +134,10 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	// Announce transitions between draft and ready-to-review modes.
 	if !snapshot.Draft && pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
+		_, _, _ = data.Nudge(ctx, prURL, data.BitbucketIDToEmail(ctx, event.PullRequest.Author.AccountID))
 	} else if snapshot.Draft && !pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
+		_ = data.SwitchTurn(ctx, prURL, data.BitbucketIDToEmail(ctx, event.Actor.AccountID), true)
 		errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), nil))
 	}
 
