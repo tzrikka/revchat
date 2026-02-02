@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -12,6 +13,7 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
+	"github.com/tzrikka/revchat/pkg/users"
 )
 
 func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer string) error {
@@ -25,24 +27,37 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 		return nil
 	}
 
-	parts := strings.SplitN(event.Text, " ", 2) // parts[0] = "nudge", "ping", or "poke".
+	cmd := strings.SplitN(event.Text, " ", 2) // cmd[0] = "nudge", "ping", or "poke".
 	if len(users) == 1 && users[0] == event.UserID {
 		msg := ":confused: Why are you trying to %s yourself? Treating this as a `%s my turn` command..."
-		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, fmt.Sprintf(msg, parts[0], event.Command))
+		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, fmt.Sprintf(msg, cmd[0], event.Command))
 		return MyTurn(ctx, event)
+	}
+
+	// Also ignore the PR's author when there are additional users. The likely scenario is
+	// that the nudge is for a group which they are also a member of, but if the group is
+	// nudged and not just them then it means the author is not the intended target.
+	if len(users) > 1 {
+		author := authorSlackID(ctx, url[0])
+		if i := slices.Index(users, author); i != -1 {
+			action, _ := strings.CutSuffix(cmd[0], "e")
+			msg := ":see_no_evil: Ignoring the PR author (<@%s>) when %sing multiple users."
+			_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, fmt.Sprintf(msg, author, action))
+			users = slices.Delete(users, i, i+1)
+		}
 	}
 
 	done := make([]string, 0, len(users))
 	for _, userID := range users {
 		// Check that the user is eligible to be nudged.
-		if !checkUserBeforeNudging(ctx, event, url[0], userID) {
+		if !checkAndNudgeUser(ctx, event, url[0], userID) {
 			continue
 		}
 
 		msg := fmt.Sprintf(":pleading_face: Please take a look at <#%s> :pray:", event.ChannelID)
 		altText := "Tip: click the collapse arrow above this image to hide it, as a self-reminder after completing this task"
 		if err := activities.PostDMWithImage(ctx, event.UserID, userID, msg, imageURL(ctx, imagesHTTPServer), altText); err != nil {
-			PostEphemeralError(ctx, event, fmt.Sprintf("failed to send a %s to <@%s>.", parts[0], userID))
+			PostEphemeralError(ctx, event, fmt.Sprintf("failed to send a %s to <@%s>.", cmd[0], userID))
 			continue
 		}
 
@@ -53,7 +68,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 		return nil
 	}
 
-	msg := "Sent " + parts[0] // "nudge", "ping", or "poke".
+	msg := "Sent " + cmd[0] // "nudge", "ping", or "poke".
 	if len(done) > 1 {
 		msg += "s"
 	}
@@ -61,14 +76,35 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
-// checkUserBeforeNudging ensures that the user exists, is opted-in, and is a reviewer of the PR.
-func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, userID string) bool {
+func authorSlackID(ctx workflow.Context, prURL string) string {
+	pr, err := data.LoadBitbucketPR(ctx, prURL)
+	if err != nil {
+		return ""
+	}
+
+	author, ok := pr["author"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	accountID, ok := author["account_id"].(string)
+	if !ok {
+		return ""
+	}
+
+	return users.BitbucketIDToSlackID(ctx, accountID, true)
+}
+
+// checkAndNudgeUser ensures that the user exists, is opted-in, and is a reviewer of the PR.
+// It returns true if the attention state was updated. If not, it also posts an explanation,
+// with the exception of self-nudges which are silently ignored (the user is nudging a group
+// that they are also part of, when the user nudges only themselves this function isn't called).
+func checkAndNudgeUser(ctx workflow.Context, event SlashCommandEvent, url, userID string) bool {
+	// Silently ignore self-nudges.
 	if userID == event.UserID {
-		// Silently ignore self-nudges when there are additional users
-		// (likely caused by nudging an entire group that includes the user).
 		return false
 	}
 
+	// Check other conditions, send error messages as needed.
 	user, optedIn, err := UserDetails(ctx, event, userID)
 	if err != nil {
 		return false
@@ -79,6 +115,7 @@ func checkUserBeforeNudging(ctx workflow.Context, event SlashCommandEvent, url, 
 		return false
 	}
 
+	// Update the PR's attention state.
 	ok, approved, err := data.Nudge(ctx, url, user.Email)
 	if err != nil {
 		PostEphemeralError(ctx, event, fmt.Sprintf("internal data error while nudging <@%s>.", userID))

@@ -170,7 +170,7 @@ func RemoveReviewerFromTurns(ctx workflow.Context, prURL, email string, approved
 }
 
 // FreezeTurns marks the attention state of a specific PR as frozen by a specific user.
-// This prevents any changes by [SwitchTurn], and only by it, until it is unfrozen.
+// This prevents most changes by [SwitchTurn], and only by it, until it is unfrozen.
 // If the turn is already frozen, this function returns false and does nothing.
 func FreezeTurns(ctx workflow.Context, prURL, email string) (bool, error) {
 	mu := prTurnsMutexes.Get(prURL)
@@ -468,15 +468,15 @@ func writeTurnsFileActivity(_ context.Context, url string, t *PRTurns) error {
 func resetTurns(ctx workflow.Context, url string) (*PRTurns, error) {
 	logger.From(ctx).Warn("resetting PR attention state file", slog.String("pr_url", url))
 
-	snapshot, err := LoadBitbucketPR(ctx, url)
+	pr, err := LoadBitbucketPR(ctx, url)
 	if err != nil {
 		return nil, err
 	}
 
-	author := userEmail(ctx, snapshot["author"])
+	author := userEmail(ctx, pr["author"])
 
 	reviewers := map[string]bool{}
-	jsonList, ok := snapshot["reviewers"].([]any)
+	jsonList, ok := pr["reviewers"].([]any)
 	if !ok {
 		jsonList = []any{}
 	}
@@ -493,12 +493,12 @@ func resetTurns(ctx workflow.Context, url string) (*PRTurns, error) {
 // userEmail extracts the Bitbucket account ID from user details map, and converts
 // it into the user's email address, based on RevChat's own user database.
 func userEmail(ctx workflow.Context, detailsMap any) string {
-	m, ok := detailsMap.(map[string]any)
+	user, ok := detailsMap.(map[string]any)
 	if !ok {
 		return ""
 	}
 
-	accountID, ok := m["account_id"].(string)
+	accountID, ok := user["account_id"].(string)
 	if !ok {
 		return ""
 	}
