@@ -245,6 +245,34 @@ func Frozen(ctx workflow.Context, url string) (time.Time, string) {
 	return t.FrozenAt, t.FrozenBy
 }
 
+// UpdateActivityTime updates the last activity timestamp of a specific user
+// in a specific PR. If the user is empty or "bot", this function does nothing.
+// This is called when the user interacts with the PR in any way that doesn't
+// change their turn (such as PR edits, commit pushes, and review actions).
+func UpdateActivityTime(ctx workflow.Context, prURL, email string) {
+	email = strings.ToLower(email)
+	if email == "" || email == "bot" {
+		return
+	}
+
+	mu := prTurnsMutexes.Get(prURL)
+	mu.Lock()
+	defer mu.Unlock()
+
+	t, err := readTurnsFile(ctx, prURL)
+	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state to update activity",
+			slog.Any("error", err), slog.String("pr_url", prURL), slog.String("email", email))
+		return
+	}
+
+	t.Activity[email] = now(ctx)
+	if err := writeTurnsFile(ctx, prURL, t); err != nil {
+		logger.From(ctx).Error("failed to write PR attention state to update activity",
+			slog.Any("error", err), slog.String("pr_url", prURL), slog.String("email", email))
+	}
+}
+
 // SwitchTurn switches the turn of a specific user in a specific PR to others.
 // If the user is not found or is a bot, this function does nothing.
 // If turns are frozen and the switch isn't forced, it only records the activity.

@@ -165,7 +165,9 @@ func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
 	return false, nil
 }
 
-func SetChannelDescription(ctx workflow.Context, channelID, title, prURL string) {
+func SetChannelDescription(ctx workflow.Context, channelID, title, prURL, email string) {
+	data.UpdateActivityTime(ctx, prURL, email)
+
 	desc := fmt.Sprintf("`%s`", title)
 	if len(desc) > channelMetadataMaxLen {
 		desc = desc[:channelMetadataMaxLen-4] + "`..."

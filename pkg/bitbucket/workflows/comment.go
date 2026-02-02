@@ -168,10 +168,12 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
+	data.UpdateActivityTime(ctx, prURL, data.BitbucketIDToEmail(ctx, event.Actor.AccountID))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
 	sact.AddOKReaction(ctx, url) // The mention below is more important than this reaction.
+
 	return bitbucket.MentionUserInReply(ctx, url, event.Actor, "%s resolved this comment. :ok:")
 }
 
@@ -185,10 +187,12 @@ func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
+	data.UpdateActivityTime(ctx, prURL, data.BitbucketIDToEmail(ctx, event.Actor.AccountID))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
 	sact.RemoveOKReaction(ctx, url) // The mention below is more important than this reaction.
+
 	return bitbucket.MentionUserInReply(ctx, url, event.Actor, "%s reopened this comment. :no_good:")
 }
 
