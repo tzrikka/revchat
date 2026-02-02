@@ -10,15 +10,19 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
 // InitPRData saves the initial state of a new PR: snapshots of PR metadata,
 // and a 2-way ID mapping for syncs between Bitbucket and Slack. If there are
 // errors, they are logged but ignored, as we can try to recreate the data later.
-func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) {
+func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slackAlertsChannel string) {
 	prURL := HTMLURL(event.PullRequest.Links)
-	_ = data.MapURLAndID(ctx, prURL, channelID)
+	if err := data.MapURLAndID(ctx, prURL, prChannelID); err != nil {
+		_ = activities.AlertError(ctx, slackAlertsChannel, "failed to set mapping between a PR and its Slack channel",
+			err, "PR URL", prURL, "Slack channel ID", prChannelID)
+	}
 
 	data.StoreBitbucketPR(ctx, prURL, event.PullRequest)
 	if err := data.UpdateBitbucketDiffstat(prURL, Diffstat(ctx, event)); err != nil {
@@ -30,6 +34,8 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, channelID string) 
 	if email == "" {
 		logger.From(ctx).Error("initializing Bitbucket PR data without author's email",
 			slog.String("pr_url", prURL), slog.String("account_id", event.Actor.AccountID))
+		activities.AlertWarn(ctx, slackAlertsChannel, "Failed to determine a PR author's email address!",
+			"Bitbucket account ID", event.Actor.AccountID)
 		return
 	}
 

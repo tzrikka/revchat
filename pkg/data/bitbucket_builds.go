@@ -37,6 +37,14 @@ func ReadBitbucketBuilds(ctx workflow.Context, prURL string) PRStatus {
 	mu.RLock()
 	defer mu.RUnlock()
 
+	if ctx == nil { // For unit testing.
+		pr, err := readBitbucketBuildsActivity(context.Background(), prURL)
+		if err != nil {
+			return PRStatus{}
+		}
+		return *pr
+	}
+
 	pr := new(PRStatus)
 	err := executeLocalActivity(ctx, readBitbucketBuildsActivity, pr, prURL)
 	if err != nil {
@@ -44,7 +52,6 @@ func ReadBitbucketBuilds(ctx workflow.Context, prURL string) PRStatus {
 			slog.Any("error", err), slog.String("pr_url", prURL))
 		return PRStatus{}
 	}
-
 	return *pr
 }
 
@@ -55,6 +62,11 @@ func UpdateBitbucketBuilds(ctx workflow.Context, prURL, commitHash, key string, 
 	mu := prBuildsMutexes.Get(prURL)
 	mu.Lock()
 	defer mu.Unlock()
+
+	if ctx == nil { // For unit testing.
+		_ = updateBitbucketBuildsActivity(context.Background(), prURL, commitHash, key, cs)
+		return
+	}
 
 	if err := executeLocalActivity(ctx, updateBitbucketBuildsActivity, nil, prURL, commitHash, key, cs); err != nil {
 		logger.From(ctx).Error("failed to update Bitbucket PR's build states", slog.Any("error", err),

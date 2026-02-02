@@ -2,15 +2,18 @@ package users
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/timpani-api/pkg/github"
 )
 
 // GitHubIDToEmail converts a GitHub username into an email address. This function returns an empty
-// string if the account ID is not found. It uses persistent data storage, or API calls as a fallback.
+// string if the username is not found. It uses persistent data storage, or API calls as a fallback.
 func GitHubIDToEmail(ctx workflow.Context, username string) string {
 	if username == "" {
 		return ""
@@ -20,7 +23,24 @@ func GitHubIDToEmail(ctx workflow.Context, username string) string {
 		return user.Email
 	}
 
-	return ""
+	// Use GitHub API as a fallback to get the user's details.
+	ghUser, err := github.UsersGetByUsername(ctx, username)
+	if err != nil {
+		logger.From(ctx).Warn("failed to retrieve GitHub user info",
+			slog.Any("error", err), slog.String("username", username))
+		return ""
+	}
+
+	if ghUser.Email == "" {
+		logger.From(ctx).Warn("found GitHub user but without an email address", slog.String("username", username))
+		return ""
+	}
+
+	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+	email := strings.ToLower(ghUser.Email)
+	_ = data.UpsertUser(ctx, email, "", username, "", "", "")
+
+	return email
 }
 
 // GitHubIDToSlackID converts a GitHub username into a Slack user ID. This

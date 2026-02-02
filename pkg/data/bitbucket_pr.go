@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -60,7 +61,7 @@ func LoadBitbucketPR(ctx workflow.Context, url string) (map[string]any, error) {
 	m := map[string]any{}
 	if err := json.NewDecoder(f).Decode(&m); err != nil {
 		logger.From(ctx).Error("failed to read Bitbucket PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
-		return nil, err
+		return nil, fmt.Errorf("failed to read Bitbucket PR snapshot: %w", err)
 	}
 
 	if len(m) == 0 {

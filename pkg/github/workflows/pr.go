@@ -80,11 +80,11 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to create Slack channel for "+pr.HTMLURL, err)
 	}
 
-	github.InitPRData(ctx, event, channelID)
+	github.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
 
 	// Channel cosmetics.
 	activities.SetChannelTopic(ctx, channelID, pr.HTMLURL)
-	activities.SetChannelDescription(ctx, channelID, pr.Title, pr.HTMLURL)
+	activities.SetChannelDescription(ctx, channelID, pr.Title, pr.HTMLURL, "")
 	github.SetChannelBookmarks(ctx, channelID, pr.HTMLURL, pr)
 
 	msg := "%s created this PR: " + markdown.LinkifyTitle(ctx, c.LinkifyMap, pr.HTMLURL, pr.Title)
@@ -153,6 +153,7 @@ func prConvertedToDraft(ctx workflow.Context, event github.PullRequestEvent) err
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as a draft. :construction:")
+	_, _, _ = data.Nudge(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.PullRequest.User.Login))
 	return nil
 }
 
@@ -167,6 +168,8 @@ func prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as ready for review. :eyes:")
+	_ = data.SwitchTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
+
 	return activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest), nil)
 }
 
@@ -262,13 +265,15 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 
 	defer github.UpdateChannelBookmarks(ctx, &pr, nil, channelID)
 
+	email := users.GitHubIDToEmail(ctx, event.Sender.Login)
+
 	// Title was changed.
 	var err error
 	if event.Changes.Title != nil {
 		msg := ":pencil2: %s edited the PR title: " + markdown.LinkifyTitle(ctx, c.LinkifyMap, pr.HTMLURL, pr.Title)
 		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
-		activities.SetChannelDescription(ctx, channelID, pr.Title, pr.HTMLURL)
+		activities.SetChannelDescription(ctx, channelID, pr.Title, pr.HTMLURL, email)
 
 		maxLen, prefix := c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix
 		err = slack.RenameChannel(ctx, pr.Number, pr.Title, pr.HTMLURL, channelID, maxLen, prefix)
@@ -281,6 +286,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.GitHubToSlack(ctx, body, pr.HTMLURL)
 		}
 		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
+		data.UpdateActivityTime(ctx, pr.HTMLURL, email)
 	}
 
 	// Base branch was changed.
@@ -289,6 +295,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 		repoURL, oldBranch, newBranch := pr.Base.Repo.HTMLURL, event.Changes.Base.Ref, pr.Base.Ref
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
 		github.MentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
+		data.UpdateActivityTime(ctx, pr.HTMLURL, email)
 	}
 
 	return err
@@ -303,6 +310,7 @@ func prSynchronized(ctx workflow.Context, event github.PullRequestEvent) error {
 		return nil
 	}
 
+	data.UpdateActivityTime(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login))
 	defer github.UpdateChannelBookmarks(ctx, &event.PullRequest, nil, channelID)
 
 	if event.After == nil {

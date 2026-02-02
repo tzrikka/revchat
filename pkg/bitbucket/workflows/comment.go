@@ -56,10 +56,10 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 
 	var err error
 	if event.Comment.Parent == nil {
-		err = bitbucket.ImpersonateUserInMsg(ctx, commentURL, channelID, event.Comment.User, msg, diff)
+		err = bitbucket.ImpersonateUserInMsg(ctx, commentURL, channelID, c.SlackAlertsChannel, event.Comment.User, msg, diff)
 	} else {
 		parentURL := bitbucket.HTMLURL(event.Comment.Parent.Links)
-		err = bitbucket.ImpersonateUserInReply(ctx, commentURL, parentURL, event.Comment.User, msg, diff)
+		err = bitbucket.ImpersonateUserInReply(ctx, commentURL, parentURL, c.SlackAlertsChannel, event.Comment.User, msg, diff)
 	}
 
 	// If the comment posting failed, there's no point in polling for updates (but don't ignore that error).
@@ -168,10 +168,12 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
+	data.UpdateActivityTime(ctx, prURL, data.BitbucketIDToEmail(ctx, event.Actor.AccountID))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
 	sact.AddOKReaction(ctx, url) // The mention below is more important than this reaction.
+
 	return bitbucket.MentionUserInReply(ctx, url, event.Actor, "%s resolved this comment. :ok:")
 }
 
@@ -185,10 +187,12 @@ func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
+	data.UpdateActivityTime(ctx, prURL, data.BitbucketIDToEmail(ctx, event.Actor.AccountID))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
 	sact.RemoveOKReaction(ctx, url) // The mention below is more important than this reaction.
+
 	return bitbucket.MentionUserInReply(ctx, url, event.Actor, "%s reopened this comment. :no_good:")
 }
 

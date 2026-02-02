@@ -114,6 +114,9 @@ func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 
+	// Also switch turns to the user who froze them (if possible), but ignore errors.
+	_, _, _ = data.Nudge(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID))
+
 	msg := ":snowflake: Turn switching is now frozen in this PR."
 	if !ok {
 		msg = ":snowflake: Turn switching is already frozen in this PR."

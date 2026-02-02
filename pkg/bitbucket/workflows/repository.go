@@ -27,12 +27,12 @@ func CommitCommentCreatedWorkflow(ctx workflow.Context, _ bitbucket.RepositoryEv
 // CommitStatusWorkflow mirrors build/commit status updates in the corresponding PR's Slack channel:
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-created
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-updated
-func CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
+func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
 	// Commit status --> commit hash --> PR snapshot (JSON map) --> [bitbucket.PullRequest] struct.
 	cs := event.CommitStatus
 	m, err := findPRByCommit(ctx, cs.Commit.Hash)
 	if err != nil {
-		return err
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to associate commit hash with PR", err)
 	}
 	if m == nil {
 		logger.From(ctx).Debug("PR not found for commit status", slog.String("hash", cs.Commit.Hash),
