@@ -38,7 +38,7 @@ func GitHubIDToEmail(ctx workflow.Context, username string) string {
 
 	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
 	email := strings.ToLower(ghUser.Email)
-	_ = data.UpsertUser(ctx, email, "", username, "", "", "")
+	_ = data.UpsertUser(ctx, email, "", "", username, "", "")
 
 	return email
 }
