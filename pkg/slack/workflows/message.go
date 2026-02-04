@@ -23,7 +23,7 @@ import (
 //  5. PR number
 //  6. Optional suffix for comments
 //  7. Numeric comment ID (if 6 isn't empty)
-var urlPattern = regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)/pull(-requests)?/(\d+)(\D+(\d+))?`)
+var urlPattern = regexp.MustCompile(`https://([^/]+)/([^/]+)/([^/]+)/pull(-requests)?/(\d+)(\S+(\d+))?`)
 
 // MessageWorkflow mirrors Slack message creation/editing/deletion events
 // as/in PR comments: https://docs.slack.dev/reference/events/message/
@@ -31,7 +31,7 @@ func (c *Config) MessageWorkflow(ctx workflow.Context, event messageEventWrapper
 	// Instead of calling ![isRevChatChannel], because we also need the PR's URL below.
 	prURL, _ := c.switchURLAndID(ctx, event.InnerEvent.Channel)
 	if prURL == "" {
-		return nil
+		return c.triggerNudge(ctx, event, extractUserID(ctx, &event.InnerEvent))
 	}
 
 	userID := extractUserID(ctx, &event.InnerEvent)

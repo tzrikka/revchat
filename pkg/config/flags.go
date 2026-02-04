@@ -159,6 +159,22 @@ func Flags() []cli.Flag {
 				toml.TOML("slack.alerts_channel", path),
 			),
 		},
+		&cli.StringSliceFlag{
+			Name:  "slack-nudge-channels",
+			Usage: "Slack channels for nudge triggering",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("SLACK_NUDGE_CHANNELS"),
+				toml.TOML("slack.nudge_channels", path),
+			),
+		},
+		&cli.StringSliceFlag{
+			Name:  "slack-nudge-groups",
+			Usage: "Slack groups for nudge triggering",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("SLACK_NUDGE_GROUPS"),
+				toml.TOML("slack.nudge_groups", path),
+			),
+		},
 		&cli.IntFlag{
 			Name:  "slack-channel-name-max-length",
 			Usage: "Maximum length of Slack channel names",

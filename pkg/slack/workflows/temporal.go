@@ -21,6 +21,8 @@ import (
 
 type Config struct {
 	AlertsChannel string
+	NudgeChannels []string
+	NudgeGroups   []string
 
 	BitbucketWorkspace string
 
@@ -39,6 +41,8 @@ type Config struct {
 func newConfig(cmd *cli.Command) *Config {
 	return &Config{
 		AlertsChannel: cmd.String("slack-alerts-channel"),
+		NudgeChannels: cmd.StringSlice("slack-nudge-channels"),
+		NudgeGroups:   cmd.StringSlice("slack-nudge-groups"),
 
 		BitbucketWorkspace: cmd.String("bitbucket-workspace"),
 

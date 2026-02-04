@@ -16,30 +16,30 @@ import (
 )
 
 var (
-	bitbucketURLPattern = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
-	userOrTeamIDPattern = regexp.MustCompile(`<(@|!subteam\^)(\w+)(\|[^>]*)?>`)
+	bitbucketURLPattern  = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
+	userOrGroupIDPattern = regexp.MustCompile(`<(@|!subteam\^)(\w+)(\|[^>]*)?>`)
 )
 
 // extractAtLeastOneUserID extracts at least one user or group ID from the slash command text.
 // Groups are expanded into their member IDs. If no IDs are found, a message is sent to the user.
 func extractAtLeastOneUserID(ctx workflow.Context, event SlashCommandEvent) []string {
-	parts := userOrTeamIDPattern.FindAllStringSubmatch(event.Text, -1)
-	if len(parts) == 0 {
+	matches := userOrGroupIDPattern.FindAllStringSubmatch(event.Text, -1)
+	if len(matches) == 0 {
 		PostEphemeralError(ctx, event, "you need to mention at least one `@user` or `@group`.")
 		return nil
 	}
 
 	var ids []string
-	for _, part := range parts {
-		if part[1] == "@" {
-			ids = append(ids, strings.ToUpper(part[2]))
+	for _, match := range matches {
+		if match[1] == "@" {
+			ids = append(ids, strings.ToUpper(match[2]))
 			continue
 		}
-		members, err := slack.UserGroupsUsersList(ctx, strings.ToUpper(part[2]), false)
+		members, err := slack.UserGroupsUsersList(ctx, strings.ToUpper(match[2]), false)
 		if err != nil {
 			logger.From(ctx).Error("failed to expand Slack user group",
-				slog.Any("error", err), slog.String("subteam_id", part[2]))
-			PostEphemeralError(ctx, event, fmt.Sprintf("failed to expand the user group `<!subteam^%s>`.", part[2]))
+				slog.Any("error", err), slog.String("subteam_id", match[2]))
+			PostEphemeralError(ctx, event, fmt.Sprintf("failed to expand the user group `<!subteam^%s>`.", match[2]))
 			continue
 		}
 		ids = append(ids, members...)
@@ -68,14 +68,14 @@ func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) ([]stri
 		return nil, nil // Not a server error as far as we're concerned.
 	}
 
-	match := bitbucketURLPattern.FindStringSubmatch(url)
-	if len(match) != 4 {
+	parts := bitbucketURLPattern.FindStringSubmatch(url)
+	if len(parts) != 4 {
 		logger.From(ctx).Error("failed to parse PR URL", slog.String("pr_url", url))
 		PostEphemeralError(ctx, event, "failed to determine the context of this channel.")
 		return nil, fmt.Errorf("failed to parse PR URL: %s", url)
 	}
 
-	return match, nil
+	return parts, nil
 }
 
 func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []string, pr map[string]any, err error) {

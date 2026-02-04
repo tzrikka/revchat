@@ -54,9 +54,10 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 			continue
 		}
 
+		imageURL := NudgeImageURL(ctx, imagesHTTPServer)
 		msg := fmt.Sprintf(":pleading_face: Please take a look at <#%s> :pray:", event.ChannelID)
 		altText := "Tip: click the collapse arrow above this image to hide it, as a self-reminder after completing this task"
-		if err := activities.PostDMWithImage(ctx, event.UserID, userID, msg, imageURL(ctx, imagesHTTPServer), altText); err != nil {
+		if err := activities.PostDMWithImage(ctx, event.UserID, userID, msg, imageURL, altText); err != nil {
 			PostEphemeralError(ctx, event, fmt.Sprintf("failed to send a %s to <@%s>.", cmd[0], userID))
 			continue
 		}
@@ -126,7 +127,7 @@ func checkAndNudgeUser(ctx workflow.Context, event SlashCommandEvent, url, userI
 	}
 
 	// Not a tracked participant in this PR - but why?
-	msg := fmt.Sprintf(":see_no_evil: <@%s> is not a tracked participant in this PR.", userID)
+	msg := fmt.Sprintf(":see_no_evil: <@%s> isn't a participant in this PR, add them to enable nudging.", userID)
 	if approved {
 		msg = fmt.Sprintf(":+1: <@%s> already approved this PR.", userID)
 	}
@@ -160,9 +161,9 @@ var nudgeImageFiles = []string{
 	"workaholics.gif",
 }
 
-// imageURL selects a random nudge image and returns its full URL.
+// NudgeImageURL selects a random nudge image and returns its full URL.
 // This function uses [workflow.SideEffect] to enforce determinism.
-func imageURL(ctx workflow.Context, httpServer string) string {
+func NudgeImageURL(ctx workflow.Context, httpServer string) string {
 	encoded := workflow.SideEffect(ctx, func(ctx workflow.Context) any {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(nudgeImageFiles))))
 		if err != nil {
