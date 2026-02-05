@@ -45,9 +45,9 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		return commands.UnfreezeTurns(ctx, event)
 
 	case "approve", "lgtm", "+1":
-		return commands.Approve(ctx, event, c.BitbucketWorkspace)
+		return commands.Approve(ctx, event)
 	case "unapprove", "-1":
-		return commands.Unapprove(ctx, event, c.BitbucketWorkspace)
+		return commands.Unapprove(ctx, event)
 	}
 
 	if cmd := userCommandsPattern.FindStringSubmatch(event.Text); cmd != nil {

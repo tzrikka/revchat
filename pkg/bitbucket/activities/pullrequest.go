@@ -52,7 +52,7 @@ func DeletePullRequestComment(ctx workflow.Context, thrippyID, workspace, repo, 
 	return nil
 }
 
-var commentURLPattern = regexp.MustCompile(`^https://[^/]+/([^/]+)/([^/]+)/pull-requests/(\d+)(.+comment-(\d+))?`)
+var commentURLPattern = regexp.MustCompile(`^https://[^/]+/([^/]+)/([^/]+)/pull-requests/(\d+)([^\s\d]+comment-(\d+))?`)
 
 const expectedSubmatches = 6
 

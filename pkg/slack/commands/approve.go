@@ -10,7 +10,7 @@ import (
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
-func Approve(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace string) error {
+func Approve(ctx workflow.Context, event SlashCommandEvent) error {
 	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
 		return err // May or may not be nil.
@@ -21,13 +21,12 @@ func Approve(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace s
 		return err
 	}
 
-	switch {
-	case bitbucketWorkspace != "":
-		err = bitbucket.PullRequestsApprove(ctx, user.ThrippyLink, url[1], url[2], url[3])
-	default:
-		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
+	if url[1] == "bitbucket.org" {
+		err = bitbucket.PullRequestsApprove(ctx, user.ThrippyLink, url[2], url[3], url[5])
+	} else {
+		logger.From(ctx).Error("GitHub is not supported yet")
 		PostEphemeralError(ctx, event, "internal configuration error.")
-		return errors.New("neither Bitbucket nor GitHub are configured")
+		return errors.New("GitHub is not supported yet")
 	}
 
 	if err != nil {
@@ -42,7 +41,7 @@ func Approve(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace s
 	return nil
 }
 
-func Unapprove(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace string) (err error) {
+func Unapprove(ctx workflow.Context, event SlashCommandEvent) (err error) {
 	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
 		return err // May or may not be nil.
@@ -53,13 +52,12 @@ func Unapprove(ctx workflow.Context, event SlashCommandEvent, bitbucketWorkspace
 		return err
 	}
 
-	switch {
-	case bitbucketWorkspace != "":
-		err = bitbucket.PullRequestsUnapprove(ctx, user.ThrippyLink, url[1], url[2], url[3])
-	default:
-		logger.From(ctx).Error("neither Bitbucket nor GitHub are configured")
+	if url[1] == "bitbucket.org" {
+		err = bitbucket.PullRequestsUnapprove(ctx, user.ThrippyLink, url[2], url[3], url[5])
+	} else {
+		logger.From(ctx).Error("GitHub is not supported yet")
 		PostEphemeralError(ctx, event, "internal configuration error.")
-		return errors.New("neither Bitbucket nor GitHub are configured")
+		return errors.New("GitHub is not supported yet")
 	}
 
 	if err != nil {

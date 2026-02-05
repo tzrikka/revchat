@@ -16,7 +16,16 @@ import (
 )
 
 var (
-	bitbucketURLPattern  = regexp.MustCompile(`^https://[^/]+/([\w-]+)/([\w-]+)/pull-requests/(\d+)`)
+	// PullRequestURLPattern is a regular expression that supports PR and comment URLs in Bitbucket and GitHub:
+	//  1. Hostname (e.g., "bitbucket.org", "github.com")
+	//  2. Bitbucket workspace / GitHub owner
+	//  3. Repository
+	//  4. Partial PR path ("" in GitHub / "-requests" in Bitbucket)
+	//  5. PR number
+	//  6. Optional suffix for comments
+	//  7. Numeric comment ID (within 6, if it's not empty)
+	PullRequestURLPattern = regexp.MustCompile(`https://([^/]+)/([^/]+)/([^/]+)/pull(-requests)?/(\d+)([^\s\d]+(\d+))?`)
+
 	userOrGroupIDPattern = regexp.MustCompile(`<(@|!subteam\^)(\w+)(\|[^>]*)?>`)
 )
 
@@ -68,8 +77,8 @@ func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) ([]stri
 		return nil, nil // Not a server error as far as we're concerned.
 	}
 
-	parts := bitbucketURLPattern.FindStringSubmatch(url)
-	if len(parts) != 4 {
+	parts := PullRequestURLPattern.FindStringSubmatch(url)
+	if len(parts) < 6 {
 		logger.From(ctx).Error("failed to parse PR URL", slog.String("pr_url", url))
 		PostEphemeralError(ctx, event, "failed to determine the context of this channel.")
 		return nil, fmt.Errorf("failed to parse PR URL: %s", url)

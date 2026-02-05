@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -12,18 +11,9 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
+	"github.com/tzrikka/revchat/pkg/slack/commands"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
-
-// urlPattern is a regular expression that supports PR and comment URLs in Bitbucket and GitHub:
-//  1. Hostname (e.g., "bitbucket.org", "github.com")
-//  2. Bitbucket workspace / GitHub owner
-//  3. Repository
-//  4. Partial PR path ("" in GitHub / "-requests" in Bitbucket)
-//  5. PR number
-//  6. Optional suffix for comments
-//  7. Numeric comment ID (if 6 isn't empty)
-var urlPattern = regexp.MustCompile(`https://([^/]+)/([^/]+)/([^/]+)/pull(-requests)?/(\d+)(\S+(\d+))?`)
 
 // MessageWorkflow mirrors Slack message creation/editing/deletion events
 // as/in PR comments: https://docs.slack.dev/reference/events/message/
@@ -132,7 +122,7 @@ func (c *Config) urlParts(ctx workflow.Context, ids string) ([]string, error) {
 		return nil, activities.AlertError(ctx, c.AlertsChannel, "", err, "Slack IDs", fmt.Sprintf("`%s`", ids))
 	}
 
-	parts := urlPattern.FindStringSubmatch(url)
+	parts := commands.PullRequestURLPattern.FindStringSubmatch(url)
 	if len(parts) != 8 {
 		logger.From(ctx).Error("failed to parse Slack message's PR comment URL",
 			slog.String("slack_ids", ids), slog.String("comment_url", url))

@@ -106,7 +106,7 @@ func intersect[S ~[]E, E cmp.Ordered](slice1, slice2 S) S {
 }
 
 func extractPullRequestURLs(text string) []string {
-	matches := urlPattern.FindAllStringSubmatch(text, -1)
+	matches := commands.PullRequestURLPattern.FindAllStringSubmatch(text, -1)
 
 	urls := make([]string, len(matches))
 	for i, parts := range matches {

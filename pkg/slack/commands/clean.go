@@ -14,7 +14,7 @@ import (
 
 func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 	url, paths, pr, err := reviewerData(ctx, event)
-	if err != nil || url == nil || len(url) < 4 || len(paths) == 0 {
+	if err != nil || len(url) < 6 || len(paths) == 0 {
 		return err
 	}
 
@@ -36,7 +36,7 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 	}
 
 	// Retrieve the latest PR metadata from Bitbucket, just in case our stored snapshot is outdated.
-	pr, err = bitbucket.PullRequestsGet(ctx, user.ThrippyLink, workspace, repo, url[3])
+	pr, err = bitbucket.PullRequestsGet(ctx, user.ThrippyLink, workspace, repo, url[5])
 	if err != nil {
 		logger.From(ctx).Error("failed to get Bitbucket PR", slog.Any("error", err), slog.String("pr_url", url[0]),
 			slog.String("slack_user_id", event.UserID), slog.String("thrippy_id", user.ThrippyLink))
@@ -55,7 +55,7 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 		}
 	}
 
-	if _, err := bitbucket.PullRequestsUpdate(ctx, user.ThrippyLink, workspace, repo, url[3], pr); err != nil {
+	if _, err := bitbucket.PullRequestsUpdate(ctx, user.ThrippyLink, workspace, repo, url[5], pr); err != nil {
 		logger.From(ctx).Error("failed to update Bitbucket PR", slog.Any("error", err), slog.String("pr_url", url[0]),
 			slog.String("slack_user_id", event.UserID), slog.String("thrippy_id", user.ThrippyLink))
 		PostEphemeralError(ctx, event, "failed to update PR reviewers in Bitbucket.")
