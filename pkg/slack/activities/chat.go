@@ -48,7 +48,7 @@ func alert(ctx workflow.Context, channelName, text string, err error, details ..
 	info := workflow.GetInfo(ctx)
 	t := info.WorkflowStartTime
 	fmt.Fprintf(msg, "\n\nWorkflow:\n  •  ID = `%s`", info.WorkflowExecution.ID)
-	fmt.Fprintf(msg, "\n  •  Start = <!date^%d^{date_long_pretty} {time_secs}|%s>", t.Unix(), t.UTC().Format(time.RFC3339))
+	fmt.Fprintf(msg, "\n  •  Start = <!date^%d^{date_num} {time_secs}|%s>", t.Unix(), t.UTC().Format(time.RFC3339))
 
 	// Extra details (optional).
 	if len(details) > 0 {
@@ -72,6 +72,9 @@ func alert(ctx workflow.Context, channelName, text string, err error, details ..
 	}
 	for more {
 		frame, more = frames.Next()
+		if !strings.Contains(frame.Function, "revchat") {
+			continue // Ignore calls outside of our codebase.
+		}
 		fn := strings.Split(frame.Function, "/")
 		fmt.Fprintf(msg, "%s - line %d\n    %s\n", frame.File, frame.Line, fn[len(fn)-1])
 	}
