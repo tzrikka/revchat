@@ -84,7 +84,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 		}
 
 		if t, ok := pr["title"].(string); ok && len(t) > 0 {
-			title = fmt.Sprintf("<%s|*%s*>", url, t)
+			title = fmt.Sprintf("<%s|*%s*>", url, strings.ReplaceAll(t, ">", "&gt;"))
 		}
 	}
 	fmt.Fprintf(summary, "\n\n  •  %s%s", draftEmoji, title)
