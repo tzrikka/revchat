@@ -12,6 +12,10 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
+const (
+	maxMessageLength = 11000
+)
+
 func SelfStatus(ctx workflow.Context, event SlashCommandEvent) error {
 	prs := slack.LoadPRTurns(ctx, true)[event.UserID]
 	if len(prs) == 0 {
@@ -24,7 +28,17 @@ func SelfStatus(ctx workflow.Context, event SlashCommandEvent) error {
 
 	slices.Sort(prs)
 	for _, url := range prs {
-		msg.WriteString(slack.PRDetails(ctx, url, []string{event.UserID}))
+		prDetails := slack.PRDetails(ctx, url, []string{event.UserID})
+
+		// If the message is too long for the Slack API, split it into multiple messages.
+		if msg.Len()+len(prDetails) > maxMessageLength {
+			if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String()); err != nil {
+				return err
+			}
+			msg.Reset()
+		}
+
+		msg.WriteString(prDetails)
 	}
 
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
@@ -61,7 +75,17 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent) error {
 	fmt.Fprintf(msg, "These open PRs were/are created/reviewed by <@%s>:", strings.Join(users, ">, <@"))
 
 	for _, url := range filteredPRs {
-		msg.WriteString(slack.PRDetails(ctx, url, users))
+		prDetails := slack.PRDetails(ctx, url, users)
+
+		// If the message is too long for the Slack API, split it into multiple messages.
+		if msg.Len()+len(prDetails) > maxMessageLength {
+			if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String()); err != nil {
+				return err
+			}
+			msg.Reset()
+		}
+
+		msg.WriteString(prDetails)
 	}
 
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
