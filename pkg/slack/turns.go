@@ -74,23 +74,20 @@ func LoadPRTurns(ctx workflow.Context, onlyCurrent bool) map[string][]string {
 func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 	summary := new(strings.Builder)
 
-	// Title.
-	title := fmt.Sprintf("\n\n  •  *<%s>*", url)
+	// Title + optional draft indicator.
+	title := url
+	draftEmoji := ""
 	pr, err := data.LoadBitbucketPR(ctx, url)
 	if err == nil {
-		if t, ok := pr["title"].(string); ok && len(t) > 0 {
-			title = fmt.Sprintf("\n\n  •  <%s|*%s*>", url, t)
+		if draft, ok := pr["draft"].(bool); ok && draft {
+			draftEmoji = ":construction: "
 		}
-	}
 
-	// Draft indicator.
-	if draft, ok := pr["draft"].(bool); ok && draft {
-		title = strings.Replace(title, "•  ", "•  :construction: ", 1)
-		if !strings.Contains(strings.ToLower(title), "draft") {
-			title += " (draft)"
+		if t, ok := pr["title"].(string); ok && len(t) > 0 {
+			title = fmt.Sprintf("<%s|*%s*>", url, t)
 		}
 	}
-	summary.WriteString(title)
+	fmt.Fprintf(summary, "\n\n  •  %s%s", draftEmoji, title)
 
 	// Author.
 	if author, ok := pr["author"].(map[string]any); ok {
@@ -103,9 +100,11 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 		}
 	}
 
-	// Slack channel link.
-	if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
-		fmt.Fprintf(summary, "\n          ◦   <#%s>", channelID)
+	// Slack channel link (unless this is a status report about other users).
+	if len(userIDs) == 1 {
+		if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
+			fmt.Fprintf(summary, "\n          ◦   <#%s>", channelID)
+		}
 	}
 
 	// PR details.
