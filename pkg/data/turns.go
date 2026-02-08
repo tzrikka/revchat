@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -93,19 +94,39 @@ func AddReviewerToTurns(ctx workflow.Context, prURL, email string) error {
 	return nil
 }
 
-// GetCurrentTurn returns the email addresses of all the users whose turn it is to
-// pay attention to a specific PR. If the PR has no assigned reviewers, this function
-// returns the PR author (as a reminder for them to assign reviewers). If any assigned
-// reviewer has their turn flag set to false, we add the author to the list as well.
-func GetCurrentTurn(ctx workflow.Context, prURL string) ([]string, error) {
+// GetAllTurns returns the email addresses of all users that are currently tracked in
+// the attention state of a specific PR, regardless of whether it's their turn or not.
+// This includes the author and reviewers who already approved the PR.
+func GetAllTurns(ctx workflow.Context, prURL string) ([]string, error) {
 	mu := prTurnsMutexes.Get(prURL)
 	mu.Lock()
 	defer mu.Unlock()
 
 	t, err := readTurnsFile(ctx, prURL)
 	if err != nil {
-		logger.From(ctx).Error("failed to read PR attention state of current turn",
-			slog.Any("error", err), slog.String("pr_url", prURL))
+		logger.From(ctx).Error("failed to read PR attention state", slog.Any("error", err), slog.String("pr_url", prURL))
+		return nil, err
+	}
+
+	emails := make([]string, 0, 1+len(t.Reviewers)+len(t.Approvers))
+	emails = slices.AppendSeq(slices.AppendSeq(append(emails, t.Author), maps.Keys(t.Reviewers)), maps.Keys(t.Approvers))
+
+	slices.Sort(emails)
+	return slices.Compact(emails), nil
+}
+
+// GetCurrentTurns returns the email addresses of all the users whose turn it is to
+// pay attention to a specific PR. If the PR has no assigned reviewers, this function
+// returns the PR author (as a reminder for them to assign reviewers). If any assigned
+// reviewer has their turn flag set to false, we add the author to the list as well.
+func GetCurrentTurns(ctx workflow.Context, prURL string) ([]string, error) {
+	mu := prTurnsMutexes.Get(prURL)
+	mu.Lock()
+	defer mu.Unlock()
+
+	t, err := readTurnsFile(ctx, prURL)
+	if err != nil {
+		logger.From(ctx).Error("failed to read PR attention state", slog.Any("error", err), slog.String("pr_url", prURL))
 		return nil, err
 	}
 

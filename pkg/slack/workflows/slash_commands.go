@@ -10,7 +10,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack/commands"
 )
 
-var userCommandsPattern = regexp.MustCompile(`^(follow|unfollow|invite|nudge|ping|poke)`)
+var userCommandsPattern = regexp.MustCompile(`^(follow|unfollow|invite|nudge|ping|poke|stat|state|status)`)
 
 // SlashCommandWorkflow routes user command events to their respective handlers in the [commands] package:
 //   - https://docs.slack.dev/apis/events-api/using-socket-mode#command
@@ -31,7 +31,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 	case "explain":
 		return commands.Explain(ctx, event)
 	case "stat", "state", "status":
-		return commands.Status(ctx, event)
+		return commands.SelfStatus(ctx, event)
 
 	case "who", "whose", "whose turn":
 		return commands.WhoseTurn(ctx, event)
@@ -60,6 +60,8 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 			return commands.Invite(ctx, event)
 		case "nudge", "ping", "poke":
 			return commands.Nudge(ctx, event, c.ThrippyHTTPAddress)
+		case "stat", "state", "status":
+			return commands.StatusOfOthers(ctx, event)
 		}
 	}
 	if commands.RemindersSyntax.MatchString(event.Text) {

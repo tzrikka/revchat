@@ -22,7 +22,7 @@ import (
 
 // LoadPRTurns scans all stored PR turn files, and returns a map of
 // Slack user IDs to all the PR URLs they need to be reminded about.
-func LoadPRTurns(ctx workflow.Context) map[string][]string {
+func LoadPRTurns(ctx workflow.Context, onlyCurrent bool) map[string][]string {
 	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
 	if err != nil {
 		return nil
@@ -39,7 +39,12 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 		}
 
 		prURL := "https://" + strings.TrimSuffix(path, data.TurnsFileSuffix)
-		emails, err := data.GetCurrentTurn(ctx, prURL)
+		var emails []string
+		if onlyCurrent {
+			emails, err = data.GetCurrentTurns(ctx, prURL)
+		} else {
+			emails, err = data.GetAllTurns(ctx, prURL)
+		}
 		if err != nil {
 			return nil
 		}
@@ -66,7 +71,7 @@ func LoadPRTurns(ctx workflow.Context) map[string][]string {
 	return usersToPRs
 }
 
-func PRDetails(ctx workflow.Context, url, userID string) string {
+func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 	summary := new(strings.Builder)
 
 	// Title.
@@ -117,13 +122,20 @@ func PRDetails(ctx workflow.Context, url, userID string) string {
 	}
 
 	// User-specific details.
+	fullNames := make([]string, 0, len(userIDs))
+	for _, userID := range userIDs {
+		if name := users.SlackIDToRealName(ctx, userID); name != "" {
+			fullNames = append(fullNames, name)
+		}
+	}
+
 	paths := data.ReadBitbucketDiffstatPaths(url)
 	if len(paths) == 0 {
 		return summary.String()
 	}
 
 	workspace, repo, branch, commit := DestinationDetails(pr)
-	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, commit, users.SlackIDToRealName(ctx, userID), paths)
+	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, commit, fullNames, paths)
 	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, commit, paths)
 	approvals, names := approvers(ctx, pr)
 

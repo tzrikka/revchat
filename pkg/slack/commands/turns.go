@@ -19,7 +19,7 @@ func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []st
 		return "", nil, data.User{}, err // The error may or may not be nil.
 	}
 
-	emails, err := data.GetCurrentTurn(ctx, url[0])
+	emails, err := data.GetCurrentTurns(ctx, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about the PR.")
 		return "", nil, data.User{}, err
@@ -62,7 +62,7 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		}
 	}
 
-	emails, err = data.GetCurrentTurn(ctx, url)
+	emails, err = data.GetCurrentTurns(ctx, url)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
@@ -92,7 +92,7 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 
-	newTurn, err := data.GetCurrentTurn(ctx, url)
+	newTurn, err := data.GetCurrentTurns(ctx, url)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err

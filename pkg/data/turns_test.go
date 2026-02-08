@@ -13,25 +13,25 @@ func TestTurns(t *testing.T) {
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Pre-initialized state (missing file).
-	got, err := GetCurrentTurn(nil, url)
+	got, err := GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatal("GetCurrentTurn() error = nil, want = true")
+		t.Fatal("GetCurrentTurns() error = nil, want = true")
 	}
 	want := []string{""}
 	if len(got) != 1 && got[0] != "" {
-		t.Fatalf("GetCurrentTurn() = %q, want = %q", got, want)
+		t.Fatalf("GetCurrentTurns() = %q, want = %q", got, want)
 	}
 
 	// Initialize state without reviewers.
 	InitTurns(nil, url, "author")
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Add reviewers.
@@ -39,52 +39,52 @@ func TestTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev1"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	err = AddReviewerToTurns(nil, url, "rev2")
 	if err != nil {
 		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	err = AddReviewerToTurns(nil, url, "rev2") // should be a no-op.
 	if err != nil {
 		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	err = AddReviewerToTurns(nil, url, "author") // should be a no-op.
 	if err != nil {
 		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Update turn states.
@@ -92,39 +92,39 @@ func TestTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	err = SwitchTurn(nil, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	err = SwitchTurn(nil, url, "author", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	ok, err := FreezeTurns(nil, url, "someone")
@@ -150,13 +150,13 @@ func TestTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Force switch while frozen.
@@ -164,13 +164,13 @@ func TestTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Add "rev1" back while still frozen.
@@ -178,39 +178,39 @@ func TestTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	err = RemoveReviewerFromTurns(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	err = RemoveReviewerFromTurns(nil, url, "rev1", false) // Should be a no-op.
 	if err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	ok, err = UnfreezeTurns(nil, url)
@@ -232,13 +232,49 @@ func TestTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
+	}
+}
+
+func TestGetAllTurns(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", d)
+	pathCache.Clear()
+
+	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
+
+	// Initialize state.
+	InitTurns(nil, url, "author")
+
+	if err := AddReviewerToTurns(nil, url, "author"); err != nil {
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
+	}
+	if err := AddReviewerToTurns(nil, url, "reviewer1"); err != nil {
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
+	}
+	if err := AddReviewerToTurns(nil, url, "reviewer2"); err != nil {
+		t.Fatalf("AddReviewerToTurns() error = %v", err)
+	}
+
+	if err := RemoveReviewerFromTurns(nil, url, "reviewer2", true); err != nil {
+		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
+	}
+
+	// Unit test,
+	got, err := GetAllTurns(nil, url)
+	if err != nil {
+		t.Fatalf("GetAllTurns() error = %v", err)
+	}
+
+	want := []string{"author", "reviewer1", "reviewer2"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("GetAllTurns() = %v, want %v", got, want)
 	}
 }
 
@@ -290,13 +326,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
 
-	got, err := GetCurrentTurn(nil, url)
+	got, err := GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want := []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Nudge a non-reviewer.
@@ -327,13 +363,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("Nudge() approved = %v, want %v", approved, false)
 	}
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Rev2 reviews -> it's the author's turn --> nudge the author.
@@ -341,13 +377,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	ok, approved, err = Nudge(nil, url, "author")
@@ -361,13 +397,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("Nudge() approved = %v, want %v", approved, false)
 	}
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Author responds to comments --> it's rev1 and rev2's turn again.
@@ -375,13 +411,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev1", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Rev1 approves, and gets removed from the turn --> it's rev2's turn
@@ -390,13 +426,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Can't nudge rev1 anymore (still a reviewer in Bitbucket, but not tracked by RevChat in this PR).
@@ -423,13 +459,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("NudgeReviewer() approved = %v, want %v", approved, false)
 	}
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author", "rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Author responds to comments --> it's rev2's turn again.
@@ -437,13 +473,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"rev2"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 
 	// Rev2 approves too --> it's the author's turn again.
@@ -451,13 +487,13 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = GetCurrentTurn(nil, url)
+	got, err = GetCurrentTurns(nil, url)
 	if err != nil {
-		t.Fatalf("GetCurrentTurn() error = %v", err)
+		t.Fatalf("GetCurrentTurns() error = %v", err)
 	}
 	want = []string{"author"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetCurrentTurn() = %v, want %v", got, want)
+		t.Fatalf("GetCurrentTurns() = %v, want %v", got, want)
 	}
 }
 

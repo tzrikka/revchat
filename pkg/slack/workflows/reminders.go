@@ -23,7 +23,7 @@ const (
 func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
 
-	prs := slack.LoadPRTurns(ctx)
+	prs := slack.LoadPRTurns(ctx, true)
 	if len(prs) == 0 {
 		return nil
 	}
@@ -52,7 +52,7 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 			var msg strings.Builder
 			msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
 			for _, url := range userPRs {
-				msg.WriteString(slack.PRDetails(ctx, url, userID))
+				msg.WriteString(slack.PRDetails(ctx, url, []string{userID}))
 			}
 
 			msg.WriteString("\n\n:information_source: Slash command tips:")

@@ -23,8 +23,8 @@ type CodeOwners struct {
 
 // CountOwnedFiles counts how many of the given file paths are owned by the given
 // user, according to the "CODEOWNERS" file in the given branch (a PR's destination).
-func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, commit, userName string, paths []string) int {
-	if userName == "" {
+func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, commit string, fullNames, paths []string) int {
+	if len(fullNames) == 0 || len(paths) == 0 {
 		return 0
 	}
 
@@ -33,7 +33,13 @@ func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, commit, user
 		return 0
 	}
 
-	if _, found := c.Users[userName]; !found {
+	found := false
+	for _, fullName := range fullNames {
+		if _, found = c.Users[fullName]; found {
+			break
+		}
+	}
+	if !found {
 		return 0
 	}
 
@@ -45,8 +51,11 @@ func CountOwnedFiles(ctx workflow.Context, workspace, repo, branch, commit, user
 				slog.Any("error", err), slog.String("file_path", p))
 			return 0
 		}
-		if slices.Contains(owners, userName) {
-			count++
+		for _, fullName := range fullNames {
+			if slices.Contains(owners, fullName) {
+				count++
+				break // Don't double-count multiple owners for the same file.
+			}
 		}
 	}
 
