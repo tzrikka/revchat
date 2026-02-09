@@ -1,6 +1,6 @@
 module github.com/tzrikka/revchat
 
-go 1.25.6
+go 1.25.7
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
@@ -43,7 +43,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20 // indirect
