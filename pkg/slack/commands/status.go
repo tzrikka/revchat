@@ -72,21 +72,11 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent) error {
 	filteredPRs = slices.Compact(filteredPRs)
 
 	msg := new(strings.Builder)
-	fmt.Fprintf(msg, "These open PRs were/are created/reviewed by <@%s>:", strings.Join(users, ">, <@"))
+	fmt.Fprintf(msg, "These open PRs were created / are reviewed by <@%s>:", strings.Join(users, ">, <@"))
 
 	for _, url := range filteredPRs {
-		prDetails := slack.PRDetails(ctx, url, users)
-
-		// If the message is too long for the Slack API, split it into multiple messages.
-		if msg.Len()+len(prDetails) > maxMessageLength {
-			if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String()); err != nil {
-				return err
-			}
-			msg.Reset()
-		}
-
-		msg.WriteString(prDetails)
+		msg.WriteString(slack.PRDetails(ctx, url, users))
 	}
 
-	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
+	return activities.PostMessage(ctx, event.ChannelID, msg.String())
 }
