@@ -511,7 +511,7 @@ func writeTurnsFileActivity(_ context.Context, url string, t *PRTurns) error {
 func resetTurns(ctx workflow.Context, url string) (*PRTurns, error) {
 	logger.From(ctx).Warn("resetting PR attention state file", slog.String("pr_url", url))
 
-	pr, err := LoadBitbucketPR(ctx, url)
+	pr, err := LoadPRSnapshot(ctx, url)
 	if err != nil {
 		return nil, err
 	}

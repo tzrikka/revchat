@@ -100,12 +100,12 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 			return err
 		}
 
-		if d.IsDir() || !strings.HasSuffix(d.Name(), data.BitbucketPRSnapshotFileSuffix) {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), data.PRSnapshotFileSuffix) {
 			return nil
 		}
 
-		prURL := "https://" + strings.TrimSuffix(path, data.BitbucketPRSnapshotFileSuffix)
-		snapshot, err := data.LoadBitbucketPR(ctx, prURL)
+		prURL := "https://" + strings.TrimSuffix(path, data.PRSnapshotFileSuffix)
+		snapshot, err := data.LoadPRSnapshot(ctx, prURL)
 		if err != nil {
 			return nil
 		}

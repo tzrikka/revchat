@@ -78,7 +78,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 }
 
 func authorSlackID(ctx workflow.Context, prURL string) string {
-	pr, err := data.LoadBitbucketPR(ctx, prURL)
+	pr, err := data.LoadPRSnapshot(ctx, prURL)
 	if err != nil {
 		return ""
 	}

@@ -77,7 +77,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 	// Title + optional draft indicator.
 	title := url
 	draftEmoji := ""
-	pr, err := data.LoadBitbucketPR(ctx, url)
+	pr, err := data.LoadPRSnapshot(ctx, url)
 	if err == nil {
 		if draft, ok := pr["draft"].(bool); ok && draft {
 			draftEmoji = ":construction: "

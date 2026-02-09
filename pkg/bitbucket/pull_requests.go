@@ -24,7 +24,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 			err, "PR URL", prURL, "Slack channel ID", prChannelID)
 	}
 
-	data.StoreBitbucketPR(ctx, prURL, event.PullRequest)
+	data.StorePRSnapshot(ctx, prURL, event.PullRequest)
 	if err := data.UpdateBitbucketDiffstat(prURL, Diffstat(ctx, event)); err != nil {
 		logger.From(ctx).Error("failed to create Bitbucket PR diffstat",
 			slog.Any("error", err), slog.String("pr_url", prURL))
@@ -80,9 +80,9 @@ func MapToStruct(m any, pr *PullRequest) error {
 
 // SwitchSnapshot stores the given new PR snapshot, and returns the previous one (if there is one).
 func SwitchSnapshot(ctx workflow.Context, prURL string, snapshot PullRequest) (*PullRequest, error) {
-	defer data.StoreBitbucketPR(ctx, prURL, snapshot)
+	defer data.StorePRSnapshot(ctx, prURL, snapshot)
 
-	prev, err := data.LoadBitbucketPR(ctx, prURL)
+	prev, err := data.LoadPRSnapshot(ctx, prURL)
 	if err != nil {
 		return nil, err
 	}

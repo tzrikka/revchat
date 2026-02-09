@@ -21,6 +21,8 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 			err, "PR URL", event.PullRequest.HTMLURL, "Slack channel ID", prChannelID)
 	}
 
+	data.StorePRSnapshot(ctx, event.PullRequest.HTMLURL, event.PullRequest)
+
 	email := users.GitHubIDToEmail(ctx, event.Sender.Login)
 	if email == "" {
 		logger.From(ctx).Error("initializing GitHub PR data without author's email",
