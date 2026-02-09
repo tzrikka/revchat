@@ -8,7 +8,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -108,7 +107,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 	}
 
 	// PR & user-specific details.
-	now := time.Now().UTC()
+	now := workflow.Now(ctx).UTC()
 	created := timeSince(now, pr["created_on"])
 	fmt.Fprintf(summary, "\n          ◦   Created `%s` ago", created)
 

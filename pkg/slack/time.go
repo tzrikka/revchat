@@ -44,13 +44,21 @@ func NormalizeTime(timeStr, amPm string) (string, error) {
 }
 
 func timeSince(now time.Time, timestamp any) string {
-	s, ok := timestamp.(string)
-	if !ok || s == "" {
-		return ""
+	t, ok := timestamp.(time.Time)
+	if !ok {
+		s, ok := timestamp.(string)
+		if !ok || s == "" {
+			return ""
+		}
+
+		var err error
+		t, err = time.Parse(time.RFC3339, s)
+		if err != nil {
+			return ""
+		}
 	}
 
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
+	if t.IsZero() || t.After(now) {
 		return ""
 	}
 
@@ -61,6 +69,6 @@ func timeSince(now time.Time, timestamp any) string {
 
 	days := int(d.Hours()) / 24
 	d -= time.Hour * time.Duration(24*days)
-	s = fmt.Sprintf("%dd %s", days, d)
+	s := fmt.Sprintf("%dd %s", days, d)
 	return strings.TrimSpace(strings.TrimSuffix(strings.ReplaceAll(s, "h", "h "), "0s"))
 }
