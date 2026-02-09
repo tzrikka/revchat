@@ -18,8 +18,6 @@ import (
 
 const (
 	dateTimeLayout = time.DateOnly + " " + time.Kitchen
-
-	maxMessageLength = 11000
 )
 
 func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
@@ -53,11 +51,14 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 
 			var msg strings.Builder
 			msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
-			for _, url := range userPRs {
-				prDetails := slack.PRDetails(ctx, url, []string{userID})
+			singleUser := []string{userID}
 
-				// If the message is too long for the Slack API, split it into multiple messages.
-				if msg.Len()+len(prDetails) > maxMessageLength {
+			for _, url := range userPRs {
+				prDetails := slack.PRDetails(ctx, url, singleUser)
+
+				// If the message becomes too long, split it into multiple chunks,
+				// even if the Slack API could technically handle a bit more.
+				if msg.Len()+len(prDetails) > 39000 {
 					aggregatedErr = errors.Join(aggregatedErr, activities.PostMessage(ctx, userID, msg.String()))
 					msg.Reset()
 				}

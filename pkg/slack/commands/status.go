@@ -12,10 +12,8 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
-const (
-	maxMessageLength = 11000
-)
-
+// SelfStatus is similar to [StatusOfOthers] but lists all the PRs that require the calling user's attention,
+// i.e. PRs where it's their turn to review or respond. The user must be opted-in to use this command.
 func SelfStatus(ctx workflow.Context, event SlashCommandEvent) error {
 	prs := slack.LoadPRTurns(ctx, true)[event.UserID]
 	if len(prs) == 0 {
@@ -25,13 +23,15 @@ func SelfStatus(ctx workflow.Context, event SlashCommandEvent) error {
 
 	var msg strings.Builder
 	msg.WriteString(":eyes: These PRs currently require your attention:")
+	singleUser := []string{event.UserID}
 
 	slices.Sort(prs)
 	for _, url := range prs {
-		prDetails := slack.PRDetails(ctx, url, []string{event.UserID})
+		prDetails := slack.PRDetails(ctx, url, singleUser)
 
-		// If the message is too long for the Slack API, split it into multiple messages.
-		if msg.Len()+len(prDetails) > maxMessageLength {
+		// If the message becomes too long, split it into multiple chunks,
+		// even if the Slack API could technically handle a bit more.
+		if msg.Len()+len(prDetails) > 11000 {
 			if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String()); err != nil {
 				return err
 			}
@@ -75,7 +75,18 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent) error {
 	fmt.Fprintf(msg, "These open PRs were created / are reviewed by <@%s>:", strings.Join(users, ">, <@"))
 
 	for _, url := range filteredPRs {
-		msg.WriteString(slack.PRDetails(ctx, url, users))
+		prDetails := slack.PRDetails(ctx, url, users)
+
+		// If the message becomes too long, split it into multiple chunks,
+		// even if the Slack API could technically handle a bit more.
+		if msg.Len()+len(prDetails) > 39000 {
+			if err := activities.PostMessage(ctx, event.ChannelID, msg.String()); err != nil {
+				return err
+			}
+			msg.Reset()
+		}
+
+		msg.WriteString(prDetails)
 	}
 
 	return activities.PostMessage(ctx, event.ChannelID, msg.String())
