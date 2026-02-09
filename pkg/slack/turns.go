@@ -107,7 +107,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 		}
 	}
 
-	// PR details.
+	// PR & user-specific details.
 	now := time.Now().UTC()
 	created := timeSince(now, pr["created_on"])
 	fmt.Fprintf(summary, "\n          ◦   Created `%s` ago", created)
@@ -116,8 +116,14 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 		fmt.Fprintf(summary, ", updated `%s` ago", updated)
 	}
 
+	if len(userIDs) == 1 {
+		if activity := data.GetActivityTime(ctx, url, users.SlackIDToEmail(ctx, userIDs[0])); !activity.IsZero() {
+			fmt.Fprintf(summary, ", touched by you `%s` ago", timeSince(now, activity))
+		}
+	}
+
 	if b := summarizeBuilds(ctx, url); b != "" {
-		summary.WriteString(", build states: " + b)
+		summary.WriteString(", builds: " + b)
 	}
 
 	// User-specific details.
@@ -142,7 +148,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 		summary.WriteString("\n          ◦   ")
 	}
 	if owner > 0 {
-		fmt.Fprintf(summary, "Code owner: *%d* file", owner)
+		fmt.Fprintf(summary, "Code owners: *%d* file", owner)
 		if owner > 1 {
 			summary.WriteString("s")
 		}
@@ -167,8 +173,6 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 		}
 		fmt.Fprintf(summary, "pprovals: *%d* (%s)", approvals, names)
 	}
-
-	// list.WriteString("\n          ◦   TODO: You haven't commented on it yet | Your last review was `XXX` ago")
 
 	return summary.String()
 }
