@@ -58,7 +58,7 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 
 				// If the message becomes too long, split it into multiple chunks,
 				// even if the Slack API could technically handle a bit more.
-				if msg.Len()+len(prDetails) > 39000 {
+				if msg.Len()+len(prDetails) > 3900 {
 					aggregatedErr = errors.Join(aggregatedErr, activities.PostMessage(ctx, userID, msg.String()))
 					msg.Reset()
 				}

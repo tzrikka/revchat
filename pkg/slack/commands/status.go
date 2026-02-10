@@ -34,7 +34,7 @@ func SelfStatus(ctx workflow.Context, event SlashCommandEvent, reportDrafts bool
 
 		// If the message becomes too long, split it into multiple chunks,
 		// even if the Slack API could technically handle a bit more.
-		if list.Len()+len(prDetails) > 4000 {
+		if list.Len()+len(prDetails) > 3900 {
 			if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, list.String()); err != nil {
 				return err
 			}
@@ -96,7 +96,7 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, reportDrafts 
 
 		// If the message becomes too long, split it into multiple chunks,
 		// even if the Slack API could technically handle a bit more.
-		if list.Len()+len(prDetails) > 4000 {
+		if list.Len()+len(prDetails) > 3900 {
 			if err := activities.PostMessage(ctx, event.ChannelID, list.String()); err != nil {
 				return err
 			}
