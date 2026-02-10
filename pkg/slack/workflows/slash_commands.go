@@ -16,6 +16,7 @@ var userCommandsPattern = regexp.MustCompile(`^(follow|unfollow|invite|nudge|pin
 //   - https://docs.slack.dev/apis/events-api/using-socket-mode#command
 //   - https://docs.slack.dev/interactivity/implementing-slash-commands#app_command_handling
 func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.SlashCommandEvent) error {
+	// Commands without any arguments.
 	event.Text = strings.ToLower(event.Text)
 	switch event.Text {
 	case "", "help":
@@ -31,7 +32,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 	case "explain":
 		return commands.Explain(ctx, event)
 	case "stat", "state", "status":
-		return commands.SelfStatus(ctx, event)
+		return commands.SelfStatus(ctx, event, c.ReportDrafts)
 
 	case "who", "whose", "whose turn":
 		return commands.WhoseTurn(ctx, event)
@@ -50,6 +51,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		return commands.Unapprove(ctx, event)
 	}
 
+	// Commands with 1 or more user and/or group mentions.
 	if cmd := userCommandsPattern.FindStringSubmatch(event.Text); cmd != nil {
 		switch cmd[1] {
 		case "follow":
@@ -61,7 +63,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		case "nudge", "ping", "poke":
 			return commands.Nudge(ctx, event, c.ThrippyHTTPAddress)
 		case "stat", "state", "status":
-			return commands.StatusOfOthers(ctx, event)
+			return commands.StatusOfOthers(ctx, event, c.ReportDrafts)
 		}
 	}
 	if commands.RemindersSyntax.MatchString(event.Text) {

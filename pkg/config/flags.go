@@ -150,7 +150,7 @@ func Flags() []cli.Flag {
 			),
 		},
 
-		// Slack.
+		// Slack (general).
 		&cli.StringFlag{
 			Name:  "slack-alerts-channel",
 			Usage: "Optional Slack channel for alerts",
@@ -175,6 +175,16 @@ func Flags() []cli.Flag {
 				toml.TOML("slack.nudge_groups", path),
 			),
 		},
+		&cli.BoolFlag{
+			Name:  "slack-report-drafts",
+			Usage: "Show drafts in Slack reminders and status reports",
+			Sources: cli.NewValueSourceChain(
+				cli.EnvVar("SLACK_REPORT_DRAFTS"),
+				toml.TOML("slack.report_drafts", path),
+			),
+		},
+
+		// Slack (for Bitbucket or GitHub).
 		&cli.IntFlag{
 			Name:  "slack-channel-name-max-length",
 			Usage: "Maximum length of Slack channel names",

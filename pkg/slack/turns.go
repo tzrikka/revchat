@@ -70,7 +70,7 @@ func LoadPRTurns(ctx workflow.Context, onlyCurrent bool) map[string][]string {
 	return usersToPRs
 }
 
-func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
+func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, reportDrafts bool) string {
 	summary := new(strings.Builder)
 
 	// Title + optional draft indicator.
@@ -86,7 +86,12 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 			title = fmt.Sprintf("<%s|*%s*>", url, strings.ReplaceAll(t, ">", "&gt;"))
 		}
 	}
-	fmt.Fprintf(summary, "\n\n  •  %s%s", draftEmoji, title)
+	fmt.Fprintf(summary, "\n\n%s%s", draftEmoji, title)
+
+	// Circuit breaker for drafts if RevChat isn't configured to report them.
+	if draftEmoji != "" && !reportDrafts {
+		return ""
+	}
 
 	// Author.
 	if author, ok := pr["author"].(map[string]any); ok {
@@ -100,16 +105,16 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 	}
 
 	// Slack channel link (unless this is a status report about other users).
-	if len(userIDs) == 1 {
+	if selfReport {
 		if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
-			fmt.Fprintf(summary, "\n          ◦   <#%s>", channelID)
+			fmt.Fprintf(summary, "\n> <#%s>", channelID)
 		}
 	}
 
 	// PR & user-specific details.
 	now := workflow.Now(ctx).UTC()
 	created := timeSince(now, pr["created_on"])
-	fmt.Fprintf(summary, "\n          ◦   Created `%s` ago", created)
+	fmt.Fprintf(summary, "\n> Created `%s` ago", created)
 
 	if updated := timeSince(now, pr["updated_on"]); updated != "" {
 		fmt.Fprintf(summary, ", updated `%s` ago", updated)
@@ -144,7 +149,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string) string {
 	approvals, names := approvers(ctx, pr)
 
 	if owner+highRisk+approvals > 0 {
-		summary.WriteString("\n          ◦   ")
+		summary.WriteString("\n> ")
 	}
 	if owner > 0 {
 		fmt.Fprintf(summary, "Code owners: *%d* file", owner)

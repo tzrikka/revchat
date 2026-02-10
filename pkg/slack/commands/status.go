@@ -14,39 +14,45 @@ import (
 
 // SelfStatus is similar to [StatusOfOthers] but lists all the PRs that require the calling user's attention,
 // i.e. PRs where it's their turn to review or respond. The user must be opted-in to use this command.
-func SelfStatus(ctx workflow.Context, event SlashCommandEvent) error {
+func SelfStatus(ctx workflow.Context, event SlashCommandEvent, reportDrafts bool) error {
 	prs := slack.LoadPRTurns(ctx, true)[event.UserID]
 	if len(prs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
 	}
 
-	var msg strings.Builder
-	msg.WriteString(":eyes: These PRs currently require your attention:")
-	singleUser := []string{event.UserID}
+	var list strings.Builder
+	list.WriteString(":eyes: These PRs currently require your attention:")
+	header := list.String()
 
 	slices.Sort(prs)
+	singleUser := []string{event.UserID}
+
 	for _, url := range prs {
-		prDetails := slack.PRDetails(ctx, url, singleUser)
+		prDetails := slack.PRDetails(ctx, url, singleUser, true, reportDrafts)
 
 		// If the message becomes too long, split it into multiple chunks,
 		// even if the Slack API could technically handle a bit more.
-		if msg.Len()+len(prDetails) > 11000 {
-			if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String()); err != nil {
+		if list.Len()+len(prDetails) > 11000 {
+			if err := activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, list.String()); err != nil {
 				return err
 			}
-			msg.Reset()
+			list.Reset()
 		}
 
-		msg.WriteString(prDetails)
+		list.WriteString(prDetails)
 	}
 
-	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg.String())
+	msg := list.String()
+	if msg == header {
+		msg = "\n:joy: No PRs require your attention at this time!"
+	}
+	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
 // StatusOfOthers is similar to [SelfStatus] but lists all the PRs associated with the given users
 // and/or groups. This is the only command that doesn't require the calling user to be opted-in.
-func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent) error {
+func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, reportDrafts bool) error {
 	users := extractAtLeastOneUserID(ctx, event)
 	if len(users) == 0 {
 		err := errors.New("failed to use user/group mentions from Slack command")
@@ -71,23 +77,29 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent) error {
 	slices.Sort(filteredPRs)
 	filteredPRs = slices.Compact(filteredPRs)
 
-	msg := new(strings.Builder)
-	fmt.Fprintf(msg, "These open PRs were created / are reviewed by <@%s>:", strings.Join(users, ">, <@"))
+	list := new(strings.Builder)
+	fmt.Fprintf(list, "These open PRs were created / are reviewed by <@%s>:", strings.Join(users, ">, <@"))
+	header := list.String()
 
 	for _, url := range filteredPRs {
-		prDetails := slack.PRDetails(ctx, url, users)
+		prDetails := slack.PRDetails(ctx, url, users, false, reportDrafts)
 
 		// If the message becomes too long, split it into multiple chunks,
 		// even if the Slack API could technically handle a bit more.
-		if msg.Len()+len(prDetails) > 39000 {
-			if err := activities.PostMessage(ctx, event.ChannelID, msg.String()); err != nil {
+		if list.Len()+len(prDetails) > 39000 {
+			if err := activities.PostMessage(ctx, event.ChannelID, list.String()); err != nil {
 				return err
 			}
-			msg.Reset()
+			list.Reset()
 		}
 
-		msg.WriteString(prDetails)
+		list.WriteString(prDetails)
 	}
 
-	return activities.PostMessage(ctx, event.ChannelID, msg.String())
+	msg := list.String()
+	if msg == header {
+		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
+			":joy: No PRs require your attention at this time!")
+	}
+	return activities.PostMessage(ctx, event.ChannelID, msg)
 }
