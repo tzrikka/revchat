@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -70,39 +71,29 @@ func LoadPRTurns(ctx workflow.Context, onlyCurrent bool) map[string][]string {
 	return usersToPRs
 }
 
+// PRDetails returns a summary of a Bitbucket or GitHub PR's metadata and activity.
+// The output is empty if the PR is in draft mode and the reportDrafts parameter is false.
 func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, reportDrafts bool) string {
 	summary := new(strings.Builder)
-
-	// Title + optional draft indicator.
-	title := url
-	draftEmoji := ""
 	pr, err := data.LoadPRSnapshot(ctx, url)
-	if err == nil {
-		if draft, ok := pr["draft"].(bool); ok && draft {
-			draftEmoji = ":construction: "
+	if err != nil {
+		fmt.Fprintf(summary, "\n\n<%s|*%s*>", url, url)
+		if selfReport {
+			if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
+				fmt.Fprintf(summary, "\n> <#%s>", channelID)
+			}
 		}
-
-		if t, ok := pr["title"].(string); ok && len(t) > 0 {
-			title = fmt.Sprintf("<%s|*%s*>", url, strings.ReplaceAll(t, ">", "&gt;"))
-		}
+		summary.WriteString("\n> :warning: Failed to read internal data about this PR")
+		return summary.String()
 	}
-	fmt.Fprintf(summary, "\n\n%s%s", draftEmoji, title)
 
-	// Circuit breaker for drafts if RevChat isn't configured to report them.
-	if draftEmoji != "" && !reportDrafts {
+	// Abort if this is a draft but RevChat isn't configured to report drafts.
+	t, draft := title(url, pr)
+	if draft && !reportDrafts {
 		return ""
 	}
 
-	// Author.
-	if author, ok := pr["author"].(map[string]any); ok {
-		if id, ok := author["account_id"].(string); ok {
-			name, ok := author["display_name"].(string)
-			if !ok {
-				name = ""
-			}
-			summary.WriteString(" by " + users.BitbucketIDToSlackRef(ctx, id, name))
-		}
-	}
+	summary.WriteString(t + author(ctx, url, pr))
 
 	// Slack channel link (unless this is a status report about other users).
 	if selfReport {
@@ -111,12 +102,11 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 		}
 	}
 
-	// PR & user-specific details.
+	// General PR details.
 	now := workflow.Now(ctx).UTC()
-	created := timeSince(now, pr["created_on"])
-	fmt.Fprintf(summary, "\n> Created `%s` ago", created)
-
-	if updated := timeSince(now, pr["updated_on"]); updated != "" {
+	created, updated := times(now, url, pr)
+	summary.WriteString(fmt.Sprintf("\n> Created `%s` ago", created))
+	if updated != "" {
 		fmt.Fprintf(summary, ", updated `%s` ago", updated)
 	}
 
@@ -126,8 +116,9 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 		}
 	}
 
-	if b := summarizeBuilds(ctx, url); b != "" {
-		summary.WriteString(", builds: " + b)
+	summary.WriteString(branch(url, pr))
+	if s := states(ctx, url); s != "" {
+		summary.WriteString(s)
 	}
 
 	// User-specific details.
@@ -181,25 +172,141 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 	return summary.String()
 }
 
-func summarizeBuilds(ctx workflow.Context, url string) string {
-	prStatus := data.ReadBitbucketBuilds(ctx, url)
-	keys := slices.Sorted(maps.Keys(prStatus.Builds))
-	var summary []string
-	for _, k := range keys {
-		switch s := prStatus.Builds[k].State; s {
-		case "INPROGRESS":
-			// Don't show in-progress builds in summary.
-		case "SUCCESSFUL":
-			summary = append(summary, "large_green_circle")
-		default: // "FAILED", "STOPPED".
-			summary = append(summary, "red_circle")
-		}
+func isBitbucketPR(url string) bool {
+	return strings.HasPrefix(url, "https://bitbucket.org/")
+}
+
+func title(url string, pr map[string]any) (string, bool) {
+	prefix := "\n\n"
+
+	draft, ok := pr["draft"].(bool)
+	if ok && draft {
+		prefix += ":construction: "
 	}
 
-	// Returns a sequence of space-separated emoji.
-	if len(summary) > 0 {
-		return fmt.Sprintf(":%s:", strings.Join(summary, ": :"))
+	title, ok := pr["title"].(string)
+	if !ok || len(strings.TrimSpace(title)) == 0 {
+		title = url
 	}
+
+	title = strings.ReplaceAll(strings.TrimSpace(title), ">", "&gt;")
+	return fmt.Sprintf("%s<%s|*%s*>", prefix, url, title), draft
+}
+
+func author(ctx workflow.Context, url string, pr map[string]any) string {
+	if isBitbucketPR(url) {
+		author, ok := pr["author"].(map[string]any)
+		if !ok {
+			return ""
+		}
+		id, ok := author["account_id"].(string)
+		if !ok {
+			return ""
+		}
+		name, ok := author["display_name"].(string)
+		if !ok {
+			name = ""
+		}
+
+		return " by " + users.BitbucketIDToSlackRef(ctx, id, name)
+	}
+
+	// GitHub.
+	author, ok := pr["user"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	login, ok := author["login"].(string)
+	if !ok {
+		return ""
+	}
+	userURL, ok := author["html_url"].(string)
+	if !ok {
+		userURL = ""
+	}
+	userType, ok := author["type"].(string)
+	if !ok {
+		userType = "User"
+	}
+
+	return " by " + users.GitHubIDToSlackRef(ctx, login, userURL, userType)
+}
+
+func times(now time.Time, url string, pr map[string]any) (created, updated string) {
+	keySuffix := "at"
+	if isBitbucketPR(url) {
+		keySuffix = "on"
+	}
+
+	var ok bool
+	created, ok = pr["created_"+keySuffix].(string)
+	if !ok || created == "" {
+		return "unknown", ""
+	}
+	updated, ok = pr["updated_"+keySuffix].(string)
+	if !ok {
+		return timeSince(now, created), ""
+	}
+
+	return timeSince(now, created), timeSince(now, updated)
+}
+
+func branch(url string, pr map[string]any) string {
+	if isBitbucketPR(url) {
+		prefix := "\n> Target branch: `"
+		dest, ok := pr["destination"].(map[string]any)
+		if !ok {
+			return prefix + "unknown`"
+		}
+		branch, ok := dest["branch"].(map[string]any)
+		if !ok {
+			return prefix + "unknown`"
+		}
+		name, ok := branch["name"].(string)
+		if !ok {
+			return prefix + "unknown`"
+		}
+
+		return fmt.Sprintf("%s%s`", prefix, name)
+	}
+
+	// GitHub.
+	prefix := "\n> Base branch: `"
+	base, ok := pr["base"].(map[string]any)
+	if !ok {
+		return prefix + "unknown`"
+	}
+	ref, ok := base["ref"].(string)
+	if !ok {
+		return prefix + "unknown`"
+	}
+
+	return fmt.Sprintf("%s%s`", prefix, ref)
+}
+
+func states(ctx workflow.Context, url string) string {
+	if isBitbucketPR(url) {
+		prStatus := data.ReadBitbucketBuilds(ctx, url)
+		keys := slices.Sorted(maps.Keys(prStatus.Builds))
+		var summary []string
+		for _, k := range keys {
+			switch s := prStatus.Builds[k].State; s {
+			case "INPROGRESS":
+				// Don't show in-progress builds in summary.
+			case "SUCCESSFUL":
+				summary = append(summary, "large_green_circle")
+			default: // "FAILED", "STOPPED".
+				summary = append(summary, "red_circle")
+			}
+		}
+
+		if len(summary) > 0 {
+			return fmt.Sprintf(", builds: :%s:", strings.Join(summary, ": :"))
+		}
+		return ""
+	}
+
+	// GitHub.
 	return ""
 }
 
