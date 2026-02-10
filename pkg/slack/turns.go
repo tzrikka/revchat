@@ -22,7 +22,7 @@ import (
 
 // LoadPRTurns scans all stored PR turn files, and returns a map of
 // Slack user IDs to all the PR URLs they need to be reminded about.
-func LoadPRTurns(ctx workflow.Context, onlyCurrent bool) map[string][]string {
+func LoadPRTurns(ctx workflow.Context, onlyCurrentTurn, authors, reviewers bool) map[string][]string {
 	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
 	if err != nil {
 		return nil
@@ -40,10 +40,10 @@ func LoadPRTurns(ctx workflow.Context, onlyCurrent bool) map[string][]string {
 
 		prURL := "https://" + strings.TrimSuffix(path, data.TurnsFileSuffix)
 		var emails []string
-		if onlyCurrent {
+		if onlyCurrentTurn {
 			emails, err = data.GetCurrentTurns(ctx, prURL)
 		} else {
-			emails, err = data.GetAllTurns(ctx, prURL)
+			emails, err = data.GetAllTurns(ctx, prURL, authors, reviewers)
 		}
 		if err != nil {
 			return nil
@@ -105,7 +105,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 	// General PR details.
 	now := workflow.Now(ctx).UTC()
 	created, updated := times(now, url, pr)
-	summary.WriteString(fmt.Sprintf("\n> Created `%s` ago", created))
+	fmt.Fprintf(summary, "\n> Created `%s` ago", created)
 	if updated != "" {
 		fmt.Fprintf(summary, ", updated `%s` ago", updated)
 	}

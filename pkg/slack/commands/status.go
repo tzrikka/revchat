@@ -3,6 +3,7 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -15,7 +16,7 @@ import (
 // SelfStatus is similar to [StatusOfOthers] but lists all the PRs that require the calling user's attention,
 // i.e. PRs where it's their turn to review or respond. The user must be opted-in to use this command.
 func SelfStatus(ctx workflow.Context, event SlashCommandEvent, reportDrafts bool) error {
-	prs := slack.LoadPRTurns(ctx, true)[event.UserID]
+	prs := slack.LoadPRTurns(ctx, true, true, true)[event.UserID]
 	if len(prs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
@@ -60,7 +61,8 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, reportDrafts 
 			":warning: Failed to use user/group mentions in the Slack command."))
 	}
 
-	allPRs := slack.LoadPRTurns(ctx, false)
+	authors, reviewers := statusMode(event.Text)
+	allPRs := slack.LoadPRTurns(ctx, false, authors, reviewers)
 	if len(allPRs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
@@ -78,7 +80,15 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, reportDrafts 
 	filteredPRs = slices.Compact(filteredPRs)
 
 	list := new(strings.Builder)
-	fmt.Fprintf(list, "These open PRs were created / are reviewed by <@%s>:", strings.Join(users, ">, <@"))
+	switch {
+	case authors && reviewers:
+		list.WriteString("These PRs were created / need to be reviewed")
+	case authors:
+		list.WriteString("These PRs were created")
+	case reviewers:
+		list.WriteString("These PRs need to be reviewed")
+	}
+	fmt.Fprintf(list, " by <@%s>:", strings.Join(users, ">, <@"))
 	header := list.String()
 
 	for _, url := range filteredPRs {
@@ -102,4 +112,19 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, reportDrafts 
 			":joy: No PRs require your attention at this time!")
 	}
 	return activities.PostMessage(ctx, event.ChannelID, msg)
+}
+
+var statusPattern = regexp.MustCompile(`^stat(e|us)?([\s-](auth|rev))?`)
+
+func statusMode(text string) (authors, reviewers bool) {
+	match := statusPattern.FindStringSubmatch(text)
+	// Can't panic because [StatusOfOthers] is registered with a more restrictive pattern.
+	switch match[3] {
+	case "auth":
+		return true, false
+	case "rev":
+		return false, true
+	default:
+		return true, true
+	}
 }

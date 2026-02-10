@@ -247,11 +247,10 @@ func TestGetAllTurns(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", d)
 	pathCache.Clear()
 
-	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
+	url := "https://github.com/owner/repo/pull/123"
 
 	// Initialize state.
 	InitTurns(nil, url, "author")
-
 	if err := AddReviewerToTurns(nil, url, "author"); err != nil {
 		t.Fatalf("AddReviewerToTurns() error = %v", err)
 	}
@@ -266,15 +265,41 @@ func TestGetAllTurns(t *testing.T) {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
 
-	// Unit test,
-	got, err := GetAllTurns(nil, url)
-	if err != nil {
-		t.Fatalf("GetAllTurns() error = %v", err)
+	// Test cases.
+	tests := []struct {
+		name      string
+		authors   bool
+		reviewers bool
+		want      []string
+	}{
+		{
+			name:    "authors_only",
+			authors: true,
+			want:    []string{"author"},
+		},
+		{
+			name:      "reviewers_only",
+			reviewers: true,
+			want:      []string{"reviewer1", "reviewer2"},
+		},
+		{
+			name:      "all",
+			authors:   true,
+			reviewers: true,
+			want:      []string{"author", "reviewer1", "reviewer2"},
+		},
 	}
 
-	want := []string{"author", "reviewer1", "reviewer2"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("GetAllTurns() = %v, want %v", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetAllTurns(nil, url, tt.authors, tt.reviewers)
+			if err != nil {
+				t.Fatalf("GetAllTurns() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("GetAllTurns() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

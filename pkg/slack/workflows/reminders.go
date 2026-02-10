@@ -23,7 +23,7 @@ const (
 func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
 
-	prs := slack.LoadPRTurns(ctx, true)
+	prs := slack.LoadPRTurns(ctx, true, true, true)
 	if len(prs) == 0 {
 		return nil
 	}

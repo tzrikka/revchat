@@ -96,8 +96,8 @@ func AddReviewerToTurns(ctx workflow.Context, prURL, email string) error {
 
 // GetAllTurns returns the email addresses of all users that are currently tracked in
 // the attention state of a specific PR, regardless of whether it's their turn or not.
-// This includes the author and reviewers who already approved the PR.
-func GetAllTurns(ctx workflow.Context, prURL string) ([]string, error) {
+// This includes the author and/or all the reviewers, including those who approved the PR.
+func GetAllTurns(ctx workflow.Context, prURL string, authors, reviewers bool) ([]string, error) {
 	mu := prTurnsMutexes.Get(prURL)
 	mu.Lock()
 	defer mu.Unlock()
@@ -108,8 +108,13 @@ func GetAllTurns(ctx workflow.Context, prURL string) ([]string, error) {
 		return nil, err
 	}
 
-	emails := make([]string, 0, 1+len(t.Reviewers)+len(t.Approvers))
-	emails = slices.AppendSeq(slices.AppendSeq(append(emails, t.Author), maps.Keys(t.Reviewers)), maps.Keys(t.Approvers))
+	var emails []string
+	if authors {
+		emails = append(emails, t.Author)
+	}
+	if reviewers {
+		emails = slices.AppendSeq(slices.AppendSeq(emails, maps.Keys(t.Reviewers)), maps.Keys(t.Approvers))
+	}
 
 	slices.Sort(emails)
 	return slices.Compact(emails), nil
