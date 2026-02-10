@@ -149,13 +149,13 @@ func TestBranch(t *testing.T) {
 					},
 				},
 			},
-			wantBranch: "\n> Target branch: `main`",
+			wantBranch: "\n>Target branch: `main`",
 		},
 		{
 			name:       "bitbucket_missing_destination",
 			url:        "https://bitbucket.org/workspace/repo/pull-requests/5678",
 			pr:         map[string]any{},
-			wantBranch: "\n> Target branch: `unknown`",
+			wantBranch: "\n>Target branch: `unknown`",
 		},
 		{
 			name: "bitbucket_missing_branch",
@@ -163,7 +163,7 @@ func TestBranch(t *testing.T) {
 			pr: map[string]any{
 				"destination": map[string]any{},
 			},
-			wantBranch: "\n> Target branch: `unknown`",
+			wantBranch: "\n>Target branch: `unknown`",
 		},
 		{
 			name: "bitbucket_missing_name",
@@ -173,7 +173,7 @@ func TestBranch(t *testing.T) {
 					"branch": map[string]any{},
 				},
 			},
-			wantBranch: "\n> Target branch: `unknown`",
+			wantBranch: "\n>Target branch: `unknown`",
 		},
 		{
 			name: "bitbucket_non_string_name",
@@ -185,7 +185,7 @@ func TestBranch(t *testing.T) {
 					},
 				},
 			},
-			wantBranch: "\n> Target branch: `unknown`",
+			wantBranch: "\n>Target branch: `unknown`",
 		},
 		{
 			name: "github_happy_path",
@@ -195,13 +195,13 @@ func TestBranch(t *testing.T) {
 					"ref": "main",
 				},
 			},
-			wantBranch: "\n> Base branch: `main`",
+			wantBranch: "\n>Base branch: `main`",
 		},
 		{
 			name:       "github_missing_base",
 			url:        "https://github.com/owner/repo/pulls/5678",
 			pr:         map[string]any{},
-			wantBranch: "\n> Base branch: `unknown`",
+			wantBranch: "\n>Base branch: `unknown`",
 		},
 		{
 			name: "github_missing_ref",
@@ -209,7 +209,7 @@ func TestBranch(t *testing.T) {
 			pr: map[string]any{
 				"base": map[string]any{},
 			},
-			wantBranch: "\n> Base branch: `unknown`",
+			wantBranch: "\n>Base branch: `unknown`",
 		},
 		{
 			name: "github_non_string_ref",
@@ -219,13 +219,13 @@ func TestBranch(t *testing.T) {
 					"ref": 123,
 				},
 			},
-			wantBranch: "\n> Base branch: `unknown`",
+			wantBranch: "\n>Base branch: `unknown`",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotBranch := branch(tt.url, tt.pr)
+			gotBranch := branchName(tt.url, tt.pr)
 			if gotBranch != tt.wantBranch {
 				t.Errorf("branch() = %q, want %q", gotBranch, tt.wantBranch)
 			}
