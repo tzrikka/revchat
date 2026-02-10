@@ -80,10 +80,10 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 		fmt.Fprintf(summary, "\n\n<%s|*%s*>", url, url)
 		if selfReport {
 			if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
-				fmt.Fprintf(summary, "\n> <#%s>", channelID)
+				fmt.Fprintf(summary, "\n><#%s>", channelID)
 			}
 		}
-		summary.WriteString("\n> :warning: Failed to read internal data about this PR")
+		summary.WriteString("\n>:warning: Failed to read internal data about this PR")
 		return summary.String()
 	}
 
@@ -98,14 +98,14 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 	// Slack channel link (unless this is a status report about other users).
 	if selfReport {
 		if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
-			fmt.Fprintf(summary, "\n> <#%s>", channelID)
+			fmt.Fprintf(summary, "\n><#%s>", channelID)
 		}
 	}
 
-	// General PR details.
+	// Timestamps.
 	now := workflow.Now(ctx).UTC()
 	created, updated := times(now, url, pr)
-	fmt.Fprintf(summary, "\n> Created `%s` ago", created)
+	fmt.Fprintf(summary, "\n>Created `%s` ago", created)
 	if updated != "" {
 		fmt.Fprintf(summary, ", updated `%s` ago", updated)
 	}
@@ -116,57 +116,55 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 		}
 	}
 
-	summary.WriteString(branch(url, pr))
+	// File-related details.
+	summary.WriteString(branchName(url, pr))
+	paths := data.ReadBitbucketDiffstatPaths(url)
+	if len(paths) > 0 {
+		workspace, repo, branch, commit := DestinationDetails(pr)
+
+		fullNames := make([]string, 0, len(userIDs))
+		for _, userID := range userIDs {
+			if name := users.SlackIDToRealName(ctx, userID); name != "" {
+				fullNames = append(fullNames, name)
+			}
+		}
+
+		if owned := files.CountOwnedFiles(ctx, workspace, repo, branch, commit, fullNames, paths); owned > 0 {
+			fmt.Fprintf(summary, ", code owners: *%d* file", owned)
+			if owned > 1 {
+				summary.WriteString("s")
+			}
+		}
+
+		if highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, commit, paths); highRisk > 0 {
+			fmt.Fprintf(summary, ", high risk: *%d* file", highRisk)
+			if highRisk > 1 {
+				summary.WriteString("s")
+			}
+		}
+	}
+
 	if s := states(ctx, url); s != "" {
 		summary.WriteString(s)
 	}
 
-	// User-specific details.
-	fullNames := make([]string, 0, len(userIDs))
-	for _, userID := range userIDs {
-		if name := users.SlackIDToRealName(ctx, userID); name != "" {
-			fullNames = append(fullNames, name)
-		}
-	}
-
-	paths := data.ReadBitbucketDiffstatPaths(url)
-	if len(paths) == 0 {
-		return summary.String()
-	}
-
-	workspace, repo, branch, commit := DestinationDetails(pr)
-	owner := files.CountOwnedFiles(ctx, workspace, repo, branch, commit, fullNames, paths)
-	highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, commit, paths)
-	approvals, names := approvers(ctx, pr)
-
-	if owner+highRisk+approvals > 0 {
-		summary.WriteString("\n> ")
-	}
-	if owner > 0 {
-		fmt.Fprintf(summary, "Code owners: *%d* file", owner)
-		if owner > 1 {
-			summary.WriteString("s")
-		}
-		if highRisk > 0 {
-			summary.WriteString(", h")
-		}
-	}
-	if highRisk > 0 {
-		if owner == 0 {
-			summary.WriteString("H")
-		}
-		fmt.Fprintf(summary, "igh risk: *%d* file", highRisk)
-		if highRisk > 1 {
-			summary.WriteString("s")
-		}
+	// Review details.
+	approvals, anames := approvers(ctx, pr)
+	changeRequests, cnames := disapprovers()
+	if approvals+changeRequests > 0 {
+		summary.WriteString("\n>")
 	}
 	if approvals > 0 {
-		if owner+highRisk > 0 {
-			summary.WriteString(", a")
-		} else {
-			summary.WriteString("A")
-		}
-		fmt.Fprintf(summary, "pprovals: *%d* (%s)", approvals, names)
+		fmt.Fprintf(summary, "Approvals: *%d* (%s)", approvals, anames)
+	}
+	if approvals > 0 && changeRequests > 0 {
+		summary.WriteString(", c")
+	}
+	if approvals == 0 && changeRequests > 0 {
+		summary.WriteString("C")
+	}
+	if changeRequests > 0 {
+		fmt.Fprintf(summary, "hange requests: *%d* (%s)", changeRequests, cnames)
 	}
 
 	return summary.String()
@@ -251,9 +249,9 @@ func times(now time.Time, url string, pr map[string]any) (created, updated strin
 	return timeSince(now, created), timeSince(now, updated)
 }
 
-func branch(url string, pr map[string]any) string {
+func branchName(url string, pr map[string]any) string {
 	if isBitbucketPR(url) {
-		prefix := "\n> Target branch: `"
+		prefix := "\n>Target branch: `"
 		dest, ok := pr["destination"].(map[string]any)
 		if !ok {
 			return prefix + "unknown`"
@@ -271,7 +269,7 @@ func branch(url string, pr map[string]any) string {
 	}
 
 	// GitHub.
-	prefix := "\n> Base branch: `"
+	prefix := "\n>Base branch: `"
 	base, ok := pr["base"].(map[string]any)
 	if !ok {
 		return prefix + "unknown`"
@@ -345,4 +343,8 @@ func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
 	}
 
 	return count, names.String()
+}
+
+func disapprovers() (int, string) {
+	return 0, ""
 }
