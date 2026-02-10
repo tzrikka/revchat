@@ -253,7 +253,7 @@ func TestStates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.WriteFile(path, data, 0o644)
+	err = os.WriteFile(path, data, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
