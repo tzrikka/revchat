@@ -10,7 +10,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack/commands"
 )
 
-var userCommandsPattern = regexp.MustCompile(`^((un)?follow|invite|nudge|ping|poke|stat(e|us)?([\s-](auth(or)?|rev(iew(er)?)?))?)`)
+var userCommandsPattern = regexp.MustCompile(`^((un)?follow|invite|nudge|ping|poke|stat(e|us)?([\s-](auth(ors|or)?|rev(iew(ers|er|s)?)?))?)`)
 
 // SlashCommandWorkflow routes user command events to their respective handlers in the [commands] package:
 //   - https://docs.slack.dev/apis/events-api/using-socket-mode#command
