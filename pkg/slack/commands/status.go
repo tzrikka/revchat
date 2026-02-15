@@ -96,9 +96,9 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bo
 	for _, url := range filteredPRs {
 		prDetails := slack.PRDetails(ctx, url, users, false, showDrafts, showTasks, thrippyID)
 
-		// If the message becomes too long, split it into multiple chunks,
-		// even if the Slack API could technically handle a bit more.
-		if list.Len()+len(prDetails) > 3900 {
+		// If the message becomes too long, split it into multiple chunks, even if the Slack API
+		// could technically handle a bit more. Why not 4000? To leave a buffer for encoding.
+		if list.Len()+len(prDetails) > 3800 {
 			if err := activities.PostMessage(ctx, event.ChannelID, list.String()); err != nil {
 				return err
 			}

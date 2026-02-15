@@ -165,23 +165,21 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	if tasksCount > 0 {
 		fmt.Fprintf(summary, "Tasks: *%d*", tasksCount)
 	}
-	if tasksCount > 0 && approversCount > 0 {
-		summary.WriteString(", a")
-	}
-	if tasksCount == 0 && approversCount > 0 {
-		summary.WriteString("A")
-	}
 	if approversCount > 0 {
-		fmt.Fprintf(summary, "pprovals: *%d* (%s)", approversCount, approvers)
-	}
-	if tasksCount+approversCount > 0 && changeRequestsCount > 0 {
-		summary.WriteString(", c")
-	}
-	if tasksCount+approversCount == 0 && changeRequestsCount > 0 {
-		summary.WriteString("C")
+		if tasksCount == 0 {
+			summary.WriteString("A")
+		} else {
+			summary.WriteString(", a")
+		}
+		fmt.Fprintf(summary, "pprovals: *%d* (%s)", approversCount, strings.Join(approvers, ", "))
 	}
 	if changeRequestsCount > 0 {
-		fmt.Fprintf(summary, "hange requests: *%d* (%s)", changeRequestsCount, changeRequests)
+		if tasksCount+approversCount == 0 {
+			summary.WriteString("C")
+		} else {
+			summary.WriteString(", c")
+		}
+		fmt.Fprintf(summary, "hange requests: *%d* (%s)", changeRequestsCount, strings.Join(changeRequests, ", "))
 	}
 	if showTasks && tasksCount > 0 {
 		fmt.Fprintf(summary, "\n>Tasks:%s", strings.Join(tasks, ""))
@@ -373,15 +371,18 @@ func prTasks(ctx workflow.Context, showTasks bool, thrippyID, url string, pr map
 		return nil
 	}
 
-	count, ok := pr["task_count"].(int)
+	// We can't use the Bitbucket API for each PR in each report due to rate limits,
+	// so we rely on the stored PR snapshot as an initial filter.
+	n, ok := pr["task_count"].(float64)
 	if !ok {
 		logger.From(ctx).Warn("missing/invalid task count in Bitbucket PR snapshot", slog.String("url", url))
 		return nil
 	}
+
+	count := int(n)
 	if count == 0 {
 		return nil
 	}
-
 	if !showTasks {
 		// Placeholder list with the correct number of tasks,
 		// because we don't care about their details.
