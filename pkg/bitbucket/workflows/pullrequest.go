@@ -214,7 +214,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		msg.WriteString("> to this PR:")
 		for _, c := range commits {
 			title, _, _ := strings.Cut(c.Message, "\n")
-			fmt.Fprintf(msg, "\n  •  <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title)
+			fmt.Fprintf(msg, "\n  •   <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title)
 		}
 
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg.String())

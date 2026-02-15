@@ -99,7 +99,7 @@ func bitbucketToSlackLists(text string) string {
 	text = regexp.MustCompile(`(?m)\n\s{4}\n([-*+])`).ReplaceAllString(text, "\n${1}")
 
 	// Up to 2 levels: "-" or "+" or "*" --> "•" and "◦".
-	text = regexp.MustCompile(`(?m)^[-*+]\s+`).ReplaceAllString(text, "  •  ")
+	text = regexp.MustCompile(`(?m)^[-*+]\s+`).ReplaceAllString(text, "  •   ")
 	text = regexp.MustCompile(`(?m)^\s{2,4}[-*+]\s+`).ReplaceAllString(text, "          ◦   ")
 
 	// Sometimes Bitbucket escapes the "." in ordered lists.

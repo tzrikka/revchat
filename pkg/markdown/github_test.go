@@ -145,49 +145,49 @@ func TestGitHubToSlack(t *testing.T) {
 		{
 			name: "simple_list_1",
 			text: "- 111\n- 222\n- 333",
-			want: "  •  111\n  •  222\n  •  333",
+			want: "  •   111\n  •   222\n  •   333",
 		},
 		{
 			name: "simple_list_2",
 			text: "* 111\n* 222\n* 333",
-			want: "  •  111\n  •  222\n  •  333",
+			want: "  •   111\n  •   222\n  •   333",
 		},
 		{
 			name: "simple_list_3",
 			text: "+ 111\n+ 222\n+ 333",
-			want: "  •  111\n  •  222\n  •  333",
+			want: "  •   111\n  •   222\n  •   333",
 		},
 		// Simple lists with confusing characters.
 		{
 			name: "simple_list_4",
 			text: "- 111 - 222\n- 333",
-			want: "  •  111 - 222\n  •  333",
+			want: "  •   111 - 222\n  •   333",
 		},
 		{
 			name: "simple_list_5",
 			text: "* 111 * 222\n* 333",
-			want: "  •  111 * 222\n  •  333",
+			want: "  •   111 * 222\n  •   333",
 		},
 		{
 			name: "simple_list_6",
 			text: "+ 111 + 222\n+ 333",
-			want: "  •  111 + 222\n  •  333",
+			want: "  •   111 + 222\n  •   333",
 		},
 		// Embedded lists.
 		{
 			name: "embedded_list_1",
 			text: "- 111\n  - 222\n  - 333\n- 444",
-			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
+			want: "  •   111\n          ◦   222\n          ◦   333\n  •   444",
 		},
 		{
 			name: "embedded_list_2",
 			text: "+ 111\n  + 222\n  + 333\n+ 444",
-			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
+			want: "  •   111\n          ◦   222\n          ◦   333\n  •   444",
 		},
 		{
 			name: "embedded_list_3",
 			text: "* 111\n  * 222\n  * 333\n* 444",
-			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
+			want: "  •   111\n          ◦   222\n          ◦   333\n  •   444",
 		},
 
 		// User mentions.

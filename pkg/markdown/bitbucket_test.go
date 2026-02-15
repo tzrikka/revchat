@@ -177,33 +177,33 @@ func TestBitbucketToSlack(t *testing.T) {
 		{
 			name: "simple_list_1",
 			text: "- 111\n- 222\n- 333",
-			want: "  •  111\n  •  222\n  •  333",
+			want: "  •   111\n  •   222\n  •   333",
 		},
 		{
 			name: "simple_list_2",
 			text: "* 111\n* 222\n* 333",
-			want: "  •  111\n  •  222\n  •  333",
+			want: "  •   111\n  •   222\n  •   333",
 		},
 		{
 			name: "simple_list_3",
 			text: "+ 111\n+ 222\n+ 333",
-			want: "  •  111\n  •  222\n  •  333",
+			want: "  •   111\n  •   222\n  •   333",
 		},
 		// Simple lists with confusing characters.
 		{
 			name: "simple_list_4",
 			text: "- 111 - 222\n- 333",
-			want: "  •  111 - 222\n  •  333",
+			want: "  •   111 - 222\n  •   333",
 		},
 		{
 			name: "simple_list_5",
 			text: "* 111 * 222\n* 333",
-			want: "  •  111 * 222\n  •  333",
+			want: "  •   111 * 222\n  •   333",
 		},
 		{
 			name: "simple_list_6",
 			text: "+ 111 + 222\n+ 333",
-			want: "  •  111 + 222\n  •  333",
+			want: "  •   111 + 222\n  •   333",
 		},
 		{
 			name: "escaped_ordered_list",
@@ -214,22 +214,22 @@ func TestBitbucketToSlack(t *testing.T) {
 		{
 			name: "embedded_list_1",
 			text: "- 111\n  - 222\n  - 333\n- 444",
-			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
+			want: "  •   111\n          ◦   222\n          ◦   333\n  •   444",
 		},
 		{
 			name: "embedded_list_2",
 			text: "* 111\n  * 222\n  * 333\n* 444",
-			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
+			want: "  •   111\n          ◦   222\n          ◦   333\n  •   444",
 		},
 		{
 			name: "embedded_list_3",
 			text: "* 111\n  * 222\n  * 333\n* 444",
-			want: "  •  111\n          ◦   222\n          ◦   333\n  •  444",
+			want: "  •   111\n          ◦   222\n          ◦   333\n  •   444",
 		},
 		{
 			name: "embedded_list_4",
 			text: "XXX\n\n* 111\n\n    * 222\n    * 333\n    \n* 444\n\nYYY",
-			want: "XXX\n\n  •  111\n          ◦   222\n          ◦   333\n  •  444\n\nYYY",
+			want: "XXX\n\n  •   111\n          ◦   222\n          ◦   333\n  •   444\n\nYYY",
 		},
 		// User mentions.
 		// {

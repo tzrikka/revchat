@@ -182,7 +182,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 		fmt.Fprintf(summary, "hange requests: *%d* (%s)", changeRequestsCount, strings.Join(changeRequests, ", "))
 	}
 	if showTasks && tasksCount > 0 {
-		fmt.Fprintf(summary, "\n>Tasks:%s", strings.Join(tasks, ""))
+		summary.WriteString(strings.Join(tasks, ""))
 	}
 
 	return summary.String()
@@ -391,7 +391,7 @@ func prTasks(ctx workflow.Context, showTasks bool, thrippyID, url string, pr map
 
 	tasks, err := activities.ListPullRequestTasks(ctx, thrippyID, url)
 	if err != nil {
-		return slices.Repeat([]string{"\n>•   (Error reading task details)"}, count)
+		return slices.Repeat([]string{"\n> •   (Error reading task details)"}, count)
 	}
 
 	lines := make([]string, 0, count)
@@ -406,12 +406,12 @@ func prTasks(ctx workflow.Context, showTasks bool, thrippyID, url string, pr map
 		}
 		ago := ""
 		if !t.IsZero() {
-			ago = fmt.Sprintf(", <!date^%d^{ago}|%s ago>", t.Unix(), timeSince(workflow.Now(ctx), t))
+			ago = fmt.Sprintf("<!date^%d^{ago}|%s ago>", t.Unix(), timeSince(workflow.Now(ctx), t))
 		}
 
 		text := task.Content.Raw
 		creator := users.BitbucketIDToSlackRef(ctx, task.Creator.AccountID, task.Creator.DisplayName)
-		lines = append(lines, fmt.Sprintf("\n>•   %s (%s%s)", text, creator, ago))
+		lines = append(lines, fmt.Sprintf("\n> •   %s (by %s %s)", text, creator, ago))
 	}
 
 	return lines

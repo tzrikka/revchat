@@ -66,7 +66,7 @@ func gitHubToSlackLinks(text, prURL string) string {
 
 func gitHubToSlackLists(text string) string {
 	// Up to 2 levels: "-" or "*" or "+" --> "•" and "◦".
-	text = regexp.MustCompile(`(?m)^[-*+]\s+`).ReplaceAllString(text, "  •  ")
+	text = regexp.MustCompile(`(?m)^[-*+]\s+`).ReplaceAllString(text, "  •   ")
 	return regexp.MustCompile(`(?m)^\s{2,4}[-*+]\s+`).ReplaceAllString(text, "          ◦   ")
 }
 
@@ -106,7 +106,6 @@ func gitHubToSlackWhitespaces(text string) string {
 // Based on:
 //   - https://docs.slack.dev/messaging/formatting-message-text/
 //   - https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
-//   - https://docs.slack.dev/messaging/formatting-message-text/
 func SlackToGitHub(_ workflow.Context, text string) string {
 	return text
 }

@@ -47,15 +47,15 @@ func alert(ctx workflow.Context, channelName, text string, err error, details ..
 	// Workflow info.
 	info := workflow.GetInfo(ctx)
 	t := info.WorkflowStartTime
-	fmt.Fprintf(msg, "\n\nWorkflow:\n  •  ID = `%s`", info.WorkflowExecution.ID)
-	fmt.Fprintf(msg, "\n  •  Start = <!date^%d^{date_num} {time_secs}|%s>", t.Unix(), t.UTC().Format(time.RFC3339))
+	fmt.Fprintf(msg, "\n\nWorkflow:\n  •   ID = `%s`", info.WorkflowExecution.ID)
+	fmt.Fprintf(msg, "\n  •   Start = <!date^%d^{date_num} {time_secs}|%s>", t.Unix(), t.UTC().Format(time.RFC3339))
 
 	// Extra details (optional).
 	if len(details) > 0 {
 		msg.WriteString("\n\nExtra details:")
 	}
 	for i := 0; i < len(details); i += 2 {
-		fmt.Fprintf(msg, "\n  •  %v", details[i])
+		fmt.Fprintf(msg, "\n  •   %v", details[i])
 		if i+1 < len(details) {
 			fmt.Fprintf(msg, " = %v", details[i+1])
 		}

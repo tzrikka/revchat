@@ -65,7 +65,7 @@ func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[
 	msg.WriteString(":mag_right: Code owners per file in this PR:")
 
 	for _, p := range paths {
-		fmt.Fprintf(&msg, "\n\n  •  `%s`", p)
+		fmt.Fprintf(&msg, "\n\n  •   `%s`", p)
 		fileOwners := owners[p]
 		if len(fileOwners) == 0 {
 			msg.WriteString("\n          ◦   (No code owners found)")
@@ -122,7 +122,7 @@ func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[
 		return msg.String()
 	}
 
-	msg.WriteString("\n\n  •  Other approvers who are not code owners")
+	msg.WriteString("\n\n  •   Other approvers who are not code owners")
 	msg.WriteString("\n          ◦   ")
 
 	mentions := slices.Collect(maps.Keys(approvers))
