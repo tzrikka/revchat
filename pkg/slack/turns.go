@@ -13,6 +13,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/files"
@@ -72,8 +73,9 @@ func LoadPRTurns(ctx workflow.Context, onlyCurrentTurn, authors, reviewers bool)
 }
 
 // PRDetails returns a summary of a Bitbucket or GitHub PR's metadata and activity.
-// The output is empty if the PR is in draft mode and the reportDrafts parameter is false.
-func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, reportDrafts bool) string {
+// The output is empty if the PR is in draft mode and the "reportDrafts" parameter is false.
+// The "thrippyID" parameter is only used to report Bitbucket PR tasks, and can be left empty otherwise.
+func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, showDrafts, showTasks bool, thrippyID string) string {
 	summary := new(strings.Builder)
 	pr, err := data.LoadPRSnapshot(ctx, url)
 	if err != nil {
@@ -89,7 +91,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 
 	// Abort if this is a draft but RevChat isn't configured to report drafts.
 	t, draft := title(url, pr)
-	if draft && !reportDrafts {
+	if draft && !showDrafts {
 		return ""
 	}
 
@@ -149,22 +151,40 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, r
 	}
 
 	// Review details.
-	approvals, anames := approvers(ctx, pr)
-	changeRequests, cnames := disapprovers()
-	if approvals+changeRequests > 0 {
+	tasks := prTasks(ctx, showTasks, thrippyID, url, pr)
+	approvers := prApprovers(ctx, pr)
+	changeRequests := prChangeRequests()
+
+	tasksCount := len(tasks)
+	approversCount := len(approvers)
+	changeRequestsCount := len(changeRequests)
+
+	if tasksCount+approversCount+changeRequestsCount > 0 {
 		summary.WriteString("\n>")
 	}
-	if approvals > 0 {
-		fmt.Fprintf(summary, "Approvals: *%d* (%s)", approvals, anames)
+	if tasksCount > 0 {
+		fmt.Fprintf(summary, "Tasks: *%d*", tasksCount)
 	}
-	if approvals > 0 && changeRequests > 0 {
+	if tasksCount > 0 && approversCount > 0 {
+		summary.WriteString(", a")
+	}
+	if tasksCount == 0 && approversCount > 0 {
+		summary.WriteString("A")
+	}
+	if approversCount > 0 {
+		fmt.Fprintf(summary, "pprovals: *%d* (%s)", approversCount, approvers)
+	}
+	if tasksCount+approversCount > 0 && changeRequestsCount > 0 {
 		summary.WriteString(", c")
 	}
-	if approvals == 0 && changeRequests > 0 {
+	if tasksCount+approversCount == 0 && changeRequestsCount > 0 {
 		summary.WriteString("C")
 	}
-	if changeRequests > 0 {
-		fmt.Fprintf(summary, "hange requests: *%d* (%s)", changeRequests, cnames)
+	if changeRequestsCount > 0 {
+		fmt.Fprintf(summary, "hange requests: *%d* (%s)", changeRequestsCount, changeRequests)
+	}
+	if showTasks && tasksCount > 0 {
+		fmt.Fprintf(summary, "\n>Tasks:%s", strings.Join(tasks, ""))
 	}
 
 	return summary.String()
@@ -308,14 +328,13 @@ func states(ctx workflow.Context, url string) string {
 	return ""
 }
 
-func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
+func prApprovers(ctx workflow.Context, pr map[string]any) []string {
 	participants, ok := pr["participants"].([]any)
 	if !ok {
-		return 0, ""
+		return nil
 	}
 
-	count := 0
-	names := strings.Builder{}
+	var mentions []string
 	for _, p := range participants {
 		participant, ok := p.(map[string]any)
 		if !ok {
@@ -325,8 +344,6 @@ func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
 		if !ok || !approved {
 			continue
 		}
-
-		count++
 		user, ok := participant["user"].(map[string]any)
 		if !ok {
 			continue
@@ -335,16 +352,66 @@ func approvers(ctx workflow.Context, pr map[string]any) (int, string) {
 		if !ok {
 			continue
 		}
-		if count > 1 {
-			names.WriteString(", ")
-		}
 
-		names.WriteString(users.BitbucketIDToSlackRef(ctx, accountID, ""))
+		mention := users.BitbucketIDToSlackRef(ctx, accountID, "")
+		if mention != "" {
+			mentions = append(mentions, mention)
+		}
 	}
 
-	return count, names.String()
+	return mentions
 }
 
-func disapprovers() (int, string) {
-	return 0, ""
+func prChangeRequests() []string {
+	return nil
+}
+
+// prTasks returns a list of formatted strings describing the open tasks in the specified Bitbucket PR.
+// It returns nil in all other cases: not a Bitbucket PR, no open tasks, or no need to enumerate them.
+func prTasks(ctx workflow.Context, showTasks bool, thrippyID, url string, pr map[string]any) []string {
+	if !isBitbucketPR(url) {
+		return nil
+	}
+
+	count, ok := pr["task_count"].(int)
+	if !ok {
+		logger.From(ctx).Warn("missing/invalid task count in Bitbucket PR snapshot", slog.String("url", url))
+		return nil
+	}
+	if count == 0 {
+		return nil
+	}
+
+	if !showTasks {
+		// Placeholder list with the correct number of tasks,
+		// because we don't care about their details.
+		return make([]string, count)
+	}
+
+	tasks, err := activities.ListPullRequestTasks(ctx, thrippyID, url)
+	if err != nil {
+		return slices.Repeat([]string{"\n>•   (Error reading task details)"}, count)
+	}
+
+	lines := make([]string, 0, count)
+	for _, task := range tasks {
+		if task.State == "RESOLVED" {
+			continue
+		}
+
+		t := task.UpdatedOn
+		if t.IsZero() {
+			t = task.CreatedOn
+		}
+		ago := ""
+		if !t.IsZero() {
+			ago = fmt.Sprintf(", <!date^%d^{ago}|%s ago>", t.Unix(), timeSince(workflow.Now(ctx), t))
+		}
+
+		text := task.Content.Raw
+		creator := users.BitbucketIDToSlackRef(ctx, task.Creator.AccountID, task.Creator.DisplayName)
+		lines = append(lines, fmt.Sprintf("\n>•   %s (%s%s)", text, creator, ago))
+	}
+
+	return lines
 }

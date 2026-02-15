@@ -3,7 +3,6 @@ package commands
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -15,7 +14,7 @@ import (
 
 // SelfStatus is similar to [StatusOfOthers] but lists all the PRs that require the calling user's attention,
 // i.e. PRs where it's their turn to review or respond. The user must be opted-in to use this command.
-func SelfStatus(ctx workflow.Context, event SlashCommandEvent, reportDrafts bool) error {
+func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool) error {
 	prs := slack.LoadPRTurns(ctx, true, true, true)[event.UserID]
 	if len(prs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
@@ -30,7 +29,7 @@ func SelfStatus(ctx workflow.Context, event SlashCommandEvent, reportDrafts bool
 	singleUser := []string{event.UserID}
 
 	for _, url := range prs {
-		prDetails := slack.PRDetails(ctx, url, singleUser, true, reportDrafts)
+		prDetails := slack.PRDetails(ctx, url, singleUser, true, showDrafts, false, "")
 
 		// If the message becomes too long, split it into multiple chunks,
 		// even if the Slack API could technically handle a bit more.
@@ -53,7 +52,10 @@ func SelfStatus(ctx workflow.Context, event SlashCommandEvent, reportDrafts bool
 
 // StatusOfOthers is similar to [SelfStatus] but lists all the PRs associated with the given users
 // and/or groups. This is the only command that doesn't require the calling user to be opted-in.
-func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, reportDrafts bool) error {
+func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, thrippyID string) error {
+	showDrafts = showDraftsOption(showDrafts, event.Text)
+	showTasks := strings.Contains(event.Text, " tasks")
+
 	users := extractAtLeastOneUserID(ctx, event)
 	if len(users) == 0 {
 		err := errors.New("failed to use user/group mentions from Slack command")
@@ -92,7 +94,7 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, reportDrafts 
 	header := list.String()
 
 	for _, url := range filteredPRs {
-		prDetails := slack.PRDetails(ctx, url, users, false, reportDrafts)
+		prDetails := slack.PRDetails(ctx, url, users, false, showDrafts, showTasks, thrippyID)
 
 		// If the message becomes too long, split it into multiple chunks,
 		// even if the Slack API could technically handle a bit more.
@@ -114,17 +116,25 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, reportDrafts 
 	return activities.PostMessage(ctx, event.ChannelID, msg)
 }
 
-var statusPattern = regexp.MustCompile(`^stat(e|us)?([\s-](auth|rev))?`)
+func showDraftsOption(defaultValue bool, text string) bool {
+	if !defaultValue && strings.Contains(text, " draft") {
+		defaultValue = true
+	}
+
+	if defaultValue && strings.Contains(text, " no draft") {
+		defaultValue = false
+	}
+
+	return defaultValue
+}
 
 func statusMode(text string) (authors, reviewers bool) {
-	match := statusPattern.FindStringSubmatch(text)
-	// Can't panic because [StatusOfOthers] is registered with a more restrictive pattern.
-	switch match[3] {
-	case "auth":
-		return true, false
-	case "rev":
-		return false, true
-	default:
-		return true, true
+	authors = strings.Contains(text, " author")
+	reviewers = strings.Contains(text, " reviewer")
+
+	if !authors && !reviewers {
+		authors, reviewers = true, true
 	}
+
+	return authors, reviewers
 }

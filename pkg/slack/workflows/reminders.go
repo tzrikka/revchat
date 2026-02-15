@@ -54,7 +54,7 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 			singleUser := []string{userID}
 
 			for _, url := range userPRs {
-				prDetails := slack.PRDetails(ctx, url, singleUser, true, c.ReportDrafts)
+				prDetails := slack.PRDetails(ctx, url, singleUser, true, c.ReportDrafts, false, "")
 
 				// If the message becomes too long, split it into multiple chunks,
 				// even if the Slack API could technically handle a bit more.

@@ -4,6 +4,44 @@ import (
 	"testing"
 )
 
+func TestShowDraftsOption(t *testing.T) {
+	tests := []struct {
+		name    string
+		initial bool
+		text    string
+		want    bool
+	}{
+		{
+			name: "no_change_1",
+		},
+		{
+			name:    "no_change_2",
+			initial: true,
+			want:    true,
+		},
+		{
+			name: "enable_drafts",
+			text: "status @user with drafts",
+			want: true,
+		},
+		{
+			name:    "disable_drafts",
+			initial: true,
+			text:    "status @user no drafts",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := showDraftsOption(tt.initial, tt.text)
+			if got != tt.want {
+				t.Errorf("showDraftsOption(%v, %q) = %v, want %v", tt.initial, tt.text, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestStatusMode(t *testing.T) {
 	tests := []struct {
 		name          string
