@@ -43,7 +43,8 @@ func appendToCSVFile(ctx workflow.Context, record []string) {
 	record = append([]string{now}, record...)
 
 	workflow.SideEffect(ctx, func(ctx workflow.Context) any {
-		f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // Hardcoded path.
+		appendFlags := os.O_APPEND | os.O_CREATE | os.O_WRONLY // != [fileFlags] to avoid truncation.
+		f, err := os.OpenFile(path, appendFlags, filePerms)    //gosec:disable G304 // Hardcoded path.
 		if err != nil {
 			logger.From(ctx).Error("failed to open Slack channels log file",
 				slog.Any("error", err), slog.Any("record", record))
