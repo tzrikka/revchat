@@ -20,25 +20,25 @@ func TestInlineCommentPrefix(t *testing.T) {
 		{
 			name: "single_from_line",
 			url:  "http://example.com",
-			i:    &Inline{From: intPtr(1), Path: "test.txt"},
+			i:    &Inline{From: new(1), Path: "test.txt"},
 			want: "<http://example.com|Inline comment> in line 1 in `test.txt`:\n",
 		},
 		{
 			name: "single_to_line",
 			url:  "http://example.com",
-			i:    &Inline{To: intPtr(1), Path: "test.txt"},
+			i:    &Inline{To: new(1), Path: "test.txt"},
 			want: "<http://example.com|Inline comment> in line 1 in `test.txt`:\n",
 		},
 		{
 			name: "multiple_lines",
 			url:  "http://example.com",
-			i:    &Inline{StartTo: intPtr(2), To: intPtr(3), Path: "test.txt"},
+			i:    &Inline{StartTo: new(2), To: new(3), Path: "test.txt"},
 			want: "<http://example.com|Inline comment> in lines 2-3 in `test.txt`:\n",
 		},
 		{
 			name: "multiple_to_and_from_lines",
 			url:  "http://example.com",
-			i:    &Inline{StartFrom: intPtr(2), StartTo: intPtr(3), From: intPtr(4), To: intPtr(5), Path: "test.txt"},
+			i:    &Inline{StartFrom: new(2), StartTo: new(3), From: new(4), To: new(5), Path: "test.txt"},
 			want: "<http://example.com|Inline comment> in lines 2-5 in `test.txt`:\n",
 		},
 	}
@@ -63,28 +63,28 @@ func TestSpliceSuggestion(t *testing.T) {
 		// Replace.
 		{
 			name:       "replace_first_line_in_original_file",
-			in:         &Inline{From: intPtr(1)},
+			in:         &Inline{From: new(1)},
 			suggestion: "New 1",
 			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
 			want:       "@@ -1,1 +1,1 @@\n-Line 1\n+New 1\n",
 		},
 		{
 			name:       "replace_first_line_in_changed_code",
-			in:         &Inline{To: intPtr(1)},
+			in:         &Inline{To: new(1)},
 			suggestion: "New 1",
 			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
 			want:       "@@ -1,1 +1,1 @@\n-Line 1\n+New 1\n",
 		},
 		{
 			name:       "replace_last_2_lines_in_original_file",
-			in:         &Inline{StartFrom: intPtr(3), From: intPtr(4)},
+			in:         &Inline{StartFrom: new(3), From: new(4)},
 			suggestion: "New 3\nNew 4",
 			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
 			want:       "@@ -3,2 +3,2 @@\n-Line 3\n-Line 4\n+New 3\n+New 4\n",
 		},
 		{
 			name:       "replace_last_2_lines_in_changed_code",
-			in:         &Inline{StartTo: intPtr(3), To: intPtr(4)},
+			in:         &Inline{StartTo: new(3), To: new(4)},
 			suggestion: "New 3\nNew 4",
 			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
 			want:       "@@ -3,2 +3,2 @@\n-Line 3\n-Line 4\n+New 3\n+New 4\n",
@@ -92,28 +92,28 @@ func TestSpliceSuggestion(t *testing.T) {
 		// Add.
 		{
 			name:       "add_1_line_in_original_file",
-			in:         &Inline{From: intPtr(2)},
+			in:         &Inline{From: new(2)},
 			suggestion: "New 2\nNew A",
 			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
 			want:       "@@ -2,1 +2,2 @@\n-Line 2\n+New 2\n+New A\n",
 		},
 		{
 			name:       "add_1_line_in_changed_code",
-			in:         &Inline{To: intPtr(2)},
+			in:         &Inline{To: new(2)},
 			suggestion: "New 2\nNew A",
 			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
 			want:       "@@ -2,1 +2,2 @@\n-Line 2\n+New 2\n+New A\n",
 		},
 		{
 			name:       "add_2_lines_in_original_file",
-			in:         &Inline{StartFrom: intPtr(2), From: intPtr(3)},
+			in:         &Inline{StartFrom: new(2), From: new(3)},
 			suggestion: "Line 2\nNew A\nLine 3\nNew B",
 			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
 			want:       "@@ -2,2 +2,4 @@\n-Line 2\n-Line 3\n+Line 2\n+New A\n+Line 3\n+New B\n",
 		},
 		{
 			name:       "add_2_lines_in_changed_code",
-			in:         &Inline{StartTo: intPtr(2), To: intPtr(3)},
+			in:         &Inline{StartTo: new(2), To: new(3)},
 			suggestion: "Line 2\nLine 3\nNew A\nNew B",
 			srcFile:    "Line 1\nLine 2\nLine 3\nLine 4",
 			want:       "@@ -2,2 +2,4 @@\n-Line 2\n-Line 3\n+Line 2\n+Line 3\n+New A\n+New B\n",
@@ -121,25 +121,25 @@ func TestSpliceSuggestion(t *testing.T) {
 		// Delete.
 		{
 			name:    "delete_last_line_in_original_file",
-			in:      &Inline{From: intPtr(4)},
+			in:      &Inline{From: new(4)},
 			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
 			want:    "@@ -4,1 @@\n-Line 4\n",
 		},
 		{
 			name:    "delete_last_line_in_changed_code",
-			in:      &Inline{To: intPtr(4)},
+			in:      &Inline{To: new(4)},
 			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
 			want:    "@@ -4,1 @@\n-Line 4\n",
 		},
 		{
 			name:    "delete_last_2_lines_in_original_file",
-			in:      &Inline{StartFrom: intPtr(3), From: intPtr(4)},
+			in:      &Inline{StartFrom: new(3), From: new(4)},
 			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
 			want:    "@@ -3,2 @@\n-Line 3\n-Line 4\n",
 		},
 		{
 			name:    "delete_last_2_lines_in_changed_code",
-			in:      &Inline{StartTo: intPtr(3), To: intPtr(4)},
+			in:      &Inline{StartTo: new(3), To: new(4)},
 			srcFile: "Line 1\nLine 2\nLine 3\nLine 4",
 			want:    "@@ -3,2 @@\n-Line 3\n-Line 4\n",
 		},
@@ -153,8 +153,4 @@ func TestSpliceSuggestion(t *testing.T) {
 			}
 		})
 	}
-}
-
-func intPtr(i int) *int {
-	return &i
 }

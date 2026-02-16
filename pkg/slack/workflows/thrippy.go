@@ -10,7 +10,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 	"google.golang.org/grpc"
@@ -52,7 +51,7 @@ func (c *Config) initThrippyLinks(ctx context.Context, id string) {
 	ctx, cancel := context.WithTimeout(ctx, grpcTimeout)
 	defer cancel()
 
-	req := thrippypb.GetLinkRequest_builder{LinkId: proto.String(id)}.Build()
+	req := thrippypb.GetLinkRequest_builder{LinkId: new(id)}.Build()
 	resp, err := client.GetLink(ctx, req)
 	if err != nil {
 		logger.FatalContext(ctx, fmt.Sprintf("failed to read the Thrippy link associated with the ID %q", id), err)
@@ -92,10 +91,10 @@ func (c *Config) createThrippyLinkActivity(ctx context.Context) (*linkData, erro
 
 	// Create the link to generate an ID.
 	createReq := thrippypb.CreateLinkRequest_builder{
-		Template: proto.String(c.ThrippyLinksTemplate),
+		Template: new(c.ThrippyLinksTemplate),
 		OauthConfig: thrippypb.OAuthConfig_builder{
-			ClientId:     proto.String(c.thrippyLinksClientID),
-			ClientSecret: proto.String(c.thrippyLinksClientSecret),
+			ClientId:     new(c.thrippyLinksClientID),
+			ClientSecret: new(c.thrippyLinksClientSecret),
 		}.Build(),
 	}.Build()
 
@@ -105,7 +104,7 @@ func (c *Config) createThrippyLinkActivity(ctx context.Context) (*linkData, erro
 	}
 
 	// Retrieve the new link's configuration to get its nonce.
-	getReq := thrippypb.GetLinkRequest_builder{LinkId: proto.String(createResp.GetLinkId())}.Build()
+	getReq := thrippypb.GetLinkRequest_builder{LinkId: new(createResp.GetLinkId())}.Build()
 	getResp, err := client.GetLink(ctx, getReq)
 	if err != nil {
 		return nil, err
@@ -138,7 +137,7 @@ func (c *Config) pollThrippyLinkActivity(ctx context.Context, linkID string) err
 	ctx, cancel := context.WithTimeout(ctx, pollLinkTimeout)
 	defer cancel()
 
-	req := thrippypb.GetCredentialsRequest_builder{LinkId: proto.String(linkID)}.Build()
+	req := thrippypb.GetCredentialsRequest_builder{LinkId: new(linkID)}.Build()
 	resp, err := client.GetCredentials(ctx, req)
 	if err != nil {
 		return err
@@ -163,7 +162,7 @@ func (c *Config) deleteThrippyLink(ctx workflow.Context, linkID string) error {
 	grpcCtx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 
-	req := thrippypb.DeleteLinkRequest_builder{LinkId: proto.String(linkID)}.Build()
+	req := thrippypb.DeleteLinkRequest_builder{LinkId: new(linkID)}.Build()
 	if _, err = client.DeleteLink(grpcCtx, req); err != nil {
 		logger.From(ctx).Error("failed to delete Thrippy link", slog.Any("error", err), slog.String("thrippy_id", linkID))
 		return err
