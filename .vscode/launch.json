@@ -16,8 +16,10 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "cmd/revchat/main.go",
-            "args": []
+            "program": "cmd/revchat",
+            "args": [
+                "--dev"
+            ]
         }
     ]
 }
