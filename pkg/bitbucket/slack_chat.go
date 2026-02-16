@@ -11,9 +11,10 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
-	tslack "github.com/tzrikka/timpani-api/pkg/slack"
+	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 // No need for thread safety here: this is set only once per process, and even
@@ -52,7 +53,7 @@ func SlackDisplayName(ctx workflow.Context, user Account) string {
 	}
 
 	if workspaceURL == "" {
-		if resp, err := tslack.AuthTest(ctx); err == nil {
+		if resp, err := slack.AuthTest(ctx); err == nil {
 			workspaceURL = resp.URL
 		}
 	}
@@ -139,7 +140,7 @@ func uploadDiff(ctx workflow.Context, diff []byte, url, msg string) (string, str
 // This distinction is necessary due to a limitation in the Slack API: messages posted as
 // another user ("impersonated") cannot be updated or deleted if they include file attachments.
 func postAsUser(ctx workflow.Context, msg, channelID, threadTS, fileID string, user Account) (string, error) {
-	var resp *tslack.ChatPostMessageResponse
+	var resp *slack.ChatPostMessageResponse
 	var err error
 
 	if fileID != "" {
@@ -208,6 +209,7 @@ func EditSlackMsg(ctx workflow.Context, url, msg string) error {
 		return err
 	}
 
+	msg = markdown.ShortenSlackURLs(url, msg)
 	return activities.UpdateMessage(ctx, ids[0], ids[len(ids)-1], msg)
 }
 
