@@ -18,8 +18,6 @@ import (
 //   - https://bitbucket.org/tutorials/markdowndemo/src/master/
 //   - https://docs.slack.dev/messaging/formatting-message-text/
 func BitbucketToSlack(ctx workflow.Context, text, prURL string) string {
-	text = bitbucketToSlackEmoji(text)
-
 	// Before list styling, because our fake lists rely on whitespace prefixes.
 	text = bitbucketToSlackWhitespaces(text)
 	// Before text styling, to prevent confusion in "*"-based bullets with text that contains "*" characters.
@@ -34,22 +32,7 @@ func BitbucketToSlack(ctx workflow.Context, text, prURL string) string {
 		text = strings.ReplaceAll(text, bbRef, users.BitbucketIDToSlackRef(ctx, accountID, ""))
 	}
 
-	return text
-}
-
-// bitbucketToSlackEmoji is the inverse of [slackToBitbucketEmoji].
-func bitbucketToSlackEmoji(text string) string {
-	text = strings.ReplaceAll(text, ":frame_photo:", ":frame_with_picture:")
-	text = strings.ReplaceAll(text, ":man_facepalming:", ":man-facepalming:")
-	text = strings.ReplaceAll(text, ":man_gesturing_ok:", ":man-gesturing-ok:")
-	text = strings.ReplaceAll(text, ":man_shrugging:", ":man-shrugging:")
-	text = strings.ReplaceAll(text, ":robot:", ":robot_face:")
-	text = strings.ReplaceAll(text, ":rofl:", ":rolling_on_the_floor_laughing:")
-	text = strings.ReplaceAll(text, ":slight_smile:", ":slightly_smiling_face:")
-	text = strings.ReplaceAll(text, ":upside_down:", ":upside_down_face:")
-	text = strings.ReplaceAll(text, ":woman_facepalming:", ":woman-facepalming:")
-	text = strings.ReplaceAll(text, ":woman_gesturing_ok:", ":woman-gesturing-ok:")
-	return strings.ReplaceAll(text, ":woman_shrugging:", ":woman-shrugging:")
+	return BitbucketToSlackEmoji(text)
 }
 
 func bitbucketToSlackLinks(text, prURL string) string {
@@ -151,8 +134,6 @@ func bitbucketToSlackWhitespaces(text string) string {
 //   - https://confluence.atlassian.com/bitbucketserver/markdown-syntax-guide-776639995.html
 //   - https://bitbucket.org/tutorials/markdowndemo/src/master/
 func SlackToBitbucket(ctx workflow.Context, text string) string {
-	text = slackToBitbucketEmoji(text)
-
 	// Before the rest because they undo a few whitespace changes.
 	text = slackToBitbucketWhitespaces(text)
 
@@ -160,7 +141,9 @@ func SlackToBitbucket(ctx workflow.Context, text string) string {
 	text = slackToBitbucketLists(text)
 	text = slackToBitbucketTextStyles(text)
 	text = slackToBitbucketReferences(ctx, text)
-	return slackToBitbucketLinks(text)
+	text = slackToBitbucketLinks(text)
+
+	return SlackToBitbucketEmoji(text)
 }
 
 func slackToBitbucketBlocks(text string) string {
@@ -171,22 +154,6 @@ func slackToBitbucketBlocks(text string) string {
 
 	// Code blocks: "```...```" --> "```\n...\n```".
 	return regexp.MustCompile("(?s)```(.+?)```").ReplaceAllString(text, "```\n${1}\n```")
-}
-
-// slackToBitbucketEmoji is the inverse of [bitbucketToSlackEmoji].
-func slackToBitbucketEmoji(text string) string {
-	text = strings.ReplaceAll(text, ":frame_with_picture:", ":frame_photo:")
-	text = strings.ReplaceAll(text, ":man-facepalming:", ":man_facepalming:")
-	text = strings.ReplaceAll(text, ":man-gesturing-ok:", ":man_gesturing_ok:")
-	text = strings.ReplaceAll(text, ":man-shrugging:", ":man_shrugging:")
-	text = strings.ReplaceAll(text, ":robot_face:", ":robot:")
-	text = strings.ReplaceAll(text, ":rolling_on_the_floor_laughing:", ":rofl:")
-	text = strings.ReplaceAll(text, ":shrug:", ":man_shrugging:")
-	text = strings.ReplaceAll(text, ":slightly_smiling_face:", ":slight_smile:")
-	text = strings.ReplaceAll(text, ":upside_down_face:", ":upside_down:")
-	text = strings.ReplaceAll(text, ":woman-facepalming:", ":woman_facepalming:")
-	text = strings.ReplaceAll(text, ":woman-gesturing-ok:", ":woman_gesturing_ok:")
-	return strings.ReplaceAll(text, ":woman-shrugging:", ":woman_shrugging:")
 }
 
 func slackToBitbucketLinks(text string) string {

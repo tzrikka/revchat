@@ -49,7 +49,7 @@ func GitHubToSlack(ctx workflow.Context, text, prURL string) string {
 		text = strings.ReplaceAll(text, ghRef, slackRef)
 	}
 
-	return text
+	return GitHubToSlackEmoji(text)
 }
 
 func gitHubToSlackLinks(text, prURL string) string {
@@ -107,5 +107,5 @@ func gitHubToSlackWhitespaces(text string) string {
 //   - https://docs.slack.dev/messaging/formatting-message-text/
 //   - https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
 func SlackToGitHub(_ workflow.Context, text string) string {
-	return text
+	return SlackToGitHubEmoji(text)
 }
