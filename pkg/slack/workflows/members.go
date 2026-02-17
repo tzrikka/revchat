@@ -32,7 +32,7 @@ func (c *Config) MemberJoinedWorkflow(ctx workflow.Context, event memberEventWra
 		"User", mention, "Channel ID", e.Channel)
 
 	msg := ":wave: Hi %s! You joined a RevChat channel, but you have to opt-in for this to work! Please run "
-	return activities.PostMessage(ctx, e.User, fmt.Sprintf(msg, mention)+"this slash command:\n\n```/revchat opt-in```")
+	return activities.PostMessage(ctx, e.User, fmt.Sprintf(msg, mention)+"this Slack command:\n\n```/revchat opt-in```")
 }
 
 // MemberLeftWorkflow is (or rather will be) based on:

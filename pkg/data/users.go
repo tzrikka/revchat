@@ -41,7 +41,7 @@ type User struct {
 
 	RealName string `json:"real_name,omitempty"` // Not guaranteed to be unique, unlike the fields above.
 
-	// Slack user IDs, controlled by the un/follow slash commands, used when creating channels.
+	// Slack user IDs, controlled by the un/follow Slack commands, used when creating channels.
 	Followers []string `json:"followers,omitempty"`
 
 	Created string `json:"created,omitempty"`

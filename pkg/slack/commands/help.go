@@ -14,7 +14,7 @@ func Help(ctx workflow.Context, event SlashCommandEvent) error {
 	cmds.WriteString(":wave: Available general commands:\n")
 	cmds.WriteString("\n  •   `%s opt-in` - opt into being added to PR channels and receiving DMs")
 	cmds.WriteString("\n  •   `%s opt-out` - opt out of being added to PR channels and receiving DMs")
-	cmds.WriteString("\n  •   `%s reminders at <time in 12h/24h format>` - weekdays, using your timezone")
+	cmds.WriteString("\n  •   `%s reminders at <time in 12h or 24h format>` - weekdays, using your timezone")
 	cmds.WriteString("\n  •   `%s follow <1 or more @users or @groups>` - auto add yourself to PRs they create")
 	cmds.WriteString("\n  •   `%s unfollow <1 or more @users or @groups>` - stop following their PR channels")
 	cmds.WriteString("\n  •   `%s status` - all the PRs you need to look at, as an author or a reviewer")

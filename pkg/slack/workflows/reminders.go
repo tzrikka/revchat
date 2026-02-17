@@ -66,9 +66,9 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 				msg.WriteString(prDetails)
 			}
 
-			msg.WriteString("\n\n:information_source: Slash command tips:")
+			msg.WriteString("\n\n:information_source: Slack command tips:")
 			msg.WriteString("\n  •   `/revchat status` - updated report at any time")
-			msg.WriteString("\n  •   `/revchat reminder <time in 12h/24h format>` - change time or timezone")
+			msg.WriteString("\n  •   `/revchat reminder <time in 12h or 24h format>` - change time or timezone")
 			msg.WriteString("\n  •   `/revchat who` / `[not] my turn` / `[un]freeze` - only in PR channels")
 			msg.WriteString("\n  •   `/revchat explain` - who needs to approve each file, and have they?")
 

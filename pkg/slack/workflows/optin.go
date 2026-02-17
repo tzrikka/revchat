@@ -99,7 +99,7 @@ func (c *Config) OptInSlashCommand(ctx workflow.Context, event commands.SlashCom
 
 	msg = ":bell: You are now opted into using RevChat.\n\n"
 	msg += ":alarm_clock: Default time for weekday reminders = *8 AM* (in your current timezone). "
-	msg += "To change it, run this slash command:\n\n```%s reminders at <time in 12h or 24h format>```"
+	msg += "To change it, run this Slack command:\n\n```%s reminders at <time in 12h or 24h format>```"
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, fmt.Sprintf(msg, event.Command))
 }
 

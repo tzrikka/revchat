@@ -258,7 +258,7 @@ func (c *Config) thrippyLinkID(ctx workflow.Context, userID, channelID string) (
 	}
 
 	if !optedIn {
-		msg := ":warning: Cannot mirror this in the PR, you need to run this slash command: `/revchat opt-in`"
+		msg := ":warning: Cannot mirror this in the PR, you need to run this Slack command: `/revchat opt-in`"
 		return "", activities.PostEphemeralMessage(ctx, channelID, userID, msg)
 	}
 
