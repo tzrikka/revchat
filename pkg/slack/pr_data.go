@@ -119,10 +119,10 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	}
 
 	// File-related details.
-	summary.WriteString(branchName(url, pr))
+	summary.WriteString(branchNameMarkdown(ctx, url, pr))
 	paths := data.ReadBitbucketDiffstatPaths(url)
 	if len(paths) > 0 {
-		workspace, repo, branch, commit := DestinationDetails(pr)
+		owner, repo, branch, commit := PRIdentifiers(ctx, url, pr)
 
 		fullNames := make([]string, 0, len(userIDs))
 		for _, userID := range userIDs {
@@ -131,14 +131,14 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 			}
 		}
 
-		if owned := files.CountOwnedFiles(ctx, workspace, repo, branch, commit, fullNames, paths); owned > 0 {
+		if owned := files.CountOwnedFiles(ctx, owner, repo, branch, commit, fullNames, paths); owned > 0 {
 			fmt.Fprintf(summary, ", code owners: *%d* file", owned)
 			if owned > 1 {
 				summary.WriteString("s")
 			}
 		}
 
-		if highRisk := files.CountHighRiskFiles(ctx, workspace, repo, branch, commit, paths); highRisk > 0 {
+		if highRisk := files.CountHighRiskFiles(ctx, owner, repo, branch, commit, paths); highRisk > 0 {
 			fmt.Fprintf(summary, ", high risk: *%d* file", highRisk)
 			if highRisk > 1 {
 				summary.WriteString("s")
@@ -188,25 +188,52 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	return summary.String()
 }
 
-func isBitbucketPR(url string) bool {
-	return strings.HasPrefix(url, "https://bitbucket.org/")
+// PRIdentifiers extracts the workspace/owner, repo, destination branch, and
+// destination commit hash from the given snapshot of a Bitbucket or GitHub PR.
+func PRIdentifiers(ctx workflow.Context, url string, pr map[string]any) (owner, repo, branch, hash string) {
+	m, ok := branchMap(ctx, url, pr)
+	if !ok {
+		return "", "", "", ""
+	}
+
+	owner, repo, ok = branchOwnerAndRepo(ctx, url, m)
+	if !ok {
+		return "", "", "", ""
+	}
+
+	branch, ok = branchName(ctx, url, m)
+	if !ok {
+		return owner, repo, "", ""
+	}
+
+	// Bitbucket commit hash.
+	if isBitbucketPR(url) {
+		commit, ok := m["commit"].(map[string]any)
+		if !ok {
+			logger.From(ctx).Warn("missing/invalid commit in PR snapshot", slog.String("pr_url", url))
+			return owner, repo, branch, ""
+		}
+		hash, ok = commit["hash"].(string)
+		if !ok {
+			logger.From(ctx).Warn("missing/invalid commit hash in PR snapshot", slog.String("pr_url", url))
+			return owner, repo, branch, ""
+		}
+
+		return owner, repo, branch, hash
+	}
+
+	// GitHub commit hash.
+	hash, ok = m["sha"].(string)
+	if !ok {
+		logger.From(ctx).Warn("missing/invalid commit sha in PR snapshot", slog.String("pr_url", url))
+		return owner, repo, branch, ""
+	}
+
+	return owner, repo, branch, hash
 }
 
-func title(url string, pr map[string]any) (string, bool) {
-	prefix := "\n\n"
-
-	draft, ok := pr["draft"].(bool)
-	if ok && draft {
-		prefix += ":construction: "
-	}
-
-	title, ok := pr["title"].(string)
-	if !ok || len(strings.TrimSpace(title)) == 0 {
-		title = url
-	}
-
-	title = strings.ReplaceAll(strings.TrimSpace(title), ">", "&gt;")
-	return fmt.Sprintf("%s<%s|*%s*>", prefix, url, title), draft
+func isBitbucketPR(url string) bool {
+	return strings.HasPrefix(url, "https://bitbucket.org/")
 }
 
 func author(ctx workflow.Context, url string, pr map[string]any) string {
@@ -248,56 +275,87 @@ func author(ctx workflow.Context, url string, pr map[string]any) string {
 	return " by " + users.GitHubIDToSlackRef(ctx, login, userURL, userType)
 }
 
-func times(now time.Time, url string, pr map[string]any) (created, updated string) {
-	keySuffix := "at"
+func branchMap(ctx workflow.Context, url string, pr map[string]any) (map[string]any, bool) {
+	field := "base" // GitHub.
 	if isBitbucketPR(url) {
-		keySuffix = "on"
+		field = "destination"
 	}
 
-	var ok bool
-	created, ok = pr["created_"+keySuffix].(string)
-	if !ok || created == "" {
-		return "unknown", ""
-	}
-	updated, ok = pr["updated_"+keySuffix].(string)
+	m, ok := pr[field].(map[string]any)
 	if !ok {
-		return timeSince(now, created), ""
+		logger.From(ctx).Warn("missing/invalid destination/base branch in PR snapshot",
+			slog.String("pr_url", url), slog.String("field_name", field))
+		return nil, false
 	}
 
-	return timeSince(now, created), timeSince(now, updated)
+	return m, true
 }
 
-func branchName(url string, pr map[string]any) string {
+func branchName(ctx workflow.Context, url string, branch map[string]any) (string, bool) {
 	if isBitbucketPR(url) {
-		prefix := "\n>Target branch: `"
-		dest, ok := pr["destination"].(map[string]any)
+		m, ok := branch["branch"].(map[string]any)
 		if !ok {
-			return prefix + "unknown`"
+			logger.From(ctx).Warn("missing/invalid branch subsection in PR snapshot", slog.String("pr_url", url))
+			return "unknown", false
 		}
-		branch, ok := dest["branch"].(map[string]any)
+		name, ok := m["name"].(string)
 		if !ok {
-			return prefix + "unknown`"
+			logger.From(ctx).Warn("missing/invalid branch name in PR snapshot", slog.String("pr_url", url))
+			return "unknown", false
 		}
-		name, ok := branch["name"].(string)
-		if !ok {
-			return prefix + "unknown`"
-		}
-
-		return fmt.Sprintf("%s%s`", prefix, name)
+		return name, true
 	}
 
 	// GitHub.
-	prefix := "\n>Base branch: `"
-	base, ok := pr["base"].(map[string]any)
+	ref, ok := branch["ref"].(string)
 	if !ok {
-		return prefix + "unknown`"
+		logger.From(ctx).Warn("missing/invalid branch ref in PR snapshot", slog.String("pr_url", url))
+		return "unknown", false
 	}
-	ref, ok := base["ref"].(string)
-	if !ok {
-		return prefix + "unknown`"
+	return ref, true
+}
+
+func branchNameMarkdown(ctx workflow.Context, url string, pr map[string]any) string {
+	prefix := "\n>Base branch" // GitHub.
+	if isBitbucketPR(url) {
+		prefix = "\n>Target branch"
 	}
 
-	return fmt.Sprintf("%s%s`", prefix, ref)
+	m, ok := branchMap(ctx, url, pr)
+	if !ok {
+		return fmt.Sprintf("%s: `%s`", prefix, "unknown")
+	}
+
+	name, _ := branchName(ctx, url, m)
+	return fmt.Sprintf("%s: `%s`", prefix, name)
+}
+
+func branchOwnerAndRepo(ctx workflow.Context, url string, branch map[string]any) (owner, repo string, ok bool) {
+	field := "repo" // GitHub.
+	if isBitbucketPR(url) {
+		field = "repository"
+	}
+
+	m, ok := branch[field].(map[string]any)
+	if !ok {
+		logger.From(ctx).Warn("missing/invalid branch repo in PR snapshot", slog.String("pr_url", url))
+		return "", "", false
+	}
+
+	fullName, ok := m["full_name"].(string)
+	if !ok {
+		logger.From(ctx).Warn("missing/invalid repo full name in PR snapshot", slog.String("pr_url", url))
+		return "", "", false
+	}
+
+	owner, repo, ok = strings.Cut(fullName, "/")
+	if !ok {
+		logger.From(ctx).Warn("invalid repo full name in PR snapshot",
+			slog.String("pr_url", url), slog.String("full_name", fullName))
+		return "", "", false
+	}
+
+	return owner, repo, true
 }
 
 func states(ctx workflow.Context, url string) string {
@@ -324,6 +382,42 @@ func states(ctx workflow.Context, url string) string {
 
 	// GitHub.
 	return ""
+}
+
+func times(now time.Time, url string, pr map[string]any) (created, updated string) {
+	keySuffix := "at" // GitHub.
+	if isBitbucketPR(url) {
+		keySuffix = "on"
+	}
+
+	var ok bool
+	created, ok = pr["created_"+keySuffix].(string)
+	if !ok || created == "" {
+		return "unknown", ""
+	}
+	updated, ok = pr["updated_"+keySuffix].(string)
+	if !ok {
+		return timeSince(now, created), ""
+	}
+
+	return timeSince(now, created), timeSince(now, updated)
+}
+
+func title(url string, pr map[string]any) (string, bool) {
+	prefix := "\n\n"
+
+	draft, ok := pr["draft"].(bool)
+	if ok && draft {
+		prefix += ":construction: "
+	}
+
+	title, ok := pr["title"].(string)
+	if !ok || len(strings.TrimSpace(title)) == 0 {
+		title = url
+	}
+
+	title = strings.ReplaceAll(strings.TrimSpace(title), ">", "&gt;")
+	return fmt.Sprintf("%s<%s|*%s*>", prefix, url, title), draft
 }
 
 func prApprovers(ctx workflow.Context, pr map[string]any) []string {

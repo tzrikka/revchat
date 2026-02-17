@@ -21,7 +21,7 @@ func Explain(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 
-	workspace, repo, branch, commit := slack.DestinationDetails(pr)
+	workspace, repo, branch, commit := slack.PRIdentifiers(ctx, url[0], pr)
 	owners, groups := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths, false)
 
 	msg := explainCodeOwners(ctx, paths, owners, groups, approversForExplain(ctx, pr))

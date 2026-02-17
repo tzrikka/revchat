@@ -1,4 +1,4 @@
-package slack
+package commands
 
 import (
 	"testing"
@@ -13,14 +13,14 @@ func TestRequiredReviewers(t *testing.T) {
 	paths := []string{"file1.go", "file2.go", "file3.go"}
 
 	want := []string{"alice", "bob", "carol", "dave"}
-	got := RequiredReviewers(paths, owners)
+	got := requiredReviewers(paths, owners)
 
 	if len(got) != len(want) {
-		t.Fatalf("RequiredReviewers() = %v, want %v", got, want)
+		t.Fatalf("requiredReviewers() = %v, want %v", got, want)
 	}
 	for i := range got {
 		if got[i] != want[i] {
-			t.Errorf("RequiredReviewers()[%d] = %q, want %q", i, got[i], want[i])
+			t.Errorf("requiredReviewers()[%d] = %q, want %q", i, got[i], want[i])
 		}
 	}
 }

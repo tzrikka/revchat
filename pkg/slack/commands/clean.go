@@ -2,6 +2,7 @@ package commands
 
 import (
 	"log/slog"
+	"slices"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -18,9 +19,9 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 
-	workspace, repo, branch, commit := slack.DestinationDetails(pr)
+	workspace, repo, branch, commit := slack.PRIdentifiers(ctx, url[0], pr)
 	owners, _ := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths, true)
-	reviewers := slack.RequiredReviewers(paths, owners)
+	reviewers := requiredReviewers(paths, owners)
 	for i, fullName := range reviewers {
 		if user := data.SelectUserByRealName(ctx, fullName); user.BitbucketID != "" {
 			reviewers[i] = user.BitbucketID
@@ -63,6 +64,17 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 	}
 
 	return nil
+}
+
+func requiredReviewers(paths []string, owners map[string][]string) []string {
+	var required []string
+
+	for _, p := range paths {
+		required = append(required, owners[p]...)
+	}
+
+	slices.Sort(required)
+	return slices.Compact(required)
 }
 
 func approversForClean(pr map[string]any) []string {
