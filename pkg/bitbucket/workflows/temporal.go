@@ -87,6 +87,8 @@ var RepositorySignals = []string{
 
 	"bitbucket.events.repo.commit_status_created",
 	"bitbucket.events.repo.commit_status_updated",
+
+	"bitbucket.events.repo.issue_created",
 }
 
 // Schedules is a list of workflow names that RevChat runs periodically via
@@ -129,9 +131,9 @@ func RegisterRepositoryWorkflows(cmd *cli.Command, opts client.Options, taskQueu
 	c := newConfig(cmd, opts, taskQueue)
 	funcs := []repoWorkflowFunc{
 		CommitCommentCreatedWorkflow,
-
 		c.CommitStatusWorkflow,
 		c.CommitStatusWorkflow,
+		IssueCreatedWorkflow,
 	}
 	for i, f := range funcs {
 		w.RegisterWorkflowWithOptions(f, workflow.RegisterOptions{Name: RepositorySignals[i]})

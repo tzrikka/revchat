@@ -89,6 +89,13 @@ func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.Repos
 	return activities.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
 }
 
+// IssueCreatedWorkflow (will) handle (in the future) this event:
+// https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Created
+func IssueCreatedWorkflow(ctx workflow.Context, _ bitbucket.RepositoryEvent) error {
+	logger.From(ctx).Debug("Bitbucket issue created event - not implemented yet")
+	return nil
+}
+
 func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, err error) {
 	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
 	if err != nil {

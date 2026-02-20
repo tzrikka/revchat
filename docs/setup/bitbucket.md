@@ -42,6 +42,7 @@
   - Commit comment created
   - Build status created
   - Build status updated
+  - Issue created
 
 ## Define a Thrippy Link for the OAuth Consumer
 
