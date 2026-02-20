@@ -191,7 +191,7 @@ func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) str
 			if event.InnerEvent.Subtype != "" {
 				subtype = event.InnerEvent.Subtype
 			}
-			id = fmt.Sprintf("%s_%s_%s", subtype, event.InnerEvent.Channel, event.InnerEvent.TS)
+			id = fmt.Sprintf("%s_%s_%s", event.InnerEvent.Channel, subtype, event.InnerEvent.TS)
 		}
 	case Signals[6], Signals[7]:
 		if event, ok := any(payload).(*reactionEventWrapper); ok {

@@ -157,23 +157,23 @@ func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) str
 	switch signal {
 	case Signals[0]:
 		if event, ok := any(payload).(*github.PullRequestEvent); ok {
-			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.PullRequest.HTMLURL))
+			id = fmt.Sprintf("%s_%s", trimURLPrefix(event.PullRequest.HTMLURL), event.Action)
 		}
 	case Signals[1]:
 		if event, ok := any(payload).(*github.PullRequestReviewEvent); ok {
-			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Review.HTMLURL))
+			id = fmt.Sprintf("%s_%s", trimURLPrefix(event.Review.HTMLURL), event.Action)
 		}
 	case Signals[2]:
 		if event, ok := any(payload).(*github.PullRequestReviewCommentEvent); ok {
-			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Comment.HTMLURL))
+			id = fmt.Sprintf("%s_%s", trimURLPrefix(event.Comment.HTMLURL), event.Action)
 		}
 	case Signals[3]:
 		if event, ok := any(payload).(*github.PullRequestReviewThreadEvent); ok {
-			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix("TODO"))
+			id = fmt.Sprintf("%s_%s", trimURLPrefix("TODO"), event.Action)
 		}
 	case Signals[4]:
 		if event, ok := any(payload).(*github.IssueCommentEvent); ok {
-			id = fmt.Sprintf("%s_%s", event.Action, trimURLPrefix(event.Comment.HTMLURL))
+			id = fmt.Sprintf("%s_%s", trimURLPrefix(event.Comment.HTMLURL), event.Action)
 		}
 	}
 
