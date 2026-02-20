@@ -34,7 +34,7 @@ func CreateChannel(ctx workflow.Context, prID int, prTitle, prURL string, maxLen
 			return "", err
 		}
 
-		data.LogSlackChannelCreated(ctx, id, name, prURL)
+		data.LogSlackChannelCreated(ctx, id, prURL, name)
 		return id, nil
 	}
 

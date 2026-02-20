@@ -25,11 +25,11 @@ func LogSlackChannelArchived(ctx workflow.Context, channelID, url string) {
 	appendToCSVFile(ctx, []string{"archived", channelID, url})
 }
 
-func LogSlackChannelCreated(ctx workflow.Context, channelID, name, url string) {
+func LogSlackChannelCreated(ctx workflow.Context, channelID, url, name string) {
 	slackChannelsMutex.Lock()
 	defer slackChannelsMutex.Unlock()
 
-	appendToCSVFile(ctx, []string{"created", channelID, name, url})
+	appendToCSVFile(ctx, []string{"created", channelID, url, name})
 }
 
 func appendToCSVFile(ctx workflow.Context, record []string) {
