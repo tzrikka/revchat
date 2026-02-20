@@ -151,10 +151,10 @@ func spliceSuggestion(ctx workflow.Context, in *Inline, suggestion, srcFile stri
 		return nil
 	}
 
-	var diff bytes.Buffer
-	diff.WriteString(fmt.Sprintf("@@ -%d,%d ", firstLine, lenFrom))
+	diff := new(bytes.Buffer)
+	fmt.Fprintf(diff, "@@ -%d,%d ", firstLine, lenFrom)
 	if lenTo > 0 {
-		diff.WriteString(fmt.Sprintf("+%d,%d ", firstLine, lenTo))
+		fmt.Fprintf(diff, "+%d,%d ", firstLine, lenTo)
 	}
 	diff.WriteString("@@\n")
 

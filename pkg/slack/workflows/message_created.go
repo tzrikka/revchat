@@ -97,10 +97,10 @@ func fileLinks(files []File, isBitbucket bool) string {
 		return ""
 	}
 
-	var sb strings.Builder
+	sb := new(strings.Builder)
 	sb.WriteString("\n\nAttached files:\n")
 	for _, f := range files {
-		sb.WriteString(fmt.Sprintf("\n- :%s: [%s](%s)", fileTypeEmoji(f, isBitbucket), f.Name, f.Permalink))
+		fmt.Fprintf(sb, "\n- :%s: [%s](%s)", fileTypeEmoji(f, isBitbucket), f.Name, f.Permalink)
 	}
 
 	return sb.String()

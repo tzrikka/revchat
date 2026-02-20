@@ -78,7 +78,7 @@ func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, prURL string) 
 
 	prStatus := data.ReadBitbucketBuilds(ctx, prURL)
 
-	var sb strings.Builder
+	sb := new(strings.Builder)
 	sb.WriteString("Builds: ")
 	if len(prStatus.Builds) == 0 {
 		sb.WriteString("no results")
@@ -92,7 +92,7 @@ func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, prURL string) 
 
 		b := prStatus.Builds[k]
 		desc := regexp.MustCompile(`\.+$`).ReplaceAllString(strings.TrimSpace(b.Desc), "")
-		sb.WriteString(fmt.Sprintf("%s %s", buildState(b.State), desc))
+		fmt.Fprintf(sb, "%s %s", buildState(b.State), desc)
 	}
 
 	title := sb.String()
