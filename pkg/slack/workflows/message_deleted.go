@@ -7,7 +7,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/activities"
+	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
 	"github.com/tzrikka/revchat/pkg/data"
 )
 
@@ -40,7 +40,7 @@ func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID 
 
 func deleteMessageInBitbucket(ctx workflow.Context, thrippyID string, url []string) error {
 	data.DeleteURLAndIDMapping(ctx, url[0])
-	return bitbucket.DeletePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7])
+	return activities.DeletePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7])
 }
 
 func deleteMessageInGitHub(ctx workflow.Context, _ string, _ []string) error {

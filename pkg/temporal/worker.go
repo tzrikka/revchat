@@ -17,10 +17,10 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/workflows"
+	bitbucketwf "github.com/tzrikka/revchat/pkg/bitbucket/workflows"
 	"github.com/tzrikka/revchat/pkg/config"
-	github "github.com/tzrikka/revchat/pkg/github/workflows"
-	slack "github.com/tzrikka/revchat/pkg/slack/workflows"
+	githubwf "github.com/tzrikka/revchat/pkg/github/workflows"
+	slackwf "github.com/tzrikka/revchat/pkg/slack/workflows"
 	"github.com/tzrikka/timpani-api/pkg/temporal"
 )
 
@@ -54,13 +54,13 @@ func Run(ctx context.Context, cmd *cli.Command, bi *debug.BuildInfo) error {
 			DefaultVersioningBehavior: workflow.VersioningBehaviorAutoUpgrade,
 		},
 	})
-	bitbucket.RegisterPullRequestWorkflows(cmd, copts, taskQueue, w)
-	bitbucket.RegisterRepositoryWorkflows(cmd, copts, taskQueue, w)
-	github.RegisterWorkflows(cmd, w)
-	slack.RegisterWorkflows(ctx, cmd, w)
+	bitbucketwf.RegisterPullRequestWorkflows(cmd, copts, taskQueue, w)
+	bitbucketwf.RegisterRepositoryWorkflows(cmd, copts, taskQueue, w)
+	githubwf.RegisterWorkflows(cmd, w)
+	slackwf.RegisterWorkflows(ctx, cmd, w)
 
-	bitbucket.CreateSchedule(ctx, cli, taskQueue)
-	slack.CreateSchedule(ctx, cli, taskQueue)
+	bitbucketwf.CreateSchedule(ctx, cli, taskQueue)
+	slackwf.CreateSchedule(ctx, cli, taskQueue)
 
 	temporal.ActivityOptions = &workflow.ActivityOptions{
 		TaskQueue:           cmd.String("temporal-task-queue-timpani"),

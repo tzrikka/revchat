@@ -11,9 +11,9 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/workflows"
-	github "github.com/tzrikka/revchat/pkg/github/workflows"
-	slack "github.com/tzrikka/revchat/pkg/slack/workflows"
+	bitbucketwf "github.com/tzrikka/revchat/pkg/bitbucket/workflows"
+	githubwf "github.com/tzrikka/revchat/pkg/github/workflows"
+	slackwf "github.com/tzrikka/revchat/pkg/slack/workflows"
 )
 
 const (
@@ -37,7 +37,7 @@ type Config struct {
 
 func workflowOptions(taskQueue string) client.StartWorkflowOptions {
 	// https://docs.temporal.io/develop/go/observability#visibility
-	signals := slices.Concat(bitbucket.PullRequestSignals, bitbucket.RepositorySignals, github.Signals, slack.Signals)
+	signals := slices.Concat(bitbucketwf.PullRequestSignals, bitbucketwf.RepositorySignals, githubwf.Signals, slackwf.Signals)
 	attrs := temporal.NewSearchAttributes(temporal.NewSearchAttributeKeyKeywordList(SearchAttribute).ValueSet(signals))
 
 	return client.StartWorkflowOptions{
@@ -65,10 +65,10 @@ func (c *Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 		ch.Receive(ctx, &c.shutdownSignal)
 	})
 
-	bitbucket.RegisterPullRequestSignals(ctx, selector)
-	bitbucket.RegisterRepositorySignals(ctx, selector)
-	github.RegisterSignals(ctx, selector)
-	slack.RegisterSignals(ctx, selector)
+	bitbucketwf.RegisterPullRequestSignals(ctx, selector)
+	bitbucketwf.RegisterRepositorySignals(ctx, selector)
+	githubwf.RegisterSignals(ctx, selector)
+	slackwf.RegisterSignals(ctx, selector)
 
 	for {
 		selector.Select(ctx) // This is the core of the dispatcher workflow's event loop.
@@ -126,10 +126,10 @@ func (c *Config) prepareForReset(ctx workflow.Context, info *workflow.Info) {
 
 // drainCycle processes each event source and returns true if any signals were found.
 func drainCycle(ctx workflow.Context) bool {
-	bitbucketPRSignalsFound := bitbucket.DrainPullRequestSignals(ctx)
-	bitbucketRepoSignalsFound := bitbucket.DrainRepositorySignals(ctx)
-	githubSignalsFound := github.DrainSignals(ctx)
-	slackSignalsFound := slack.DrainSignals(ctx)
+	bitbucketPRSignalsFound := bitbucketwf.DrainPullRequestSignals(ctx)
+	bitbucketRepoSignalsFound := bitbucketwf.DrainRepositorySignals(ctx)
+	githubSignalsFound := githubwf.DrainSignals(ctx)
+	slackSignalsFound := slackwf.DrainSignals(ctx)
 
 	return bitbucketPRSignalsFound || bitbucketRepoSignalsFound || githubSignalsFound || slackSignalsFound
 }
