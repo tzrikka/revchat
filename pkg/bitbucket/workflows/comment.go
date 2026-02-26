@@ -16,10 +16,10 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
-	bact "github.com/tzrikka/revchat/pkg/bitbucket/activities"
+	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
-	sact "github.com/tzrikka/revchat/pkg/slack/activities"
+	slack "github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
@@ -28,7 +28,7 @@ import (
 func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := sact.LookupChannel(ctx, prURL)
+	channelID, found := slack.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
@@ -80,7 +80,7 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 func (c Config) CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := sact.LookupChannel(ctx, prURL)
+	channelID, found := slack.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
@@ -100,7 +100,7 @@ func (c Config) CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 func (c Config) updateCommentInWorkflow(ctx workflow.Context, comment *bitbucket.Comment) error {
 	// If the comment previously had an attached diff file, delete it - it's obsolete now.
 	if fileID, _ := data.SwitchURLAndID(ctx, bitbucket.HTMLURL(comment.Links)+"/slack_file_id"); fileID != "" {
-		sact.DeleteFile(ctx, fileID)
+		slack.DeleteFile(ctx, fileID)
 	}
 
 	commentURL := bitbucket.HTMLURL(comment.Links)
@@ -142,7 +142,7 @@ func (c Config) updateCommentInWorkflow(ctx workflow.Context, comment *bitbucket
 func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := sact.LookupChannel(ctx, prURL)
+	channelID, found := slack.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
@@ -151,7 +151,7 @@ func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.Pul
 
 	commentURL := bitbucket.HTMLURL(event.Comment.Links)
 	if fileID, _ := data.SwitchURLAndID(ctx, commentURL+"/slack_file_id"); fileID != "" {
-		sact.DeleteFile(ctx, fileID)
+		slack.DeleteFile(ctx, fileID)
 	}
 
 	err := bitbucket.DeleteSlackMsg(ctx, commentURL)
@@ -163,7 +163,7 @@ func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.Pul
 func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := sact.LookupChannel(ctx, prURL)
+	channelID, found := slack.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
@@ -172,7 +172,7 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
-	sact.AddOKReaction(ctx, url) // The mention below is more important than this reaction.
+	slack.AddOKReaction(ctx, url) // The mention below is more important than this reaction.
 
 	return bitbucket.MentionUserInReply(ctx, url, event.Actor, "%s resolved this comment. :ok:")
 }
@@ -182,7 +182,7 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
-	channelID, found := sact.LookupChannel(ctx, prURL)
+	channelID, found := slack.LookupChannel(ctx, prURL)
 	if !found {
 		return nil
 	}
@@ -191,7 +191,7 @@ func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
-	sact.RemoveOKReaction(ctx, url) // The mention below is more important than this reaction.
+	slack.RemoveOKReaction(ctx, url) // The mention below is more important than this reaction.
 
 	return bitbucket.MentionUserInReply(ctx, url, event.Actor, "%s reopened this comment. :no_good:")
 }
@@ -309,7 +309,7 @@ func trimURLPrefix(commentURL string) string {
 //
 // [10-minute window]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
 func (c Config) PollCommentWorkflow(ctx workflow.Context, req PollCommentRequest) error {
-	comment, err := bact.GetPullRequestComment(ctx, req.ThrippyID, req.CommentURL)
+	comment, err := activities.GetPullRequestComment(ctx, req.ThrippyID, req.CommentURL)
 	if err != nil {
 		return err
 	}

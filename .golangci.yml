@@ -10,7 +10,7 @@ linters:
     - containedctx
     - contextcheck
     - copyloopvar
-    # - dupl
+    - dupl
     - dupword
     - embeddedstructfieldcheck
     - errcheck
@@ -28,6 +28,7 @@ linters:
     - gosmopolitan
     - govet
     - iface
+    - importas
     - ineffassign
     - intrange
     - mirror
@@ -35,6 +36,7 @@ linters:
     - modernize
     - musttag
     - noctx
+    - nolintlint
     - nosprintfhostport
     - perfsprint
     - predeclared
@@ -44,10 +46,13 @@ linters:
     - sloglint
     - staticcheck
     - thelper
+    - tparallel
     - unconvert
+    - unparam
     - unused
     - usestdlibvars
     - usetesting
+    # - wrapcheck
 
   exclusions:
     rules:
@@ -66,8 +71,36 @@ linters:
         - identical
         - unused
         - unexported
+    importas:
+      no-extra-aliases: true
+      alias:
+        - pkg: github.com/tzrikka/revchat/pkg/bitbucket/activities
+          alias: bitbucket
+        - pkg: github.com/tzrikka/revchat/pkg/bitbucket/workflows
+          alias: bitbucketwf
+        - pkg: github.com/tzrikka/revchat/pkg/github/activities
+          alias: github
+        - pkg: github.com/tzrikka/revchat/pkg/github/workflows
+          alias: githubwf
+        - pkg: github.com/tzrikka/revchat/pkg/slack/activities
+          alias: slack
+        - pkg: github.com/tzrikka/revchat/pkg/slack/workflows
+          alias: slackwf
+        - pkg: github.com/tzrikka/thrippy-api/thrippy/v1
+          alias: thrippypb
+        - pkg: github.com/tzrikka/timpani-api/pkg/slack
+          alias: tslack
+        - pkg: github.com/urfave/cli-altsrc/v3
+          alias: altsrc
+        - pkg: go.opentelemetry.io/otel/metric
+          alias: otelmetric
+        - pkg: go.opentelemetry.io/otel/semconv/v1.37.0
+          alias: semconv
     misspell:
       locale: US
+    nolintlint:
+      allow-unused: false
+      require-explanation: true
     predeclared:
       qualified-name: true
     revive:

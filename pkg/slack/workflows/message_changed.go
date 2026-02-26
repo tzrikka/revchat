@@ -8,7 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/activities"
+	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
 	"github.com/tzrikka/revchat/pkg/markdown"
 )
 
@@ -42,7 +42,7 @@ func (c *Config) changeMessage(ctx workflow.Context, event MessageEvent, userID 
 func editMessageInBitbucket(ctx workflow.Context, event MessageEvent, thrippyID string, url []string) error {
 	msg, _ := strings.CutSuffix(event.Message.Text, "\n\n[This comment was updated by RevChat]: #")
 	msg = markdown.SlackToBitbucket(ctx, msg) + "\n\n[This comment was updated by RevChat]: #"
-	return bitbucket.UpdatePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7], msg)
+	return activities.UpdatePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7], msg)
 }
 
 func editMessageInGitHub(ctx workflow.Context, _ MessageEvent, _ string, _ []string) error {
