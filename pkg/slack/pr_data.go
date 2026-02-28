@@ -358,6 +358,12 @@ func branchOwnerAndRepo(ctx workflow.Context, url string, branch map[string]any)
 	return owner, repo, true
 }
 
+const (
+	buildSuccessful = "large_green_circle"
+	buildInProgress = "large_yellow_circle"
+	buildFailed     = "red_circle"
+)
+
 func states(ctx workflow.Context, url string) string {
 	if isBitbucketPR(url) {
 		prStatus := data.ReadBitbucketBuilds(ctx, url)
@@ -365,12 +371,12 @@ func states(ctx workflow.Context, url string) string {
 		var summary []string
 		for _, k := range keys {
 			switch s := prStatus.Builds[k].State; s {
-			case "INPROGRESS":
-				// Don't show in-progress builds in summary.
 			case "SUCCESSFUL":
-				summary = append(summary, "large_green_circle")
+				summary = append(summary, buildSuccessful)
+			case "INPROGRESS":
+				summary = append(summary, buildInProgress)
 			default: // "FAILED", "STOPPED".
-				summary = append(summary, "red_circle")
+				summary = append(summary, buildFailed)
 			}
 		}
 

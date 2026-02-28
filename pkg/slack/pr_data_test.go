@@ -473,6 +473,7 @@ func TestStates(t *testing.T) {
 		"builds": map[string]any{
 			"build1": map[string]any{"state": "SUCCESSFUL"},
 			"build2": map[string]any{"state": "FAILED"},
+			"build3": map[string]any{"state": "INPROGRESS"},
 		},
 	}
 	data, err := json.Marshal(builds)
@@ -497,7 +498,7 @@ func TestStates(t *testing.T) {
 		{
 			name: "bitbucket_builds",
 			url:  "https://bitbucket.org/workspace/repo/pull-requests/67890",
-			want: ", builds: :large_green_circle: :red_circle:",
+			want: ", builds: :large_green_circle: :red_circle: :large_yellow_circle:",
 		},
 	}
 
