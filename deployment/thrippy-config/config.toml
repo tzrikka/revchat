@@ -1,0 +1,13 @@
+[secrets]
+provider = "file"
+
+[grpc.client]
+client_cert = "/home/nonroot/.config/thrippy/thrippy_client_cert.pem"
+client_key = "/home/nonroot/.config/thrippy/thrippy_client_key.pem"
+server_ca_cert = "/home/nonroot/.config/thrippy/thrippy_ca_cert.pem"
+server_name_override = "thrippy.example.com"
+
+[grpc.server]
+client_ca_cert = "/home/nonroot/.config/thrippy/thrippy_ca_cert.pem"
+server_cert = "/home/nonroot/.config/thrippy/thrippy_server_cert.pem"
+server_key = "/home/nonroot/.config/thrippy/thrippy_server_key.pem"
