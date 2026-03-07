@@ -160,7 +160,7 @@ services:
 
   temporal-ui:
     container_name: temporal-ui
-    image: temporalio/ui:latest
+    image: temporalio/ui:${TEMPORAL_UI_VERSION:-latest}
     networks:
       - revchat-network
     ports:
