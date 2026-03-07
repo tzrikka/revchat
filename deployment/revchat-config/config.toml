@@ -1,0 +1,9 @@
+[otlp]
+disabled = true
+
+[thrippy]
+grpc_address = "thrippy:14460"
+client_cert = "/home/nonroot/.config/timpani/thrippy_client_cert.pem"
+client_key = "/home/nonroot/.config/timpani/thrippy_client_key.pem"
+server_ca_cert = "/home/nonroot/.config/timpani/thrippy_ca_cert.pem"
+server_name_override = "thrippy.example.com"
