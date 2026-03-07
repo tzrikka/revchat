@@ -153,7 +153,6 @@ services:
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - NAMESPACE=${TEMPORAL_NAMESPACE:-default}
-      - MAX_WAIT_TIME=300
     entrypoint: [ "/bin/sh", "-c" ]
     command: [ "exec /scripts/validate-temporal.sh" ]
     restart: on-failure:5

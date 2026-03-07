@@ -5,7 +5,6 @@ set -eu
 echo "=== Temporal Validation Script ==="
 echo "Temporal address: $TEMPORAL_ADDRESS"
 echo "Namespace: $NAMESPACE"
-echo "Max wait time: ${MAX_WAIT_TIME}s"
 echo
 
 # Check cluster health
