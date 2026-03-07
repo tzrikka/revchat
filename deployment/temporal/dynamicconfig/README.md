@@ -13,8 +13,8 @@ constraints. There are only three types of constraint:
 2. `taskQueueName`: `string`
 3. `taskType`: `int` (`1`:`Workflow`, `2`:`Activity`)
 
-A value will be selected and returned if all its has exactly the same constraints
-as the ones specified in query filters (including the number of constraints).
+A value will be selected and returned if its constraints match exactly all
+the ones specified in the query filters (including the number of constraints).
 
 Please use the following format:
 
