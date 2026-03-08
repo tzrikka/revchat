@@ -18,6 +18,12 @@ func TestWhoseTurnText(t *testing.T) {
 		want   string
 	}{
 		{
+			name:   "no_one",
+			emails: []string{"", "bot"},
+			user:   data.User{Email: "author@example.com"},
+			want:   "I think it's no one's turn to review this PR.",
+		},
+		{
 			name:   "author_only_with_tweak",
 			emails: []string{"author@example.com"},
 			user:   data.User{Email: "author@example.com"},

@@ -153,7 +153,7 @@ func SelectUserByBitbucketID(ctx workflow.Context, accountID string) User {
 }
 
 func SelectUserByEmail(ctx workflow.Context, email string) User {
-	if email == "" {
+	if email == "" || email == "bot" {
 		return User{}
 	}
 

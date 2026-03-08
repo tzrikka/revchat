@@ -45,7 +45,7 @@ func TestAccountIDs(t *testing.T) {
 			accounts: []Account{
 				{AccountID: "aaa", Type: "user"},
 				{AccountID: "team1", Type: "team"},
-				{AccountID: "app1", Type: "app"},
+				{AccountID: "app1", Type: "app_user"},
 				{AccountID: "bbb", Type: ""},
 			},
 			want: []string{"aaa", "bbb"},

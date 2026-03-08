@@ -51,6 +51,9 @@ func LoadPRTurns(ctx workflow.Context, onlyCurrentTurn, authors, reviewers bool)
 		}
 
 		for _, email := range emails {
+			if email == "" || email == "bot" {
+				continue // Nothing to check/remove.
+			}
 			if id := users.EmailToSlackID(ctx, email); id != "" {
 				usersToPRs[id] = append(usersToPRs[id], prURL)
 				continue

@@ -427,7 +427,7 @@ func readTurnsFile(ctx workflow.Context, url string) (*PRTurns, error) {
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return resetTurns(ctx, url)
+			return resetTurns(ctx, url, nil)
 		}
 		return nil, err
 	}
@@ -435,12 +435,12 @@ func readTurnsFile(ctx workflow.Context, url string) (*PRTurns, error) {
 
 	t := new(PRTurns)
 	if err := json.NewDecoder(f).Decode(&t); err != nil {
-		return resetTurns(ctx, url)
+		return resetTurns(ctx, url, nil)
 	}
 
 	// Data sanity checks.
 	if t.Author == "" {
-		return resetTurns(ctx, url)
+		return resetTurns(ctx, url, t)
 	}
 	normalizeEmailAddresses(t)
 	if t.Reviewers == nil {
@@ -513,7 +513,7 @@ func writeTurnsFileActivity(_ context.Context, url string, t *PRTurns) error {
 
 // resetTurns recreates the attention state file for a specific PR, based on the current
 // PR snapshot. This is a fallback for when the turn file is missing or corrupted.
-func resetTurns(ctx workflow.Context, url string) (*PRTurns, error) {
+func resetTurns(ctx workflow.Context, url string, t *PRTurns) (*PRTurns, error) {
 	logger.From(ctx).Warn("resetting PR attention state file", slog.String("pr_url", url))
 
 	pr, err := LoadPRSnapshot(ctx, url)
@@ -521,49 +521,69 @@ func resetTurns(ctx workflow.Context, url string) (*PRTurns, error) {
 		return nil, err
 	}
 
-	author := userEmail(ctx, pr["author"])
+	author, accountType := userEmailAndType(ctx, pr["author"])
 
+	// If the only thing that needs fixing is the author's email, do just that.
+	if t != nil && len(t.Reviewers)+len(t.Activity)+len(t.Approvers) > 0 {
+		if author == "" && accountType == "app_user" {
+			author = "bot"
+		}
+		t.Author = author
+		return t, writeTurnsFile(ctx, url, t)
+	}
+
+	// Otherwise, recreate the entire struct and file.
 	reviewers := map[string]bool{}
 	jsonList, ok := pr["reviewers"].([]any)
 	if !ok {
 		jsonList = []any{}
 	}
 	for _, r := range jsonList {
-		if email := userEmail(ctx, r); email != "" {
+		if email, _ := userEmailAndType(ctx, r); email != "" {
 			reviewers[email] = true
 		}
 	}
 
-	t := &PRTurns{Author: author, Reviewers: reviewers, Activity: map[string]time.Time{}, Approvers: map[string]time.Time{}}
+	approvers := map[string]time.Time{}
+
+	t = &PRTurns{Author: author, Reviewers: reviewers, Activity: map[string]time.Time{}, Approvers: approvers}
 	return t, writeTurnsFile(ctx, url, t)
 }
 
-// userEmail extracts the Bitbucket account ID from user details map, and converts
-// it into the user's email address, based on RevChat's own user database.
-func userEmail(ctx workflow.Context, detailsMap any) string {
+// userEmailAndType extracts the Bitbucket account ID from user details map, and converts
+// it into the user's email address and account type, based on RevChat's own user database.
+func userEmailAndType(ctx workflow.Context, detailsMap any) (email, accountType string) {
 	user, ok := detailsMap.(map[string]any)
 	if !ok {
-		return ""
+		return "", ""
 	}
 
 	accountID, ok := user["account_id"].(string)
 	if !ok {
-		return ""
+		return "", ""
+	}
+	accountType, ok = user["type"].(string)
+	if !ok {
+		accountType = ""
 	}
 
-	return BitbucketIDToEmail(ctx, accountID)
+	return BitbucketIDToEmail(ctx, accountID, accountType), accountType
 }
 
 // BitbucketIDToEmail converts a Bitbucket account ID into an email address. This function returns an empty
 // string if the account ID is not found. It uses persistent data storage, or API calls as a fallback.
 // This function is also wrapped in the "users" package, and reused by other packages from there.
-func BitbucketIDToEmail(ctx workflow.Context, accountID string) string {
+func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) string {
 	if accountID == "" {
 		return ""
 	}
 
 	if user := SelectUserByBitbucketID(ctx, accountID); user.Email != "" {
 		return user.Email
+	}
+
+	if accountType == "app_user" {
+		return "" // Not a real user, so no point to check in Jira.
 	}
 
 	// We use the Jira API as a fallback because the Bitbucket API doesn't expose email addresses.
