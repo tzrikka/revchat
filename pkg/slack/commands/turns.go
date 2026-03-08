@@ -168,7 +168,16 @@ func WhoseTurn(ctx workflow.Context, event SlashCommandEvent) error {
 }
 
 // whoseTurnText builds a "whose turn is it" summary message, reused by multiple slash commands.
+// The emails slice must be deduped, but may contain invalid/bot email addresses (which are removed).
 func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak string) string {
+	// Ignore invalid/bot email addresses.
+	if i := slices.Index(emails, ""); i > -1 {
+		emails = slices.Delete(emails, i, i+1)
+	}
+	if i := slices.Index(emails, "bot"); i > -1 {
+		emails = slices.Delete(emails, i, i+1)
+	}
+
 	// If the user who ran the command is in the list, highlight that to them.
 	var msg strings.Builder
 	i := slices.Index(emails, user.Email)
@@ -180,11 +189,14 @@ func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak 
 	msg.WriteString(tweak)
 
 	withOthers := false
-	if i == -1 {
+	switch {
+	case i == -1 && len(emails) == 0:
+		msg.WriteString(" no one's turn")
+	case i == -1 && len(emails) > 0:
 		msg.WriteString(" the turn of ")
-	} else {
-		emails = slices.Delete(emails, i, i+1)
+	default:
 		msg.WriteString(" *your* turn")
+		emails = slices.Delete(emails, i, i+1)
 		if len(emails) > 0 {
 			msg.WriteString(" - along with ")
 			withOthers = true

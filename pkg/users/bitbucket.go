@@ -45,9 +45,20 @@ func EmailToBitbucketID(ctx workflow.Context, email string) string {
 	return users[0].AccountID
 }
 
+// BitbucketActorToEmail is a trivial wrapper around [BitbucketIDToEmail]. Merely syntactic sugar.
+func BitbucketActorToEmail(ctx workflow.Context, actor bitbucket.User) string {
+	return BitbucketIDToEmail(ctx, actor.AccountID, actor.Type)
+}
+
 // BitbucketIDToEmail is a trivial wrapper around [data.BitbucketIDToEmail].
-func BitbucketIDToEmail(ctx workflow.Context, accountID string) string {
-	return data.BitbucketIDToEmail(ctx, accountID)
+// It exists only for architectural clarity (all "XxxToYyy" functions in this package).
+// However, outside the "data" package, we return "bot" instead of "" for non-user accounts.
+func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) string {
+	email := data.BitbucketIDToEmail(ctx, accountID, accountType)
+	if email == "" && accountType == "app_user" {
+		return "bot"
+	}
+	return email
 }
 
 // BitbucketIDToSlackID converts a Bitbucket account ID into a Slack user ID. This function returns an empty
@@ -56,7 +67,7 @@ func BitbucketIDToSlackID(ctx workflow.Context, accountID string, checkOptIn boo
 	user := data.SelectUserByBitbucketID(ctx, accountID)
 	if user.SlackID == "" {
 		// Workaround in case only the user's Bitbucket account ID isn't stored yet, but the rest is.
-		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID))
+		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID, "user"))
 	}
 
 	if checkOptIn && !user.IsOptedIn() {
@@ -72,7 +83,7 @@ func BitbucketIDToSlackRef(ctx workflow.Context, accountID, displayName string) 
 	user := data.SelectUserByBitbucketID(ctx, accountID)
 	if user.SlackID == "" {
 		// Workaround in case only the user's Bitbucket account ID isn't stored yet, but the rest is.
-		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID))
+		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID, "user"))
 	}
 
 	if user.SlackID != "" {

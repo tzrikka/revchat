@@ -129,13 +129,13 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	defer bitbucket.UpdateChannelBookmarks(ctx, pr, prURL, channelID)
 
-	email := data.BitbucketIDToEmail(ctx, event.Actor.AccountID)
+	email := users.BitbucketActorToEmail(ctx, event.Actor)
 	var errs []error
 
 	// Announce transitions between draft and ready-to-review modes.
 	if !snapshot.Draft && pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
-		_, _, _ = data.Nudge(ctx, prURL, data.BitbucketIDToEmail(ctx, event.PullRequest.Author.AccountID))
+		_, _, _ = data.Nudge(ctx, prURL, users.BitbucketActorToEmail(ctx, event.PullRequest.Author))
 	} else if snapshot.Draft && !pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
 		_ = data.SwitchTurn(ctx, prURL, email, true)
@@ -240,7 +240,7 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
-	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
+	email := users.BitbucketActorToEmail(ctx, event.Actor)
 	msg := "%s "
 	var err error
 

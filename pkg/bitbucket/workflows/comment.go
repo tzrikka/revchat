@@ -36,8 +36,7 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	// Don't abort if this fails - it's more important to post the comment.
-	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
-	_ = data.SwitchTurn(ctx, prURL, email, false)
+	_ = data.SwitchTurn(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor), false)
 
 	// If the comment was created by RevChat, i.e. mirrored from Slack, don't repost it.
 	// Also, don't poll Bitbucket for updates because we expect them to come from Slack.
@@ -168,7 +167,7 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
-	data.UpdateActivityTime(ctx, prURL, data.BitbucketIDToEmail(ctx, event.Actor.AccountID))
+	data.UpdateActivityTime(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
@@ -187,7 +186,7 @@ func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
-	data.UpdateActivityTime(ctx, prURL, data.BitbucketIDToEmail(ctx, event.Actor.AccountID))
+	data.UpdateActivityTime(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)

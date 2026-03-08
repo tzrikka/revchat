@@ -30,7 +30,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 			slog.Any("error", err), slog.String("pr_url", prURL))
 	}
 
-	email := users.BitbucketIDToEmail(ctx, event.Actor.AccountID)
+	email := users.BitbucketActorToEmail(ctx, event.Actor)
 	if email == "" {
 		logger.From(ctx).Error("initializing Bitbucket PR data without author's email",
 			slog.String("pr_url", prURL), slog.String("account_id", event.Actor.AccountID))
@@ -42,8 +42,8 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 	data.InitTurns(ctx, prURL, email)
 }
 
-// accountIDs extracts the IDs from a slice of [Account]s.
-// The output is guaranteed to be sorted, without repetitions, and not contain teams/apps.
+// accountIDs extracts the IDs from a slice of [Account]s. The output is guaranteed
+// to be sorted, without repetitions, and not contain apps/bots or teams.
 func accountIDs(accounts []Account) []string {
 	if len(accounts) == 0 {
 		return nil
