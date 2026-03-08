@@ -73,9 +73,9 @@ func (c *Config) OptInSlashCommand(ctx workflow.Context, event commands.SlashCom
 	if err != nil {
 		err = errors.Join(err, c.deleteThrippyLink(ctx, thrippyID))
 
-		if err.Error() == errLinkAuthzTimeout { // For some reason [errors.Is] doesn't work across Temporal?
+		if strings.Contains(err.Error(), errLinkAuthzTimeout) { // [errors.Is] doesn't work across Temporal gRPC.
 			logger.From(ctx).Warn("user did not complete Thrippy OAuth flow in time", slog.String("email", user.Email))
-			commands.PostEphemeralError(ctx, event, scm+" authorization timed out - please try opting in again.")
+			commands.PostEphemeralError(ctx, event, scm+" authorization timed out - please opt-in again to get a new link.")
 			return nil // Not a server error as far as we're concerned.
 		}
 
