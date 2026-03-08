@@ -522,12 +522,12 @@ func resetTurns(ctx workflow.Context, url string, t *PRTurns) (*PRTurns, error) 
 	}
 
 	author, accountType := userEmailAndType(ctx, pr["author"])
+	if author == "" && accountType == "app_user" {
+		author = "bot"
+	}
 
 	// If the only thing that needs fixing is the author's email, do just that.
 	if t != nil && len(t.Reviewers)+len(t.Activity)+len(t.Approvers) > 0 {
-		if author == "" && accountType == "app_user" {
-			author = "bot"
-		}
 		t.Author = author
 		return t, writeTurnsFile(ctx, url, t)
 	}
