@@ -534,20 +534,35 @@ func resetTurns(ctx workflow.Context, url string, t *PRTurns) (*PRTurns, error) 
 
 	// Otherwise, recreate the entire struct and file.
 	reviewers := map[string]bool{}
-	jsonList, ok := pr["reviewers"].([]any)
-	if !ok {
-		jsonList = []any{}
-	}
-	for _, r := range jsonList {
-		if email, _ := userEmailAndType(ctx, r); email != "" {
+	jsonList := listOf(pr, "reviewers")
+	for _, reviewer := range jsonList {
+		if email, _ := userEmailAndType(ctx, reviewer); email != "" {
 			reviewers[email] = true
 		}
 	}
 
-	approvers := map[string]time.Time{}
+	activity, approvers := map[string]time.Time{}, map[string]time.Time{}
+	jsonList = listOf(pr, "participants")
+	for _, participant := range jsonList {
+		if email, approved, timestamp := userActivity(ctx, participant); email != "" {
+			activity[email] = timestamp
+			if approved {
+				approvers[email] = timestamp
+			}
+		}
+	}
 
-	t = &PRTurns{Author: author, Reviewers: reviewers, Activity: map[string]time.Time{}, Approvers: approvers}
+	t = &PRTurns{Author: author, Reviewers: reviewers, Activity: activity, Approvers: approvers}
 	return t, writeTurnsFile(ctx, url, t)
+}
+
+// listOf converts a given field in a PR's snapshot into a slice.
+func listOf(pr map[string]any, key string) []any {
+	jsonList, ok := pr[key].([]any)
+	if !ok {
+		return []any{}
+	}
+	return jsonList
 }
 
 // userEmailAndType extracts the Bitbucket account ID from user details map, and converts
@@ -568,6 +583,32 @@ func userEmailAndType(ctx workflow.Context, detailsMap any) (email, accountType 
 	}
 
 	return BitbucketIDToEmail(ctx, accountID, accountType), accountType
+}
+
+// userActivity extracts a user's email, approval status, and activity
+// time from a JSON block of participant details in a Bitbucket PR snapshot.
+func userActivity(ctx workflow.Context, detailsMap any) (string, bool, time.Time) {
+	participant, ok := detailsMap.(map[string]any)
+	if !ok {
+		return "", false, time.Time{}
+	}
+
+	email, _ := userEmailAndType(ctx, participant)
+	approved, ok := participant["approved"].(bool)
+	if !ok {
+		approved = false
+	}
+
+	t, ok := participant["participated_on"].(string)
+	if !ok {
+		return email, approved, time.Time{}
+	}
+	parsedTime, err := time.Parse(time.RFC3339, t)
+	if err != nil {
+		return email, approved, time.Time{}
+	}
+
+	return email, approved, parsedTime
 }
 
 // BitbucketIDToEmail converts a Bitbucket account ID into an email address. This function returns an empty
