@@ -118,12 +118,18 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	snapshot, err := bitbucket.SwitchSnapshot(ctx, prURL, pr)
 	if err != nil {
-		return err
+		// In Bitbucket's case, not having the previous PR snapshot for comparison with
+		// the current state prevents us from identifying the actual update(s) in this event.
+		logger.From(ctx).Error("can't handle PR update event without previous PR snapshot",
+			slog.Any("error", err), slog.String("pr_url", prURL))
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "can't handle PR update event", err, "PR URL", prURL)
 	}
 
 	// Support PR data recovery.
 	if snapshot == nil {
 		bitbucket.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
+		logger.From(ctx).Warn("reinitialized PR snapshot instead of handling update event: loaded but empty", slog.String("pr_url", prURL))
+		activities.AlertWarn(ctx, c.SlackAlertsChannel, "reinitialized PR snapshot instead of handling update event", "PR URL", prURL)
 		return nil
 	}
 
@@ -229,7 +235,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Approval-removed
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Changes-Request-created
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Changes-Request-removed
-func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
+func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	pr := event.PullRequest
 	prURL := bitbucket.HTMLURL(pr.Links)
@@ -244,57 +250,59 @@ func PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucket.PullReque
 	msg := "%s "
 	var err error
 
+	// Don't abort in case of errors in any of the following cases, it's important
+	// to handle and announce them even if our internal state becomes stale.
 	switch event.Type {
 	case "approved":
 		msg += "approved this PR. :+1:"
+
 		err = data.RemoveReviewerFromTurns(ctx, prURL, email, true)
-		// Don't abort - it's more important to announce this, even if our internal state is stale.
+		if err != nil {
+			_ = activities.AlertError(ctx, c.SlackAlertsChannel, "failed to remove approver from PR turns", err, "Email", email)
+		}
 
 	case "unapproved":
-		data.UpdateActivityTime(ctx, prURL, email)
-
 		msg += "unapproved this PR. :-1:"
+
+		data.UpdateActivityTime(ctx, prURL, email)
 		// If the user isn't opted-in, or isn't a member of the Slack channel, don't add them back to the
 		// PR's attention state (just like the logic in other places, e.g. PR creation and PR updates).
 		if user := data.SelectUserByEmail(ctx, email); user.IsOptedIn() {
-			err = activities.InviteUsersToChannel(ctx, channelID, prURL, []string{users.EmailToSlackID(ctx, email)}, nil)
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
+			slackUserIDs := []string{users.EmailToSlackID(ctx, email)}
+			err = errors.Join(err, activities.InviteUsersToChannel(ctx, channelID, prURL, slackUserIDs, nil))
 		}
 
 	case "changes_request_created":
-		pr.ChangeRequestCount++
 		msg += "requested changes in this PR. :warning:"
-		_, err = bitbucket.SwitchSnapshot(ctx, prURL, pr)
-		if err != nil {
-			logger.From(ctx).Error("failed to update change-request count in PR snapshot",
-				slog.Any("error", err), slog.String("pr_url", prURL), slog.Int("new_count", pr.ChangeRequestCount))
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
-		}
 
-		if err2 := data.SwitchTurn(ctx, prURL, email, false); err2 != nil {
-			err = errors.Join(err, err2)
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
-		}
+		pr.ChangeRequestCount++
+		err = data.SwitchTurn(ctx, prURL, email, false)
 
+	// This case is different: we handle - but don't announce - it in the PR channel. Should we announce it?
 	case "changes_request_removed":
-		data.UpdateActivityTime(ctx, prURL, email)
+		msg = ""
 
 		pr.ChangeRequestCount--
 		if pr.ChangeRequestCount < 0 {
 			pr.ChangeRequestCount = 0 // Should not happen, but just in case.
 		}
-		_, err = bitbucket.SwitchSnapshot(ctx, prURL, pr)
-		if err != nil {
-			logger.From(ctx).Error("failed to update change-request count in PR snapshot",
-				slog.Any("error", err), slog.String("pr_url", prURL), slog.Int("new_count", pr.ChangeRequestCount))
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
-		}
+		data.UpdateActivityTime(ctx, prURL, email)
 
 	default:
 		logger.From(ctx).Error("unrecognized Bitbucket PR review event type", slog.String("event_type", event.Type))
-		return nil
+		err = errors.New("unrecognized Bitbucket PR review event type: " + event.Type)
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "", err)
 	}
 
-	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
+	_, err2 := bitbucket.SwitchSnapshot(ctx, prURL, pr)
+	if strings.HasPrefix(event.Type, "changes_request") && err2 != nil {
+		_ = activities.AlertError(ctx, c.SlackAlertsChannel, "failed to update change-request count in PR snapshot",
+			err2, "PR URL", prURL, "New count", pr.ChangeRequestCount)
+		err = errors.Join(err, err2)
+	}
+
+	if msg != "" {
+		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
+	}
 	return err
 }

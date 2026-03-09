@@ -104,12 +104,12 @@ func RegisterPullRequestWorkflows(cmd *cli.Command, opts client.Options, taskQue
 	funcs := []prWorkflowFunc{
 		c.PullRequestCreatedWorkflow,
 		c.PullRequestUpdatedWorkflow,
-		PullRequestReviewedWorkflow, // Approved.
-		PullRequestReviewedWorkflow, // Unapproved.
-		PullRequestReviewedWorkflow, // Changes requested.
-		PullRequestReviewedWorkflow, // Changes request removed.
-		c.PullRequestClosedWorkflow, // Fulfilled, a.k.a. merged.
-		c.PullRequestClosedWorkflow, // Rejected, a.k.a. declined.
+		c.PullRequestReviewedWorkflow, // Approved.
+		c.PullRequestReviewedWorkflow, // Unapproved.
+		c.PullRequestReviewedWorkflow, // Changes requested.
+		c.PullRequestReviewedWorkflow, // Changes request removed.
+		c.PullRequestClosedWorkflow,   // Fulfilled, a.k.a. merged.
+		c.PullRequestClosedWorkflow,   // Rejected, a.k.a. declined.
 
 		c.CommentCreatedWorkflow,
 		c.CommentUpdatedWorkflow,

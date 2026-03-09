@@ -109,7 +109,7 @@ func (c *Config) prepareForReset(ctx workflow.Context, info *workflow.Info) {
 		logger.From(ctx).Error("failed to wait for all handlers to finish", slog.Any("error", err))
 	}
 
-	for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 5; cyclesSinceLastSignal++ {
+	for cyclesSinceLastSignal := 0; cyclesSinceLastSignal < 3; cyclesSinceLastSignal++ {
 		if drainCycle(ctx) {
 			cyclesSinceLastSignal = -1 // Will become 0 after loop increment.
 		}

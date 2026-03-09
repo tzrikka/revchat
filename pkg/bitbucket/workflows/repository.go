@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/config"
@@ -16,6 +18,11 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/xdg"
 )
+
+// We don't want to spam the channel with "ready to merge" messages in times of frequent
+// builds, so we throttle these messages to at most once per hour per PR. This is not
+// a critical or common need, so a non-persistent in-memory cache is good enough.
+var mergeReadiness = cache.New[bool](time.Hour, cache.DefaultCleanupInterval)
 
 // CommitCommentCreatedWorkflow (will) handle (in the future) this event:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Commit-comment-created
@@ -75,6 +82,7 @@ func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.Repos
 	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(ctx, prURL) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
 		return err
 	}
+
 	approvers := 0
 	for _, p := range pr.Participants {
 		if p.Approved {
@@ -85,8 +93,17 @@ func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.Repos
 		return err
 	}
 
+	if announced, _ := mergeReadiness.Get(prURL); announced {
+		return err
+	}
+
 	logger.From(ctx).Info("Bitbucket PR is ready to be merged", slog.String("pr_url", prURL))
-	return activities.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
+	if err := activities.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:"); err != nil {
+		return err
+	}
+
+	mergeReadiness.Set(prURL, true, cache.DefaultExpiration)
+	return nil
 }
 
 // IssueCreatedWorkflow (will) handle (in the future) this event:
