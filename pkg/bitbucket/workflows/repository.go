@@ -97,9 +97,13 @@ func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.Repos
 		return err
 	}
 
-	mergeReadiness.Set(prURL, true, cache.DefaultExpiration)
 	logger.From(ctx).Info("Bitbucket PR is ready to be merged", slog.String("pr_url", prURL))
-	return activities.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:")
+	if err := activities.PostMessage(ctx, channelID, "<!here> this PR is ready to be merged! :tada:"); err != nil {
+		return err
+	}
+
+	mergeReadiness.Set(prURL, true, cache.DefaultExpiration)
+	return nil
 }
 
 // IssueCreatedWorkflow (will) handle (in the future) this event:
