@@ -15,6 +15,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/xdg"
 )
@@ -124,12 +125,12 @@ func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, 
 			return err
 		}
 
-		if d.IsDir() || !strings.HasSuffix(d.Name(), data.PRSnapshotFileSuffix) {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), data2.PRSnapshotFileSuffix) {
 			return nil
 		}
 
-		prURL := "https://" + strings.TrimSuffix(path, data.PRSnapshotFileSuffix)
-		snapshot, err := data.LoadPRSnapshot(ctx, prURL)
+		prURL := "https://" + strings.TrimSuffix(path, data2.PRSnapshotFileSuffix)
+		snapshot, err := data2.LoadPRSnapshot(ctx, prURL)
 		if err != nil {
 			return nil
 		}

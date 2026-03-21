@@ -16,6 +16,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/xdg"
@@ -80,7 +81,7 @@ func LoadPRTurns(ctx workflow.Context, onlyCurrentTurn, authors, reviewers bool)
 // The "thrippyID" parameter is only used to report Bitbucket PR tasks, and can be left empty otherwise.
 func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, showDrafts, showTasks bool, thrippyID string) string {
 	summary := new(strings.Builder)
-	pr, err := data.LoadPRSnapshot(ctx, url)
+	pr, err := data2.LoadPRSnapshot(ctx, url)
 	if err != nil {
 		fmt.Fprintf(summary, "\n\n<%s|*%s*>", url, url)
 		if selfReport {

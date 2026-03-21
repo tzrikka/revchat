@@ -14,6 +14,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/timpani-api/pkg/jira"
 )
 
@@ -516,7 +517,7 @@ func writeTurnsFileActivity(_ context.Context, url string, t *PRTurns) error {
 func resetTurns(ctx workflow.Context, url string, t *PRTurns) (*PRTurns, error) {
 	logger.From(ctx).Warn("resetting PR attention state file", slog.String("pr_url", url))
 
-	pr, err := LoadPRSnapshot(ctx, url)
+	pr, err := data2.LoadPRSnapshot(ctx, url)
 	if err != nil {
 		return nil, err
 	}

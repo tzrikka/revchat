@@ -1,4 +1,4 @@
-package data
+package data2
 
 import (
 	"reflect"
@@ -8,7 +8,6 @@ import (
 func TestPRSnapshot(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache.Clear()
 
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 

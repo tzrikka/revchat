@@ -8,6 +8,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
@@ -21,7 +22,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 			err, "PR URL", event.PullRequest.HTMLURL, "Slack channel ID", prChannelID)
 	}
 
-	data.StorePRSnapshot(ctx, event.PullRequest.HTMLURL, event.PullRequest)
+	data2.StorePRSnapshot(ctx, event.PullRequest.HTMLURL, event.PullRequest)
 
 	email := users.GitHubIDToEmail(ctx, event.Sender.Login)
 	if email == "" {

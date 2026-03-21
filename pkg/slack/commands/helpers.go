@@ -11,6 +11,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -93,7 +94,7 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 		return nil, nil, nil, err // The error may or may not be nil.
 	}
 
-	pr, err = data.LoadPRSnapshot(ctx, url[0])
+	pr, err = data2.LoadPRSnapshot(ctx, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to load PR snapshot.")
 		return url, nil, nil, err

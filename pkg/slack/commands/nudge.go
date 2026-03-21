@@ -12,6 +12,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
@@ -78,7 +79,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 }
 
 func authorSlackID(ctx workflow.Context, prURL string) string {
-	pr, err := data.LoadPRSnapshot(ctx, prURL)
+	pr, err := data2.LoadPRSnapshot(ctx, prURL)
 	if err != nil {
 		return ""
 	}
