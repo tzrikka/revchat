@@ -72,7 +72,7 @@ func alert(ctx workflow.Context, channelName, text string, err error, details ..
 	}
 	for more {
 		frame, more = frames.Next()
-		if !strings.Contains(frame.Function, "revchat") {
+		if !strings.Contains(frame.Function, "tzrikka") && !strings.Contains(frame.Function, "revchat") {
 			continue // Ignore calls outside of our codebase.
 		}
 		fn := strings.Split(frame.Function, "/")

@@ -61,6 +61,15 @@ func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) str
 	return email
 }
 
+// BitbucketActorToSlackID is a trivial wrapper around [BitbucketIDToSlackID].
+// It avoids unnecessary API calls for non-user accounts by checking the account type first.
+func BitbucketActorToSlackID(ctx workflow.Context, actor bitbucket.User, checkOptIn bool) string {
+	if actor.Type == "app_user" {
+		return ""
+	}
+	return BitbucketIDToSlackID(ctx, actor.AccountID, checkOptIn)
+}
+
 // BitbucketIDToSlackID converts a Bitbucket account ID into a Slack user ID. This function returns an empty
 // string if the account ID is not found. It uses persistent data storage, or API calls as a fallback.
 func BitbucketIDToSlackID(ctx workflow.Context, accountID string, checkOptIn bool) string {

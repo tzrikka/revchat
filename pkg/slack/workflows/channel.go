@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"fmt"
 	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
@@ -29,8 +30,13 @@ func (c *Config) ChannelArchivedWorkflow(ctx workflow.Context, event archiveEven
 	// is that the last member has left the channel, so Slackbot auto-archived it.
 	logger.From(ctx).Info("RevChat channel archived by someone else",
 		slog.String("channel_id", event.InnerEvent.Channel), slog.String("user", event.InnerEvent.User))
+
+	mention := event.InnerEvent.User
+	if mention != "USLACKBOT" {
+		mention = fmt.Sprintf("<@%s>", mention)
+	}
 	activities.AlertWarn(ctx, c.AlertsChannel, "RevChat channel archived by someone else!",
-		"Channel ID", event.InnerEvent.Channel, "User", event.InnerEvent.User)
+		"Channel ID", event.InnerEvent.Channel, "User", mention)
 
 	data.CleanupPRData(ctx, event.InnerEvent.Channel, prURL)
 	return nil

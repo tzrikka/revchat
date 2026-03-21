@@ -34,7 +34,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 	if email == "" {
 		logger.From(ctx).Error("initializing Bitbucket PR data without author's email",
 			slog.String("pr_url", prURL), slog.String("account_id", event.Actor.AccountID))
-		activities.AlertWarn(ctx, slackAlertsChannel, "Failed to determine a PR author's email address!",
+		activities.AlertWarn(ctx, slackAlertsChannel, "Failed to determine a PR author's email address",
 			"Bitbucket account ID", event.Actor.AccountID)
 		return
 	}

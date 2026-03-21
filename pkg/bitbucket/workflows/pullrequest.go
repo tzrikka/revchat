@@ -129,7 +129,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	if snapshot == nil {
 		bitbucket.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
 		logger.From(ctx).Warn("reinitialized PR snapshot instead of handling update event: loaded but empty", slog.String("pr_url", prURL))
-		activities.AlertWarn(ctx, c.SlackAlertsChannel, "reinitialized PR snapshot instead of handling update event", "PR URL", prURL)
+		activities.AlertWarn(ctx, c.SlackAlertsChannel, "Reinitialized PR snapshot instead of handling update event", "PR URL", prURL)
 		return nil
 	}
 

@@ -27,7 +27,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 	if email == "" {
 		logger.From(ctx).Error("initializing GitHub PR data without author's email",
 			slog.String("pr_url", event.PullRequest.HTMLURL), slog.String("login", event.Sender.Login))
-		activities.AlertWarn(ctx, slackAlertsChannel, "Failed to determine a PR author's email address!",
+		activities.AlertWarn(ctx, slackAlertsChannel, "Failed to determine a PR author's email address",
 			"GitHub login", event.Sender.Login)
 		return
 	}
