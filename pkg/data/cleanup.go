@@ -14,7 +14,7 @@ func CleanupPRData(ctx workflow.Context, channelID, prURL string) {
 		return
 	}
 
-	DeleteBitbucketBuilds(ctx, prURL)
+	data2.DeleteBitbucketBuilds(ctx, prURL)
 	DeleteDiffstat(ctx, prURL)
 	data2.DeletePRSnapshot(ctx, prURL)
 	DeleteTurns(ctx, prURL)

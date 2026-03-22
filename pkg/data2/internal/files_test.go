@@ -115,7 +115,7 @@ func TestDataPath(t *testing.T) {
 	}
 }
 
-func TestDeletePRFile(t *testing.T) {
+func TestDeleteGenericPRFile(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
 
@@ -127,16 +127,16 @@ func TestDeletePRFile(t *testing.T) {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
 
-	if err := DeletePRFile(t.Context(), "file.json"); err != nil {
-		t.Fatalf("DeletePRFile() error = %v", err)
+	if err := DeleteGenericPRFile(t.Context(), "file.json"); err != nil {
+		t.Fatalf("DeleteGenericPRFile() error = %v", err)
 	}
 
 	if _, err := os.Stat(name); !os.IsNotExist(err) {
-		t.Fatalf("file still exists after DeletePRFile(): %v", err)
+		t.Fatalf("file still exists after DeleteGenericPRFile(): %v", err)
 	}
 
 	// Deleting again should not return an error.
-	if err := DeletePRFile(t.Context(), "file.json"); err != nil {
-		t.Fatalf("DeletePRFile() error on non-existent file = %v", err)
+	if err := DeleteGenericPRFile(t.Context(), "file.json"); err != nil {
+		t.Fatalf("DeleteGenericPRFile() error on non-existent file = %v", err)
 	}
 }

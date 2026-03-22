@@ -370,7 +370,7 @@ const (
 
 func states(ctx workflow.Context, url string) string {
 	if isBitbucketPR(url) {
-		prStatus := data.ReadBitbucketBuilds(ctx, url)
+		prStatus := data2.ReadBitbucketBuilds(ctx, url)
 		keys := slices.Sorted(maps.Keys(prStatus.Builds))
 		var summary []string
 		for _, k := range keys {

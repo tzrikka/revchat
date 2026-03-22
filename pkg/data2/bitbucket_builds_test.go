@@ -1,4 +1,4 @@
-package data
+package data2
 
 import (
 	"reflect"
@@ -8,12 +8,11 @@ import (
 func TestBitbucketBuilds(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache.Clear()
 
-	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
+	prURL := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Initial state.
-	got := ReadBitbucketBuilds(nil, url)
+	got := ReadBitbucketBuilds(nil, prURL)
 	if got.Builds != nil {
 		t.Fatalf("ReadBitbucketBuilds() = %#v, want %#v", got, PRStatus{})
 	}
@@ -25,9 +24,9 @@ func TestBitbucketBuilds(t *testing.T) {
 		Desc:  "Build passed",
 		URL:   "http://build1",
 	}
-	UpdateBitbucketBuilds(nil, url, "commit1", "build1", cs1)
+	UpdateBitbucketBuilds(nil, prURL, "commit1", "build1", cs1)
 
-	got = ReadBitbucketBuilds(nil, url)
+	got = ReadBitbucketBuilds(nil, prURL)
 	want := PRStatus{
 		CommitHash: "commit1",
 		Builds: map[string]CommitStatus{
@@ -45,9 +44,9 @@ func TestBitbucketBuilds(t *testing.T) {
 		Desc:  "Build failed",
 		URL:   "http://build2",
 	}
-	UpdateBitbucketBuilds(nil, url, "commit2", "build2", cs2)
+	UpdateBitbucketBuilds(nil, prURL, "commit2", "build2", cs2)
 
-	got = ReadBitbucketBuilds(nil, url)
+	got = ReadBitbucketBuilds(nil, prURL)
 	want = PRStatus{
 		CommitHash: "commit2",
 		Builds: map[string]CommitStatus{
@@ -59,9 +58,9 @@ func TestBitbucketBuilds(t *testing.T) {
 	}
 
 	// Delete builds.
-	DeleteBitbucketBuilds(nil, url)
+	DeleteBitbucketBuilds(nil, prURL)
 
-	got = ReadBitbucketBuilds(nil, url)
+	got = ReadBitbucketBuilds(nil, prURL)
 	if got.Builds != nil {
 		t.Fatalf("ReadBitbucketBuilds() = %v, want %v", got, PRStatus{})
 	}

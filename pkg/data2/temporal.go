@@ -28,7 +28,7 @@ func executeLocalActivity(ctx workflow.Context, activity, result any, args ...an
 
 	start := time.Now()
 	err := workflow.ExecuteLocalActivity(ctx, activity, args...).Get(ctx, result)
-	logger.From(ctx).Debug("executed local Temporal activity for data access", slog.String("activity", fn),
+	logger.From(ctx).Debug("executed Temporal local activity for data access", slog.String("activity", fn),
 		slog.Duration("duration", time.Since(start)), slog.Any("error", err))
 
 	return err

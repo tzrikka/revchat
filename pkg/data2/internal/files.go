@@ -2,14 +2,34 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/xdg"
 )
+
+const (
+	fileFlags = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
+	filePerms = xdg.NewFilePermissions
+)
+
+// RWMutexMap is a concurrency-safe map of string keys to *sync.RWMutex values. The zero value is ready to use.
+// This is useful for managing concurrent access to multiple files, where each file is identified by a string key.
+type RWMutexMap struct {
+	sm sync.Map
+}
+
+func (m *RWMutexMap) Get(key string) *sync.RWMutex {
+	actual, _ := m.sm.LoadOrStore(key, &sync.RWMutex{})
+	return actual.(*sync.RWMutex) //nolint:errcheck // Safe type assertion, always succeeds by definition.
+}
+
+var dataFileMutexes RWMutexMap
 
 // dataPath returns the absolute path to a data file with the given relative path.
 // The relative path can be a filename, or a PR's URL with a file-content-type suffix.
@@ -48,9 +68,31 @@ func fixEmptyJSONFile(path string) {
 	}
 }
 
-// DeletePRFile deletes a file related to a specific PR. Unlike [os.Remove], this
-// function is idempotent: it does not return an error if the file does not exist.
-func DeletePRFile(_ context.Context, prURLWithSuffix string) error {
+// writeGenericJSONFile writes the given map as JSON to the specified file. It expects the caller to hold the appropriate mutex.
+func writeGenericJSONFile(_ context.Context, filename string, data any) error {
+	path, err := dataPath(filename)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // Path specified by admin, or from signature-verified event.
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	e := json.NewEncoder(f)
+	e.SetIndent("", "  ")
+	return e.Encode(data)
+}
+
+// DeleteGenericPRFile deletes a file related to a specific PR. Unlike [os.Remove],
+// this is idempotent: it does not return an error if the file does not exist.
+func DeleteGenericPRFile(_ context.Context, prURLWithSuffix string) error {
+	mu := dataFileMutexes.Get(prURLWithSuffix)
+	mu.Lock()
+	defer mu.Unlock()
+
 	path, err := dataPath(prURLWithSuffix)
 	if err != nil {
 		return err

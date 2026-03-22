@@ -19,6 +19,10 @@ const (
 
 // StorePRSnapshot writes a snapshot of a PR, which is used to detect and analyze metadata changes.
 func StorePRSnapshot(_ context.Context, prURL string, pr any) error {
+	mu := dataFileMutexes.Get(prURL + PRSnapshotFileSuffix)
+	mu.Lock()
+	defer mu.Unlock()
+
 	path, err := dataPath(prURL + PRSnapshotFileSuffix)
 	if err != nil {
 		return fmt.Errorf("failed to get PR snapshot path: %w", err)
@@ -43,6 +47,10 @@ func StorePRSnapshot(_ context.Context, prURL string, pr any) error {
 // LoadPRSnapshot reads a snapshot of a PR, which is used to detect and analyze metadata
 // changes. If a snapshot doesn't exist, this function returns a nil map and no error.
 func LoadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
+	mu := dataFileMutexes.Get(prURL + PRSnapshotFileSuffix)
+	mu.Lock()
+	defer mu.Unlock()
+
 	path, err := dataPath(prURL + PRSnapshotFileSuffix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PR snapshot path: %w", err)

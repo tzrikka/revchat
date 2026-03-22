@@ -12,6 +12,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -76,7 +77,7 @@ func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, prURL string) 
 		return
 	}
 
-	prStatus := data.ReadBitbucketBuilds(ctx, prURL)
+	prStatus := data2.ReadBitbucketBuilds(ctx, prURL)
 
 	sb := new(strings.Builder)
 	sb.WriteString("Builds: ")

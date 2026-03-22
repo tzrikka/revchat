@@ -13,6 +13,7 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
@@ -64,8 +65,8 @@ func updateCommitStatus(ctx workflow.Context, cs *bitbucket.CommitStatus, pr *bi
 
 	defer bitbucket.UpdateChannelBuildsBookmark(ctx, channelID, prURL)
 
-	status := data.CommitStatus{Name: cs.Name, State: cs.State, Desc: cs.Description, URL: cs.URL}
-	data.UpdateBitbucketBuilds(ctx, prURL, cs.Commit.Hash, cs.Key, status)
+	status := data2.CommitStatus{Name: cs.Name, State: cs.State, Desc: cs.Description, URL: cs.URL}
+	data2.UpdateBitbucketBuilds(ctx, prURL, cs.Commit.Hash, cs.Key, status)
 
 	desc, _, _ := strings.Cut(cs.Description, "\n")
 	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, desc)
@@ -125,7 +126,7 @@ func buildStateEmoji(state string) string {
 }
 
 func allBuildsSuccessful(ctx workflow.Context, url string) bool {
-	prStatus := data.ReadBitbucketBuilds(ctx, url)
+	prStatus := data2.ReadBitbucketBuilds(ctx, url)
 	if len(prStatus.Builds) < 2 {
 		return false
 	}

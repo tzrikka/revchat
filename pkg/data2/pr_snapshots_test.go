@@ -9,10 +9,10 @@ func TestPRSnapshot(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
 
-	url := "https://bitbucket.org/workspace/repo/pull-requests/12345"
+	prURL := "https://bitbucket.org/workspace/repo/pull-requests/12345"
 
 	// Initial state.
-	got, err := LoadPRSnapshot(nil, url)
+	got, err := LoadPRSnapshot(nil, prURL)
 	if err != nil {
 		t.Fatalf("LoadPRSnapshot() error = %v", err)
 	}
@@ -22,9 +22,9 @@ func TestPRSnapshot(t *testing.T) {
 
 	// Initial snapshot.
 	pr1 := map[string]any{"title": "pr1"}
-	StorePRSnapshot(nil, url, pr1)
+	StorePRSnapshot(nil, prURL, pr1)
 
-	got, err = LoadPRSnapshot(nil, url)
+	got, err = LoadPRSnapshot(nil, prURL)
 	if err != nil {
 		t.Fatalf("LoadPRSnapshot() error = %v", err)
 	}
@@ -34,9 +34,9 @@ func TestPRSnapshot(t *testing.T) {
 
 	// Update snapshot.
 	pr2 := map[string]any{"title": "pr2"}
-	StorePRSnapshot(nil, url, pr2)
+	StorePRSnapshot(nil, prURL, pr2)
 
-	got, err = LoadPRSnapshot(nil, url)
+	got, err = LoadPRSnapshot(nil, prURL)
 	if err != nil {
 		t.Fatalf("LoadPRSnapshot() error = %v", err)
 	}
@@ -45,9 +45,9 @@ func TestPRSnapshot(t *testing.T) {
 	}
 
 	// Delete snapshot.
-	DeletePRSnapshot(nil, url)
+	DeletePRSnapshot(nil, prURL)
 
-	got, err = LoadPRSnapshot(nil, url)
+	got, err = LoadPRSnapshot(nil, prURL)
 	if err != nil {
 		t.Fatalf("LoadPRSnapshot() error = %v", err)
 	}
