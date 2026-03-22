@@ -1,10 +1,9 @@
 package workflows
 
 import (
+	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
@@ -13,11 +12,8 @@ import (
 	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
-	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
-	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
-	"github.com/tzrikka/xdg"
 )
 
 // We don't want to spam the channel with "ready to merge" messages in times of frequent
@@ -36,26 +32,29 @@ func CommitCommentCreatedWorkflow(ctx workflow.Context, _ bitbucket.RepositoryEv
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-created
 //   - https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Build-status-updated
 func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.RepositoryEvent) error {
-	// Commit status --> commit hash --> PR snapshot (JSON map) --> [bitbucket.PullRequest] struct.
+	// Commit status --> commit hash --> 0 or more [bitbucket.PullRequest] instances.
 	cs := event.CommitStatus
-	m, err := findPRByCommit(ctx, cs.Commit.Hash)
+	prs, err := bitbucket.FindPRsByCommit(ctx, cs.Commit.Hash)
 	if err != nil {
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to associate commit hash with PR", err)
 	}
-	if m == nil {
+
+	if len(prs) == 0 {
 		logger.From(ctx).Debug("PR not found for commit status", slog.String("hash", cs.Commit.Hash),
 			slog.String("build_name", cs.Name), slog.String("build_url", cs.URL))
-		// Not an error: the commit may not belong to any open PR,
+		// This is not a problem: the commit may not belong to any open PR,
 		// or may be obsoleted by a newer commit in the snapshot.
 		return nil
 	}
 
-	pr := new(bitbucket.PullRequest)
-	if err := bitbucket.MapToStruct(m, pr); err != nil {
-		logger.From(ctx).Error("invalid Bitbucket PR", slog.Any("error", err), slog.String("pr_url", urlFromPR(m)))
-		return err
+	for _, pr := range prs {
+		err = errors.Join(err, updateCommitStatus(ctx, cs, pr))
 	}
 
+	return err
+}
+
+func updateCommitStatus(ctx workflow.Context, cs *bitbucket.CommitStatus, pr *bitbucket.PullRequest) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	prURL := bitbucket.HTMLURL(pr.Links)
 	channelID, found := activities.LookupChannel(ctx, prURL)
@@ -70,9 +69,9 @@ func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.Repos
 
 	desc, _, _ := strings.Cut(cs.Description, "\n")
 	msg := fmt.Sprintf(`%s "%s" build status: <%s|%s>`, buildStateEmoji(cs.State), cs.Name, cs.URL, desc)
-	err = activities.PostMessage(ctx, channelID, msg)
+	err := activities.PostMessage(ctx, channelID, msg)
 
-	// If the channel is archived but we still store data for it, clean it up.
+	// If the channel is archived but we still store data for it, clean it up. We don't consider this a server error.
 	if err != nil && strings.Contains(err.Error(), "is_archived") {
 		data.CleanupPRData(ctx, channelID, prURL)
 		return nil
@@ -112,81 +111,6 @@ func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.Repos
 func IssueCreatedWorkflow(ctx workflow.Context, _ bitbucket.RepositoryEvent) error {
 	logger.From(ctx).Debug("Bitbucket issue created event - not implemented yet")
 	return nil
-}
-
-func findPRByCommit(ctx workflow.Context, eventHash string) (pr map[string]any, err error) {
-	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
-	if err != nil {
-		return nil, err
-	}
-
-	err = fs.WalkDir(os.DirFS(root), ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() || !strings.HasSuffix(d.Name(), data2.PRSnapshotFileSuffix) {
-			return nil
-		}
-
-		prURL := "https://" + strings.TrimSuffix(path, data2.PRSnapshotFileSuffix)
-		snapshot, err := data2.LoadPRSnapshot(ctx, prURL)
-		if err != nil {
-			return nil
-		}
-
-		prHash, ok := prCommitHash(snapshot)
-		if !ok {
-			return nil
-		}
-
-		if strings.HasPrefix(eventHash, prHash) {
-			if pr != nil {
-				logger.From(ctx).Warn("commit hash collision", slog.String("hash", eventHash),
-					slog.String("existing_pr", urlFromPR(pr)), slog.String("new_pr", urlFromPR(snapshot)))
-				return nil
-			}
-			pr = snapshot
-		}
-
-		return nil
-	})
-
-	return pr, err
-}
-
-func prCommitHash(pr map[string]any) (string, bool) {
-	source, ok := pr["source"].(map[string]any)
-	if !ok {
-		return "", false
-	}
-	commit, ok := source["commit"].(map[string]any)
-	if !ok {
-		return "", false
-	}
-	hash, ok := commit["hash"].(string)
-	if !ok {
-		return "", false
-	}
-
-	return hash, true
-}
-
-func urlFromPR(pr map[string]any) string {
-	links, ok := pr["links"].(map[string]any)
-	if !ok {
-		return ""
-	}
-	html, ok := links["html"].(map[string]any)
-	if !ok {
-		return ""
-	}
-	href, ok := html["href"].(string)
-	if !ok {
-		return ""
-	}
-
-	return href
 }
 
 func buildStateEmoji(state string) string {

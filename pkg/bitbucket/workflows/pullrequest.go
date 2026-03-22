@@ -116,7 +116,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	commits := bitbucket.Commits(ctx, event)
 	pr.CommitCount = len(commits)
 
-	snapshot, err := bitbucket.SwitchSnapshot(ctx, prURL, pr)
+	snapshot, err := bitbucket.SwitchPRSnapshot(ctx, prURL, pr)
 	if err != nil {
 		// In Bitbucket's case, not having the previous PR snapshot for comparison with
 		// the current state prevents us from identifying the actual update(s) in this event.
@@ -294,7 +294,7 @@ func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucke
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "", err)
 	}
 
-	_, err2 := bitbucket.SwitchSnapshot(ctx, prURL, pr)
+	_, err2 := bitbucket.SwitchPRSnapshot(ctx, prURL, pr)
 	if strings.HasPrefix(event.Type, "changes_request") && err2 != nil {
 		_ = activities.AlertError(ctx, c.SlackAlertsChannel, "failed to update change-request count in PR snapshot",
 			err2, "PR URL", prURL, "New count", pr.ChangeRequestCount)

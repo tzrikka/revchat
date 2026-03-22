@@ -65,8 +65,68 @@ func HTMLURL(links map[string]Link) string {
 	return links["html"].HRef
 }
 
-// MapToStruct converts a map-based representation of JSON data into a [PullRequest] struct.
-func MapToStruct(m any, pr *PullRequest) error {
+// LoadPRSnapshot reads a snapshot of a PR, which is used to detect and analyze metadata
+// changes. If a snapshot doesn't exist, this function returns a nil map and no error.
+func LoadPRSnapshot(ctx workflow.Context, prURL string) (*PullRequest, error) {
+	prev, err := data2.LoadPRSnapshot(ctx, prURL)
+	if err != nil || prev == nil {
+		return nil, err // Error may or may not be nil, but in either case there's no snapshot to return.
+	}
+
+	pr := new(PullRequest)
+	if err := mapToStruct(prev, pr); err != nil {
+		logger.From(ctx).Error("previous snapshot of Bitbucket PR is invalid",
+			slog.Any("error", err), slog.String("pr_url", prURL))
+		return nil, err
+	}
+
+	return pr, nil
+}
+
+// SwitchPRSnapshot stores the given new PR snapshot, and returns the previous one (if there is one).
+func SwitchPRSnapshot(ctx workflow.Context, prURL string, snapshot PullRequest) (*PullRequest, error) {
+	defer data2.StorePRSnapshot(ctx, prURL, &snapshot) // Pointer - to include potential updates below.
+
+	pr, err := LoadPRSnapshot(ctx, prURL)
+	if err != nil || pr == nil {
+		return nil, err // Error may or may not be nil, but in either case there's no snapshot to return.
+	}
+
+	// The "CommitCount" and "ChangeRequestCount" fields are populated and used by RevChat, not Bitbucket.
+	// Persist them across snapshots (before the deferred call to [data.StorePRSnapshot]).
+	if snapshot.CommitCount == 0 {
+		snapshot.CommitCount = pr.CommitCount
+	}
+	if snapshot.ChangeRequestCount == 0 {
+		snapshot.ChangeRequestCount = pr.ChangeRequestCount
+	}
+
+	return pr, nil
+}
+
+// FindPRsByCommit returns all (0 or more) the PR snapshots that are currently associated with the given commit hash.
+func FindPRsByCommit(ctx workflow.Context, hash string) ([]*PullRequest, error) {
+	ms, err := data2.FindPRsByCommit(ctx, hash)
+	if err != nil || ms == nil {
+		return nil, err
+	}
+
+	prs := make([]*PullRequest, 0, len(ms))
+	for _, m := range ms {
+		pr := new(PullRequest)
+		if err := mapToStruct(m, pr); err != nil {
+			logger.From(ctx).Error("snapshot of Bitbucket PR is invalid",
+				slog.Any("error", err), slog.String("commit_hash", hash))
+			continue
+		}
+		prs = append(prs, pr)
+	}
+
+	return prs, nil
+}
+
+// mapToStruct converts a map-based representation of JSON data into a [PullRequest] struct.
+func mapToStruct(m any, pr *PullRequest) error {
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(m); err != nil {
 		return err
@@ -77,35 +137,4 @@ func MapToStruct(m any, pr *PullRequest) error {
 	}
 
 	return nil
-}
-
-// SwitchSnapshot stores the given new PR snapshot, and returns the previous one (if there is one).
-func SwitchSnapshot(ctx workflow.Context, prURL string, snapshot PullRequest) (*PullRequest, error) {
-	defer data2.StorePRSnapshot(ctx, prURL, snapshot)
-
-	prev, err := data2.LoadPRSnapshot(ctx, prURL)
-	if err != nil {
-		return nil, err
-	}
-	if prev == nil {
-		return nil, nil
-	}
-
-	pr := new(PullRequest)
-	if err := MapToStruct(prev, pr); err != nil {
-		logger.From(ctx).Error("previous snapshot of Bitbucket PR is invalid",
-			slog.Any("error", err), slog.String("pr_url", prURL))
-		return nil, err
-	}
-
-	// the "CommitCount" and "ChangeRequestCount" fields are populated and used by RevChat, not Bitbucket.
-	// Persist them across snapshots (before the deferred call to [data.StoreBitbucketPR]).
-	if snapshot.CommitCount == 0 {
-		snapshot.CommitCount = pr.CommitCount
-	}
-	if snapshot.ChangeRequestCount == 0 {
-		snapshot.ChangeRequestCount = pr.ChangeRequestCount
-	}
-
-	return pr, nil
 }

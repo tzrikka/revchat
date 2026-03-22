@@ -10,18 +10,14 @@ import (
 	"github.com/tzrikka/revchat/pkg/data2/internal"
 )
 
-const (
-	PRSnapshotFileSuffix = "_snapshot.json"
-)
-
 // StorePRSnapshot writes a snapshot of a PR, which is used to detect and analyze metadata changes.
 func StorePRSnapshot(ctx workflow.Context, url string, pr any) {
 	if ctx == nil { // For unit testing.
-		_ = internal.StorePRSnapshot(context.Background(), url+PRSnapshotFileSuffix, pr)
+		_ = internal.StorePRSnapshot(context.Background(), url, pr)
 		return
 	}
 
-	if err := executeLocalActivity(ctx, internal.StorePRSnapshot, nil, url+PRSnapshotFileSuffix, pr); err != nil {
+	if err := executeLocalActivity(ctx, internal.StorePRSnapshot, nil, url, pr); err != nil {
 		logger.From(ctx).Error("failed to store PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
 	}
 }
@@ -30,11 +26,11 @@ func StorePRSnapshot(ctx workflow.Context, url string, pr any) {
 // changes. If a snapshot doesn't exist, this function returns a nil map and no error.
 func LoadPRSnapshot(ctx workflow.Context, url string) (map[string]any, error) {
 	if ctx == nil { // For unit testing.
-		return internal.LoadPRSnapshot(context.Background(), url+PRSnapshotFileSuffix)
+		return internal.LoadPRSnapshot(context.Background(), url)
 	}
 
-	pr := map[string]any{}
-	if err := executeLocalActivity(ctx, internal.LoadPRSnapshot, &pr, url+PRSnapshotFileSuffix); err != nil {
+	var pr map[string]any
+	if err := executeLocalActivity(ctx, internal.LoadPRSnapshot, &pr, url); err != nil {
 		logger.From(ctx).Error("failed to load PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
 		return nil, err
 	}
@@ -42,13 +38,28 @@ func LoadPRSnapshot(ctx workflow.Context, url string) (map[string]any, error) {
 	return pr, nil
 }
 
+// FindPRsByCommit returns all (0 or more) the PR snapshots that are currently associated with the given commit hash.
+func FindPRsByCommit(ctx workflow.Context, hash string) ([]map[string]any, error) {
+	if ctx == nil { // For unit testing.
+		return internal.FindPRsByCommit(context.Background(), hash)
+	}
+
+	var prs []map[string]any
+	if err := executeLocalActivity(ctx, internal.FindPRsByCommit, &prs, hash); err != nil {
+		logger.From(ctx).Error("failed to find PR snapshots by commit hash", slog.Any("error", err), slog.String("hash", hash))
+		return nil, err
+	}
+
+	return prs, nil
+}
+
 func DeletePRSnapshot(ctx workflow.Context, url string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.DeletePRFile(context.Background(), url+PRSnapshotFileSuffix)
+		_ = internal.DeletePRFile(context.Background(), url+internal.PRSnapshotFileSuffix)
 		return
 	}
 
-	if err := executeLocalActivity(ctx, internal.DeletePRFile, nil, url+PRSnapshotFileSuffix); err != nil {
+	if err := executeLocalActivity(ctx, internal.DeletePRFile, nil, url+internal.PRSnapshotFileSuffix); err != nil {
 		logger.From(ctx).Warn("failed to delete PR snapshot", slog.Any("error", err), slog.String("pr_url", url))
 	}
 }

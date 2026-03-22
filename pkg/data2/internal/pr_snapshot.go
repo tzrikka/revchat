@@ -5,12 +5,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"strings"
+
+	"github.com/tzrikka/revchat/pkg/config"
+	"github.com/tzrikka/xdg"
+)
+
+const (
+	PRSnapshotFileSuffix = "_snapshot.json"
 )
 
 // StorePRSnapshot writes a snapshot of a PR, which is used to detect and analyze metadata changes.
-func StorePRSnapshot(_ context.Context, urlWithSuffix string, pr any) error {
-	path, err := dataPath(urlWithSuffix)
+func StorePRSnapshot(_ context.Context, prURL string, pr any) error {
+	path, err := dataPath(prURL + PRSnapshotFileSuffix)
 	if err != nil {
 		return fmt.Errorf("failed to get PR snapshot path: %w", err)
 	}
@@ -33,8 +42,8 @@ func StorePRSnapshot(_ context.Context, urlWithSuffix string, pr any) error {
 
 // LoadPRSnapshot reads a snapshot of a PR, which is used to detect and analyze metadata
 // changes. If a snapshot doesn't exist, this function returns a nil map and no error.
-func LoadPRSnapshot(_ context.Context, urlWithSuffix string) (map[string]any, error) {
-	path, err := dataPath(urlWithSuffix)
+func LoadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
+	path, err := dataPath(prURL + PRSnapshotFileSuffix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PR snapshot path: %w", err)
 	}
@@ -57,4 +66,107 @@ func LoadPRSnapshot(_ context.Context, urlWithSuffix string) (map[string]any, er
 		return nil, nil
 	}
 	return pr, nil
+}
+
+// FindPRsByCommit returns all (0 or more) the PR snapshots that are currently associated with the given commit hash.
+func FindPRsByCommit(ctx context.Context, hash string) (prs []map[string]any, err error) {
+	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = fs.WalkDir(os.DirFS(root), ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() || !strings.HasSuffix(d.Name(), PRSnapshotFileSuffix) {
+			return nil
+		}
+
+		prURL := "https://" + strings.TrimSuffix(path, PRSnapshotFileSuffix)
+		snapshot, err := LoadPRSnapshot(ctx, prURL)
+		if err != nil || snapshot == nil {
+			return nil
+		}
+
+		// The hash from the event (hash) is always the full commit hash, but the one in the snapshot (prHash) may be truncated.
+		if prHash := prCommitHash(snapshot); prHash != "" && strings.HasPrefix(hash, prHash) {
+			prs = append(prs, snapshot)
+		}
+
+		return nil
+	})
+
+	return prs, err
+}
+
+func prCommitHash(pr map[string]any) string {
+	if hash := prCommitHashBitbucket(pr); hash != "" {
+		return hash
+	}
+	return prCommitHashGitHub(pr)
+}
+
+func prCommitHashBitbucket(pr map[string]any) string {
+	source, ok := pr["source"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	commit, ok := source["commit"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	hash, ok := commit["hash"].(string)
+	if !ok {
+		return ""
+	}
+
+	return hash
+}
+
+func prCommitHashGitHub(pr map[string]any) string {
+	head, ok := pr["head"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	sha, ok := head["sha"].(string)
+	if !ok {
+		return ""
+	}
+
+	return sha
+}
+
+func urlFromPR(pr map[string]any) string {
+	if url := urlFromPRBitbucket(pr); url != "" {
+		return url
+	}
+	return urlFromPRGitHub(pr)
+}
+
+func urlFromPRBitbucket(pr map[string]any) string {
+	links, ok := pr["links"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	html, ok := links["html"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	href, ok := html["href"].(string)
+	if !ok {
+		return ""
+	}
+
+	return href
+}
+
+func urlFromPRGitHub(pr map[string]any) string {
+	html, ok := pr["html_url"].(string)
+	if !ok {
+		return ""
+	}
+
+	return html
 }
