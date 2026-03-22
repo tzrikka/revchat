@@ -18,18 +18,19 @@ const (
 	filePerms = xdg.NewFilePermissions
 )
 
-// RWMutexMap is a concurrency-safe map of string keys to *sync.RWMutex values. The zero value is ready to use.
+// MutexMap is a concurrency-safe map of string keys to *sync.Mutex values. The zero value is ready to use.
 // This is useful for managing concurrent access to multiple files, where each file is identified by a string key.
-type RWMutexMap struct {
+// We don't use [sync.RWMutex] because even "read" operations may call [fixEmptyJSONFile], which modifies the file.
+type MutexMap struct {
 	sm sync.Map
 }
 
-func (m *RWMutexMap) Get(key string) *sync.RWMutex {
-	actual, _ := m.sm.LoadOrStore(key, &sync.RWMutex{})
-	return actual.(*sync.RWMutex) //nolint:errcheck // Safe type assertion, always succeeds by definition.
+func (m *MutexMap) Get(key string) *sync.Mutex {
+	actual, _ := m.sm.LoadOrStore(key, &sync.Mutex{})
+	return actual.(*sync.Mutex) //nolint:errcheck // Safe type assertion, always succeeds by definition.
 }
 
-var dataFileMutexes RWMutexMap
+var dataFileMutexes MutexMap
 
 // dataPath returns the absolute path to a data file with the given relative path.
 // The relative path can be a filename, or a PR's URL with a file-content-type suffix.
@@ -59,7 +60,7 @@ func fixEmptyJSONFile(path string) {
 	}
 
 	switch {
-	case strings.HasSuffix(path, bitbucketDiffstatFileSuffix):
+	case strings.HasSuffix(path, DiffstatFileSuffix):
 		fallthrough
 	case strings.HasSuffix(path, "/users.json"):
 		_ = os.WriteFile(path, []byte("[]\n"), xdg.NewFilePermissions)

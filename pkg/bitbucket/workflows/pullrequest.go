@@ -13,6 +13,7 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
@@ -193,12 +194,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	// Commit(s) pushed to the PR branch.
 	if pr.CommitCount > 0 && snapshot.Source.Commit.Hash != pr.Source.Commit.Hash {
-		if err := data.UpdateBitbucketDiffstat(prURL, bitbucket.Diffstat(ctx, event)); err != nil {
-			logger.From(ctx).Error("failed to update Bitbucket PR diffstat",
-				slog.Any("error", err), slog.String("pr_url", prURL))
-			errs = append(errs, err)
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
-		}
+		data2.UpdateDiffstat(ctx, prURL, bitbucket.Diffstat(ctx, event))
 
 		slices.Reverse(commits) // Switch from reverse order to chronological order.
 

@@ -27,10 +27,10 @@ type PRStatus struct {
 
 func ReadBitbucketBuilds(_ context.Context, prURL string) (*PRStatus, error) {
 	mu := dataFileMutexes.Get(prURL + BuildsFileSuffix)
-	mu.Lock() // Not RLock() because [readBitbucketBuildsFile] may call [fixEmptyJSONFile].
+	mu.Lock()
 	defer mu.Unlock()
 
-	return readBitbucketBuildsFile(prURL)
+	return readBitbucketBuilds(prURL)
 }
 
 func UpdateBitbucketBuilds(ctx context.Context, prURL, commitHash, key string, cs CommitStatus) error {
@@ -38,7 +38,7 @@ func UpdateBitbucketBuilds(ctx context.Context, prURL, commitHash, key string, c
 	mu.Lock()
 	defer mu.Unlock()
 
-	status, err := readBitbucketBuildsFile(prURL)
+	status, err := readBitbucketBuilds(prURL)
 	if err != nil {
 		return err
 	}
@@ -52,23 +52,23 @@ func UpdateBitbucketBuilds(ctx context.Context, prURL, commitHash, key string, c
 	return writeGenericJSONFile(ctx, prURL+BuildsFileSuffix, status)
 }
 
-// readBitbucketBuildsFile expects the calling function to hold the appropriate mutex for the given PR URL.
-func readBitbucketBuildsFile(prURL string) (*PRStatus, error) {
+// readBitbucketBuilds expects the calling function to hold the appropriate mutex for the given PR URL.
+func readBitbucketBuilds(prURL string) (*PRStatus, error) {
 	path, err := dataPath(prURL + BuildsFileSuffix)
 	if err != nil {
 		return nil, err
 	}
 
-	status := new(PRStatus)
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return status, nil
+			return nil, nil
 		}
 		return nil, err
 	}
 	defer f.Close()
 
+	status := new(PRStatus)
 	if err := json.NewDecoder(f).Decode(&status); err != nil {
 		return nil, err
 	}

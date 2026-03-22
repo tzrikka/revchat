@@ -11,7 +11,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -33,7 +32,7 @@ func newBookmarkTitles(pr PullRequest, files int) []string {
 }
 
 func SetChannelBookmarks(ctx workflow.Context, channelID, prURL string, pr PullRequest) {
-	titles := newBookmarkTitles(pr, len(data.ReadBitbucketDiffstatPaths(prURL)))
+	titles := newBookmarkTitles(pr, len(data2.ReadDiffstatPaths(ctx, prURL)))
 	_ = slack.BookmarksAdd(ctx, channelID, titles[0], prURL+"/overview", ":eyes:")
 	_ = slack.BookmarksAdd(ctx, channelID, titles[1], prURL+"/overview", ":speech_balloon:")
 	_ = slack.BookmarksAdd(ctx, channelID, titles[2], prURL+"/overview", ":white_check_mark:")
@@ -52,7 +51,7 @@ func UpdateChannelBookmarks(ctx workflow.Context, pr PullRequest, prURL, channel
 		return
 	}
 
-	newTitles := newBookmarkTitles(pr, len(data.ReadBitbucketDiffstatPaths(prURL)))
+	newTitles := newBookmarkTitles(pr, len(data2.ReadDiffstatPaths(ctx, prURL)))
 	for i, b := range bookmarks {
 		if i >= len(newTitles) {
 			break

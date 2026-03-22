@@ -26,10 +26,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 	}
 
 	data2.StorePRSnapshot(ctx, prURL, event.PullRequest)
-	if err := data.UpdateBitbucketDiffstat(prURL, Diffstat(ctx, event)); err != nil {
-		logger.From(ctx).Error("failed to create Bitbucket PR diffstat",
-			slog.Any("error", err), slog.String("pr_url", prURL))
-	}
+	data2.UpdateDiffstat(ctx, prURL, Diffstat(ctx, event))
 
 	email := users.BitbucketActorToEmail(ctx, event.Actor)
 	if email == "" {

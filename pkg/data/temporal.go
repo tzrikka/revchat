@@ -19,6 +19,7 @@ import (
 	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/config"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/xdg"
 )
 
@@ -145,7 +146,7 @@ func fixEmptyJSONFile(path string) {
 	}
 
 	switch {
-	case strings.HasSuffix(path, diffstatFileSuffix):
+	case strings.HasSuffix(path, data2.DiffstatFileSuffix):
 		fallthrough
 	case strings.HasSuffix(path, "/users.json"):
 		_ = os.WriteFile(path, []byte("[]\n"), xdg.NewFilePermissions)

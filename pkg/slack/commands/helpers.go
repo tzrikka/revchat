@@ -100,7 +100,7 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 		return url, nil, nil, err
 	}
 
-	paths = data.ReadBitbucketDiffstatPaths(url[0])
+	paths = data2.ReadDiffstatPaths(ctx, url[0])
 	if len(paths) == 0 {
 		PostEphemeralError(ctx, event, "no file paths found in PR diffstat.")
 		return url, nil, pr, nil
