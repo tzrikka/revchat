@@ -13,11 +13,11 @@ import (
 // StorePRSnapshot writes a snapshot of a PR, which is used to detect and analyze metadata changes.
 func StorePRSnapshot(ctx workflow.Context, prURL string, pr any) {
 	if ctx == nil { // For unit testing.
-		_ = internal.StorePRSnapshot(context.Background(), prURL, pr)
+		_ = internal.WritePRSnapshot(context.Background(), prURL, pr)
 		return
 	}
 
-	if err := executeLocalActivity(ctx, internal.StorePRSnapshot, nil, prURL, pr); err != nil {
+	if err := executeLocalActivity(ctx, internal.WritePRSnapshot, nil, prURL, pr); err != nil {
 		logger.From(ctx).Error("failed to store PR snapshot", slog.Any("error", err), slog.String("pr_url", prURL))
 	}
 }
@@ -26,11 +26,11 @@ func StorePRSnapshot(ctx workflow.Context, prURL string, pr any) {
 // changes. If a snapshot doesn't exist, this function returns a nil map and no error.
 func LoadPRSnapshot(ctx workflow.Context, prURL string) (map[string]any, error) {
 	if ctx == nil { // For unit testing.
-		return internal.LoadPRSnapshot(context.Background(), prURL)
+		return internal.ReadPRSnapshot(context.Background(), prURL)
 	}
 
 	var pr map[string]any
-	if err := executeLocalActivity(ctx, internal.LoadPRSnapshot, &pr, prURL); err != nil {
+	if err := executeLocalActivity(ctx, internal.ReadPRSnapshot, &pr, prURL); err != nil {
 		logger.From(ctx).Error("failed to load PR snapshot", slog.Any("error", err), slog.String("pr_url", prURL))
 		return nil, err
 	}

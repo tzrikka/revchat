@@ -17,8 +17,8 @@ const (
 	PRSnapshotFileSuffix = "_snapshot.json"
 )
 
-// StorePRSnapshot writes a snapshot of a PR, which is used to detect and analyze metadata changes.
-func StorePRSnapshot(_ context.Context, prURL string, pr any) error {
+// WritePRSnapshot writes a snapshot of a PR, which is used to detect and analyze metadata changes.
+func WritePRSnapshot(_ context.Context, prURL string, pr any) error {
 	mu := dataFileMutexes.Get(prURL + PRSnapshotFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
@@ -44,9 +44,9 @@ func StorePRSnapshot(_ context.Context, prURL string, pr any) error {
 	return nil
 }
 
-// LoadPRSnapshot reads a snapshot of a PR, which is used to detect and analyze metadata
+// ReadPRSnapshot reads a snapshot of a PR, which is used to detect and analyze metadata
 // changes. If a snapshot doesn't exist, this function returns a nil map and no error.
-func LoadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
+func ReadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
 	mu := dataFileMutexes.Get(prURL + PRSnapshotFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
@@ -76,7 +76,9 @@ func LoadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
 	return pr, nil
 }
 
-// FindPRsByCommit returns all (0 or more) the PR snapshots that are currently associated with the given commit hash.
+// FindPRsByCommit returns all (0 or more) the PR snapshots that are currently associated with the given
+// commit hash. This is used when processing commit events, to identify the relevant PR(s). To do this,
+// this function scans through all the PR snapshots and checks their current commit hashes.
 func FindPRsByCommit(ctx context.Context, hash string) (prs []map[string]any, err error) {
 	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
 	if err != nil {
@@ -93,7 +95,7 @@ func FindPRsByCommit(ctx context.Context, hash string) (prs []map[string]any, er
 		}
 
 		prURL := "https://" + strings.TrimSuffix(path, PRSnapshotFileSuffix)
-		snapshot, err := LoadPRSnapshot(ctx, prURL)
+		snapshot, err := ReadPRSnapshot(ctx, prURL)
 		if err != nil || snapshot == nil {
 			return nil
 		}

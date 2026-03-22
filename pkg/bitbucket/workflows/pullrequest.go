@@ -194,7 +194,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	// Commit(s) pushed to the PR branch.
 	if pr.CommitCount > 0 && snapshot.Source.Commit.Hash != pr.Source.Commit.Hash {
-		data2.UpdateDiffstat(ctx, prURL, bitbucket.Diffstat(ctx, event))
+		data2.StoreDiffstat(ctx, prURL, bitbucket.Diffstat(ctx, event))
 
 		slices.Reverse(commits) // Switch from reverse order to chronological order.
 

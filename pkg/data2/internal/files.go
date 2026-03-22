@@ -18,19 +18,19 @@ const (
 	filePerms = xdg.NewFilePermissions
 )
 
-// MutexMap is a concurrency-safe map of string keys to *sync.Mutex values. The zero value is ready to use.
+// mutexMap is a concurrency-safe map of string keys to *sync.Mutex values. The zero value is ready to use.
 // This is useful for managing concurrent access to multiple files, where each file is identified by a string key.
 // We don't use [sync.RWMutex] because even "read" operations may call [fixEmptyJSONFile], which modifies the file.
-type MutexMap struct {
+type mutexMap struct {
 	sm sync.Map
 }
 
-func (m *MutexMap) Get(key string) *sync.Mutex {
+func (m *mutexMap) Get(key string) *sync.Mutex {
 	actual, _ := m.sm.LoadOrStore(key, &sync.Mutex{})
 	return actual.(*sync.Mutex) //nolint:errcheck // Safe type assertion, always succeeds by definition.
 }
 
-var dataFileMutexes MutexMap
+var dataFileMutexes mutexMap
 
 // dataPath returns the absolute path to a data file with the given relative path.
 // The relative path can be a filename, or a PR's URL with a file-content-type suffix.

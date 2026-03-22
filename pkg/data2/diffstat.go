@@ -14,7 +14,18 @@ const (
 	DiffstatFileSuffix = internal.DiffstatFileSuffix
 )
 
-func ReadDiffstatPaths(ctx workflow.Context, prURL string) []string {
+func StoreDiffstat(ctx workflow.Context, prURL string, files any) {
+	if ctx == nil { // For unit testing.
+		_ = internal.WriteDiffstat(context.Background(), prURL, files)
+		return
+	}
+
+	if err := executeLocalActivity(ctx, internal.WriteDiffstat, nil, prURL, files); err != nil {
+		logger.From(ctx).Error("failed to write PR diffstat", slog.Any("error", err), slog.String("pr_url", prURL))
+	}
+}
+
+func LoadDiffstatPaths(ctx workflow.Context, prURL string) []string {
 	if ctx == nil { // For unit testing.
 		paths, err := internal.ReadDiffstatPaths(context.Background(), prURL)
 		if err != nil {
@@ -31,17 +42,6 @@ func ReadDiffstatPaths(ctx workflow.Context, prURL string) []string {
 	}
 
 	return paths
-}
-
-func UpdateDiffstat(ctx workflow.Context, prURL string, files any) {
-	if ctx == nil { // For unit testing.
-		_ = internal.UpdateDiffstat(context.Background(), prURL, files)
-		return
-	}
-
-	if err := executeLocalActivity(ctx, internal.UpdateDiffstat, nil, prURL, files); err != nil {
-		logger.From(ctx).Error("failed to update PR diffstat", slog.Any("error", err), slog.String("pr_url", prURL))
-	}
 }
 
 func DeleteDiffstat(ctx workflow.Context, prURL string) {

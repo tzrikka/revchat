@@ -10,9 +10,9 @@ func TestDiffstat(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", d)
 
 	// Initial state.
-	got := ReadDiffstatPaths(nil, "url")
+	got := LoadDiffstatPaths(nil, "url")
 	if got != nil {
-		t.Fatalf("ReadDiffstatPaths() = %#v, want %v", got, nil)
+		t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, nil)
 	}
 
 	// New PR.
@@ -41,10 +41,10 @@ func TestDiffstat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			UpdateDiffstat(nil, "url", tt.files)
-			got := ReadDiffstatPaths(nil, "url")
+			StoreDiffstat(nil, "url", tt.files)
+			got := LoadDiffstatPaths(nil, "url")
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("ReadDiffstatPaths() = %#v, want %v", got, tt.want)
+				t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -52,8 +52,8 @@ func TestDiffstat(t *testing.T) {
 	// PR closed.
 	DeleteDiffstat(nil, "url")
 
-	got = ReadDiffstatPaths(nil, "url")
+	got = LoadDiffstatPaths(nil, "url")
 	if got != nil {
-		t.Fatalf("ReadDiffstatPaths() = %#v, want %v", got, nil)
+		t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, nil)
 	}
 }

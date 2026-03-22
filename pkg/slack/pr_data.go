@@ -124,7 +124,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 
 	// File-related details.
 	summary.WriteString(branchNameMarkdown(ctx, url, pr))
-	paths := data2.ReadDiffstatPaths(ctx, url)
+	paths := data2.LoadDiffstatPaths(ctx, url)
 	if len(paths) > 0 {
 		owner, repo, branch, commit := PRIdentifiers(ctx, url, pr)
 

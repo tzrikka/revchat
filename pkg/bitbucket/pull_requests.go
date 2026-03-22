@@ -26,7 +26,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 	}
 
 	data2.StorePRSnapshot(ctx, prURL, event.PullRequest)
-	data2.UpdateDiffstat(ctx, prURL, Diffstat(ctx, event))
+	data2.StoreDiffstat(ctx, prURL, Diffstat(ctx, event))
 
 	email := users.BitbucketActorToEmail(ctx, event.Actor)
 	if email == "" {

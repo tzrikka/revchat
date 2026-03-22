@@ -11,6 +11,14 @@ const (
 	DiffstatFileSuffix = "_diffstat.json"
 )
 
+func WriteDiffstat(ctx context.Context, prURL string, files any) error {
+	mu := dataFileMutexes.Get(prURL + DiffstatFileSuffix)
+	mu.Lock()
+	defer mu.Unlock()
+
+	return writeGenericJSONFile(ctx, prURL+DiffstatFileSuffix, files)
+}
+
 func ReadDiffstatPaths(_ context.Context, prURL string) ([]string, error) {
 	mu := dataFileMutexes.Get(prURL + DiffstatFileSuffix)
 	mu.Lock()
@@ -22,14 +30,6 @@ func ReadDiffstatPaths(_ context.Context, prURL string) ([]string, error) {
 	}
 
 	return extractFilePaths(files), nil
-}
-
-func UpdateDiffstat(ctx context.Context, prURL string, files any) error {
-	mu := dataFileMutexes.Get(prURL + DiffstatFileSuffix)
-	mu.Lock()
-	defer mu.Unlock()
-
-	return writeGenericJSONFile(ctx, prURL+DiffstatFileSuffix, files)
 }
 
 // readDiffstat expects the calling function to hold the appropriate mutex for the given PR URL.
