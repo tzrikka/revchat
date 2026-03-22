@@ -104,7 +104,7 @@ func TestDataPath(t *testing.T) {
 				t.Fatalf("dataPath() path = %q, want %q", gotPath, wantPath)
 			}
 
-			gotContent, err := os.ReadFile(gotPath)
+			gotContent, err := os.ReadFile(gotPath) //gosec:disable G304 // Unit test.
 			if err != nil {
 				t.Fatalf("os.ReadFile() error = %v", err)
 			}
