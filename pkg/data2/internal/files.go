@@ -69,7 +69,28 @@ func fixEmptyJSONFile(path string) {
 	}
 }
 
-// writeGenericJSONFile writes the given map as JSON to the specified file. It expects the caller to hold the appropriate mutex.
+// readGenericJSONFile expects the caller to hold the appropriate mutex.
+func readGenericJSONFile(filename string) (map[string]string, error) {
+	path, err := dataPath(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data file path: %w", err)
+	}
+
+	f, err := os.Open(path) //gosec:disable G304 // Specified by admin by design.
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer f.Close()
+
+	var m map[string]string
+	if err := json.NewDecoder(f).Decode(&m); err != nil {
+		return nil, fmt.Errorf("failed to decode JSON: %w", err)
+	}
+
+	return m, nil
+}
+
+// writeGenericJSONFile expects the caller to hold the appropriate mutex.
 func writeGenericJSONFile(filename string, data any) error {
 	path, err := dataPath(filename)
 	if err != nil {

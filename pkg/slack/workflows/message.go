@@ -9,7 +9,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/slack/commands"
 	"github.com/tzrikka/timpani-api/pkg/slack"
@@ -83,11 +83,7 @@ func extractUserID(ctx workflow.Context, msg *MessageEvent) string {
 
 // convertBotIDToUserID uses cached API calls to convert Slack bot IDs to a user IDs.
 func convertBotIDToUserID(ctx workflow.Context, botID string) string {
-	userID, err := data.GetSlackBotUserID(ctx, botID)
-	if err != nil {
-		logger.From(ctx).Error("failed to load Slack bot's user ID", slog.Any("error", err), slog.String("bot_id", botID))
-		return ""
-	}
+	userID := data2.GetSlackBotUserID(ctx, botID)
 	if userID != "" {
 		return userID
 	}
@@ -97,13 +93,10 @@ func convertBotIDToUserID(ctx workflow.Context, botID string) string {
 		logger.From(ctx).Error("failed to retrieve bot info from Slack", slog.Any("error", err), slog.String("bot_id", botID))
 		return ""
 	}
+	logger.From(ctx).Debug("retrieved bot info from Slack", slog.String("bot_id", botID),
+		slog.String("user_id", bot.UserID), slog.String("name", bot.Name))
 
-	logger.From(ctx).Debug("retrieved bot info from Slack",
-		slog.String("bot_id", botID), slog.String("user_id", bot.UserID), slog.String("name", bot.Name))
-	if err := data.SetSlackBotUserID(ctx, botID, bot.UserID); err != nil {
-		logger.From(ctx).Error("failed to save Slack bot's user ID", slog.Any("error", err), slog.String("bot_id", botID))
-	}
-
+	data2.SetSlackBotUserID(ctx, botID, bot.UserID)
 	return bot.UserID
 }
 

@@ -11,7 +11,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
@@ -40,7 +39,7 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 		return nil
 	}
 
-	reminders, err := data.ListReminders(ctx)
+	reminders, err := data2.ListScheduledUserReminders(ctx)
 	if err != nil {
 		return activities.AlertError(ctx, c.AlertsChannel, "", err)
 	}

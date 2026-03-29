@@ -69,7 +69,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		}
 	}
 	if commands.RemindersSyntax.MatchString(event.Text) {
-		return commands.Reminders(ctx, event)
+		return commands.Reminders(ctx, event, c.AlertsChannel)
 	}
 
 	commands.PostEphemeralError(ctx, event, fmt.Sprintf("unrecognized command - try `%s help`", event.Command))

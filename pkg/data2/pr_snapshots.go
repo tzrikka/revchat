@@ -18,7 +18,7 @@ func StorePRSnapshot(ctx workflow.Context, prURL string, pr any) {
 	}
 
 	if err := executeLocalActivity(ctx, internal.WritePRSnapshot, nil, prURL, pr); err != nil {
-		logger.From(ctx).Error("failed to store PR snapshot", slog.Any("error", err), slog.String("pr_url", prURL))
+		logger.From(ctx).Error("failed to write PR snapshot", slog.Any("error", err), slog.String("pr_url", prURL))
 	}
 }
 
@@ -31,7 +31,7 @@ func LoadPRSnapshot(ctx workflow.Context, prURL string) (map[string]any, error) 
 
 	var pr map[string]any
 	if err := executeLocalActivity(ctx, internal.ReadPRSnapshot, &pr, prURL); err != nil {
-		logger.From(ctx).Error("failed to load PR snapshot", slog.Any("error", err), slog.String("pr_url", prURL))
+		logger.From(ctx).Error("failed to read PR snapshot", slog.Any("error", err), slog.String("pr_url", prURL))
 		return nil, err
 	}
 

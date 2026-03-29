@@ -1,9 +1,11 @@
-package data2
+package data2_test
 
 import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/tzrikka/revchat/pkg/data2"
 )
 
 func TestInitTurns(t *testing.T) {
@@ -13,7 +15,7 @@ func TestInitTurns(t *testing.T) {
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Pre-initialized state (missing file).
-	got, err := LoadCurrentTurnEmails(nil, url)
+	got, err := data2.LoadCurrentTurnEmails(nil, url)
 	if err == nil {
 		t.Fatal("LoadCurrentTurnEmails() error = nil, want = true")
 	}
@@ -23,9 +25,9 @@ func TestInitTurns(t *testing.T) {
 	}
 
 	// Initialize PR without reviewers.
-	InitTurns(nil, url, "author@example.com")
+	data2.InitTurns(nil, url, "author@example.com")
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -36,9 +38,9 @@ func TestInitTurns(t *testing.T) {
 
 	// Initialize another PR without reviewers.
 	url = "https://bitbucket.org/workspace/repo/pull-requests/2"
-	InitTurns(nil, url, "bot")
+	data2.InitTurns(nil, url, "bot")
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -53,11 +55,11 @@ func TestDeleteTurns(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", d)
 
 	url := "https://github.com/owner/repo/pull/1"
-	InitTurns(nil, url, "author@example.com")
+	data2.InitTurns(nil, url, "author@example.com")
 
-	DeleteTurns(nil, url)
+	data2.DeleteTurns(nil, url)
 
-	_, err := LoadCurrentTurnEmails(nil, url)
+	_, err := data2.LoadCurrentTurnEmails(nil, url)
 	if err == nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = nil, want = true")
 	}
@@ -115,10 +117,10 @@ func TestLoadCurrentTurnEmails(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			url := fmt.Sprintf("https://github.com/owner/repo/pull/%d", i+1)
-			InitTurns(nil, url, tt.author)
+			data2.InitTurns(nil, url, tt.author)
 
 			if tt.reviewer != "" {
-				gotDone, gotApproved, gotErr := SetReviewerTurn(nil, url, tt.reviewer, false)
+				gotDone, gotApproved, gotErr := data2.SetReviewerTurn(nil, url, tt.reviewer, false)
 				if gotErr != nil {
 					t.Fatalf("SetReviewerTurn() error = %v", gotErr)
 				}
@@ -130,7 +132,7 @@ func TestLoadCurrentTurnEmails(t *testing.T) {
 				}
 			}
 
-			got, err := LoadCurrentTurnEmails(nil, url)
+			got, err := data2.LoadCurrentTurnEmails(nil, url)
 			if err != nil {
 				t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 			}
@@ -148,9 +150,9 @@ func TestTurns(t *testing.T) {
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Initialize state without reviewers.
-	InitTurns(nil, url, "author@example.com")
+	data2.InitTurns(nil, url, "author@example.com")
 
-	got, err := LoadCurrentTurnEmails(nil, url)
+	got, err := data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -160,7 +162,7 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Add reviewers.
-	done, approved, err := SetReviewerTurn(nil, url, "rev1", false)
+	done, approved, err := data2.SetReviewerTurn(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -171,7 +173,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -180,7 +182,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	done, approved, err = SetReviewerTurn(nil, url, "rev2", false)
+	done, approved, err = data2.SetReviewerTurn(nil, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -191,7 +193,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -200,7 +202,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	done, approved, err = SetReviewerTurn(nil, url, "rev2", false) // should be a no-op.
+	done, approved, err = data2.SetReviewerTurn(nil, url, "rev2", false) // should be a no-op.
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -211,7 +213,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -220,7 +222,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	done, approved, err = SetReviewerTurn(nil, url, "author@example.com", false) // should be a no-op.
+	done, approved, err = data2.SetReviewerTurn(nil, url, "author@example.com", false) // should be a no-op.
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -231,7 +233,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -241,11 +243,11 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Update turn states.
-	err = SwitchTurn(nil, url, "rev1", false)
+	err = data2.SwitchTurn(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -254,11 +256,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	err = SwitchTurn(nil, url, "rev2", false)
+	err = data2.SwitchTurn(nil, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -267,11 +269,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	err = SwitchTurn(nil, url, "author@example.com", false)
+	err = data2.SwitchTurn(nil, url, "author@example.com", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -280,14 +282,14 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	ok, err := FreezeTurns(nil, url, "someone")
+	ok, err := data2.FreezeTurns(nil, url, "someone")
 	if err != nil {
 		t.Fatalf("FreezeTurns() error = %v", err)
 	}
 	if !ok {
 		t.Fatalf("FreezeTurns() = %v, want %v", ok, true)
 	}
-	ok, err = FreezeTurns(nil, url, "someone")
+	ok, err = data2.FreezeTurns(nil, url, "someone")
 	if err != nil {
 		t.Fatalf("FreezeTurns() error = %v", err)
 	}
@@ -295,15 +297,15 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("FreezeTurns() = %v, want %v", ok, false)
 	}
 
-	err = SwitchTurn(nil, url, "rev1", false)
+	err = data2.SwitchTurn(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	err = SwitchTurn(nil, url, "rev2", false)
+	err = data2.SwitchTurn(nil, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -313,11 +315,11 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Force switch while frozen.
-	err = SwitchTurn(nil, url, "rev1", true)
+	err = data2.SwitchTurn(nil, url, "rev1", true)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -327,11 +329,11 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Add "rev1" back while still frozen.
-	err = SwitchTurn(nil, url, "author@example.com", true)
+	err = data2.SwitchTurn(nil, url, "author@example.com", true)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -340,11 +342,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	err = RemoveReviewerFromTurns(nil, url, "rev1", false)
+	err = data2.RemoveReviewerFromTurns(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -353,11 +355,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	err = RemoveReviewerFromTurns(nil, url, "rev1", false) // Should be a no-op.
+	err = data2.RemoveReviewerFromTurns(nil, url, "rev1", false) // Should be a no-op.
 	if err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -366,14 +368,14 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	ok, err = UnfreezeTurns(nil, url)
+	ok, err = data2.UnfreezeTurns(nil, url)
 	if err != nil {
 		t.Fatalf("UnfreezeTurns() error = %v", err)
 	}
 	if !ok {
 		t.Fatalf("UnfreezeTurns() = %v, want %v", ok, true)
 	}
-	ok, err = UnfreezeTurns(nil, url)
+	ok, err = data2.UnfreezeTurns(nil, url)
 	if err != nil {
 		t.Fatalf("UnfreezeTurns() error = %v", err)
 	}
@@ -381,11 +383,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("UnfreezeTurns() = %v, want %v", ok, false)
 	}
 
-	err = SwitchTurn(nil, url, "rev2", false)
+	err = data2.SwitchTurn(nil, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -401,9 +403,9 @@ func TestFrozen(t *testing.T) {
 
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
-	InitTurns(nil, url, "author@example.com")
+	data2.InitTurns(nil, url, "author@example.com")
 
-	at, by := IsFrozen(nil, url)
+	at, by := data2.IsFrozen(nil, url)
 	if !at.IsZero() {
 		t.Fatalf("Frozen() at = %v, want zero time", at)
 	}
@@ -412,12 +414,12 @@ func TestFrozen(t *testing.T) {
 	}
 
 	email := "freezer"
-	_, err := FreezeTurns(nil, url, email)
+	_, err := data2.FreezeTurns(nil, url, email)
 	if err != nil {
 		t.Fatalf("FreezeTurns() error = %v", err)
 	}
 
-	at, by = IsFrozen(nil, url)
+	at, by = data2.IsFrozen(nil, url)
 	if at.IsZero() {
 		t.Fatalf("Frozen() at = zero time, want non-zero time")
 	}
@@ -433,8 +435,8 @@ func TestNudge(t *testing.T) {
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Initialize state.
-	InitTurns(nil, url, "author@example.com")
-	done, approved, err := SetReviewerTurn(nil, url, "rev1", false)
+	data2.InitTurns(nil, url, "author@example.com")
+	done, approved, err := data2.SetReviewerTurn(nil, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -444,7 +446,7 @@ func TestNudge(t *testing.T) {
 	if approved {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
-	done, approved, err = SetReviewerTurn(nil, url, "rev2", false)
+	done, approved, err = data2.SetReviewerTurn(nil, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -455,7 +457,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
 
-	got, err := LoadCurrentTurnEmails(nil, url)
+	got, err := data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -465,7 +467,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Nudge a non-reviewer.
-	ok, approved, err := SetReviewerTurn(nil, url, "non-reviewer", true)
+	ok, approved, err := data2.SetReviewerTurn(nil, url, "non-reviewer", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -477,11 +479,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev1 reviews, author nudges rev2.
-	if err := SwitchTurn(nil, url, "rev1", false); err != nil {
+	if err := data2.SwitchTurn(nil, url, "rev1", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	ok, approved, err = SetReviewerTurn(nil, url, "rev2", true)
+	ok, approved, err = data2.SetReviewerTurn(nil, url, "rev2", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -492,7 +494,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -502,11 +504,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev2 reviews -> it's the author's turn --> nudge the author.
-	if err := SwitchTurn(nil, url, "rev2", false); err != nil {
+	if err := data2.SwitchTurn(nil, url, "rev2", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -515,7 +517,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("LoadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	ok, approved, err = SetReviewerTurn(nil, url, "author@example.com", true)
+	ok, approved, err = data2.SetReviewerTurn(nil, url, "author@example.com", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -526,7 +528,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -536,11 +538,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Author responds to comments --> it's rev1 and rev2's turn again.
-	if err := SwitchTurn(nil, url, "author@example.com", false); err != nil {
+	if err := data2.SwitchTurn(nil, url, "author@example.com", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -551,11 +553,11 @@ func TestNudge(t *testing.T) {
 
 	// Rev1 approves, and gets removed from the turn --> it's rev2's turn
 	// (not the author, because it's currently the turn of "all the remaining reviewers").
-	if err := RemoveReviewerFromTurns(nil, url, "rev1", true); err != nil {
+	if err := data2.RemoveReviewerFromTurns(nil, url, "rev1", true); err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -565,7 +567,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Can't nudge rev1 anymore (still a reviewer in Bitbucket, but not tracked by RevChat in this PR).
-	ok, approved, err = SetReviewerTurn(nil, url, "rev1", true)
+	ok, approved, err = data2.SetReviewerTurn(nil, url, "rev1", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -577,7 +579,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev2 nudged the author after some offline discussion.
-	ok, approved, err = SetReviewerTurn(nil, url, "author@example.com", true)
+	ok, approved, err = data2.SetReviewerTurn(nil, url, "author@example.com", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -588,7 +590,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", approved, false)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -598,11 +600,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Author responds to comments --> it's rev2's turn again.
-	if err := SwitchTurn(nil, url, "author@example.com", false); err != nil {
+	if err := data2.SwitchTurn(nil, url, "author@example.com", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
@@ -612,11 +614,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev2 approves too --> it's the author's turn again.
-	if err := SwitchTurn(nil, url, "rev2", false); err != nil {
+	if err := data2.SwitchTurn(nil, url, "rev2", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = LoadCurrentTurnEmails(nil, url)
+	got, err = data2.LoadCurrentTurnEmails(nil, url)
 	if err != nil {
 		t.Fatalf("LoadCurrentTurnEmails() error = %v", err)
 	}
