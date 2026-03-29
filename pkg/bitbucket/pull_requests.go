@@ -37,7 +37,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 		return
 	}
 
-	data.InitTurns(ctx, prURL, email)
+	data2.InitTurns(ctx, prURL, email)
 }
 
 // accountIDs extracts the IDs from a slice of [Account]s. The output is guaranteed

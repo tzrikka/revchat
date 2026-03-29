@@ -11,6 +11,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/github"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
@@ -153,8 +154,8 @@ func prConvertedToDraft(ctx workflow.Context, event github.PullRequestEvent) err
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as a draft. :construction:")
-	_, _, _ = data.Nudge(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.PullRequest.User.Login))
-	return nil
+	_, _, err := data2.SetReviewerTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.PullRequest.User.Login), true)
+	return err
 }
 
 // prReadyForReview announces that a draft PR was marked as ready for review.
@@ -168,9 +169,9 @@ func prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as ready for review. :eyes:")
-	_ = data.SwitchTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
-
-	return activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest), nil)
+	err1 := data2.SwitchTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
+	err2 := activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest), nil)
+	return errors.Join(err1, err2)
 }
 
 // lookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
@@ -286,7 +287,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.GitHubToSlack(ctx, body, pr.HTMLURL)
 		}
 		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
-		data.UpdateActivityTime(ctx, pr.HTMLURL, email)
+		data2.UpdateActivityTime(ctx, pr.HTMLURL, email)
 	}
 
 	// Base branch was changed.
@@ -295,7 +296,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 		repoURL, oldBranch, newBranch := pr.Base.Repo.HTMLURL, event.Changes.Base.Ref, pr.Base.Ref
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
 		github.MentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
-		data.UpdateActivityTime(ctx, pr.HTMLURL, email)
+		data2.UpdateActivityTime(ctx, pr.HTMLURL, email)
 	}
 
 	return err
@@ -310,7 +311,7 @@ func prSynchronized(ctx workflow.Context, event github.PullRequestEvent) error {
 		return nil
 	}
 
-	data.UpdateActivityTime(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login))
+	data2.UpdateActivityTime(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login))
 	defer github.UpdateChannelBookmarks(ctx, &event.PullRequest, nil, channelID)
 
 	if event.After == nil {

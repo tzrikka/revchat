@@ -35,7 +35,7 @@ func (c *Config) ChannelArchivedWorkflow(ctx workflow.Context, event archiveEven
 	if mention != "USLACKBOT" {
 		mention = fmt.Sprintf("<@%s>", mention)
 	}
-	activities.AlertWarn(ctx, c.AlertsChannel, "RevChat channel archived by someone else!",
+	activities.AlertWarn(ctx, c.AlertsChannel, "RevChat channel archived by someone else",
 		"Channel ID", event.InnerEvent.Channel, "User", mention)
 
 	data.CleanupPRData(ctx, event.InnerEvent.Channel, prURL)

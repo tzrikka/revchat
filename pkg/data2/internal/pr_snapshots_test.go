@@ -59,53 +59,6 @@ func TestPRCommitHash(t *testing.T) {
 	}
 }
 
-func TestURLFromPR(t *testing.T) {
-	tests := []struct {
-		name string
-		pr   map[string]any
-		want string
-	}{
-		// Bitbucket.
-		{
-			name: "happy_path",
-			pr: map[string]any{"links": map[string]any{"html": map[string]any{
-				"href": "https://bitbucket.org/example/repo/pull-requests/1",
-			}}},
-			want: "https://bitbucket.org/example/repo/pull-requests/1",
-		},
-		{
-			name: "missing_links",
-			pr:   map[string]any{},
-		},
-		{
-			name: "missing_html",
-			pr:   map[string]any{"links": map[string]any{}},
-		},
-		{
-			name: "missing_href",
-			pr:   map[string]any{"links": map[string]any{"html": map[string]any{}}},
-		},
-		// GitHub.
-		{
-			name: "happy_path_github",
-			pr:   map[string]any{"html_url": "https://github.com/example/repo/pull/1"},
-			want: "https://github.com/example/repo/pull/1",
-		},
-		{
-			name: "missing_html_url",
-			pr:   map[string]any{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := urlFromPR(tt.pr); got != tt.want {
-				t.Errorf("urlFromPR() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestFindPRsByCommit(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)

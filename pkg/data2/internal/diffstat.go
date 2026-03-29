@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"slices"
 )
@@ -11,12 +12,12 @@ const (
 	DiffstatFileSuffix = "_diffstat.json"
 )
 
-func WriteDiffstat(ctx context.Context, prURL string, files any) error {
+func WriteDiffstat(_ context.Context, prURL string, files any) error {
 	mu := dataFileMutexes.Get(prURL + DiffstatFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	return writeGenericJSONFile(ctx, prURL+DiffstatFileSuffix, files)
+	return writeGenericJSONFile(prURL+DiffstatFileSuffix, files)
 }
 
 func ReadDiffstatPaths(_ context.Context, prURL string) ([]string, error) {
@@ -36,18 +37,18 @@ func ReadDiffstatPaths(_ context.Context, prURL string) ([]string, error) {
 func readDiffstat(prURL string) ([]map[string]any, error) {
 	path, err := dataPath(prURL + DiffstatFileSuffix)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get file path: %w", err)
 	}
 
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer f.Close()
 
 	ds := []map[string]any{}
 	if err := json.NewDecoder(f).Decode(&ds); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read/decode JSON: %w", err)
 	}
 	return ds, nil
 }

@@ -25,12 +25,12 @@ func WritePRSnapshot(_ context.Context, prURL string, pr any) error {
 
 	path, err := dataPath(prURL + PRSnapshotFileSuffix)
 	if err != nil {
-		return fmt.Errorf("failed to get PR snapshot path: %w", err)
+		return fmt.Errorf("failed to get file path: %w", err)
 	}
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) //gosec:disable G304 // Verified URL, and suffix is hardcoded.
 	if err != nil {
-		return fmt.Errorf("failed to open PR snapshot: %w", err)
+		return fmt.Errorf("failed to open file: %w", err)
 	}
 	defer f.Close()
 
@@ -38,7 +38,7 @@ func WritePRSnapshot(_ context.Context, prURL string, pr any) error {
 	e.SetIndent("", "  ")
 
 	if err := e.Encode(pr); err != nil {
-		return fmt.Errorf("failed to write PR snapshot: %w", err)
+		return fmt.Errorf("failed to encode/write JSON file: %w", err)
 	}
 
 	return nil
@@ -53,7 +53,7 @@ func ReadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
 
 	path, err := dataPath(prURL + PRSnapshotFileSuffix)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get PR snapshot path: %w", err)
+		return nil, fmt.Errorf("failed to get file path: %w", err)
 	}
 
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
@@ -61,13 +61,13 @@ func ReadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to open PR snapshot: %w", err)
+		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer f.Close()
 
 	pr := map[string]any{}
 	if err := json.NewDecoder(f).Decode(&pr); err != nil {
-		return nil, fmt.Errorf("failed to read PR snapshot: %w", err)
+		return nil, fmt.Errorf("failed to read/decode JSON: %w", err)
 	}
 
 	if len(pr) == 0 {
@@ -82,7 +82,7 @@ func ReadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
 func FindPRsByCommit(ctx context.Context, hash string) (prs []map[string]any, err error) {
 	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
 	err = fs.WalkDir(os.DirFS(root), ".", func(path string, d fs.DirEntry, err error) error {
@@ -146,37 +146,4 @@ func prCommitHashGitHub(pr map[string]any) string {
 	}
 
 	return sha
-}
-
-func urlFromPR(pr map[string]any) string {
-	if url := urlFromPRBitbucket(pr); url != "" {
-		return url
-	}
-	return urlFromPRGitHub(pr)
-}
-
-func urlFromPRBitbucket(pr map[string]any) string {
-	links, ok := pr["links"].(map[string]any)
-	if !ok {
-		return ""
-	}
-	html, ok := links["html"].(map[string]any)
-	if !ok {
-		return ""
-	}
-	href, ok := html["href"].(string)
-	if !ok {
-		return ""
-	}
-
-	return href
-}
-
-func urlFromPRGitHub(pr map[string]any) string {
-	html, ok := pr["html_url"].(string)
-	if !ok {
-		return ""
-	}
-
-	return html
 }

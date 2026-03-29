@@ -7,7 +7,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/github"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
@@ -42,7 +42,7 @@ func issueCommentCreated(ctx workflow.Context, event github.IssueCommentEvent) e
 
 	// Don't abort if this fails - it's more important to post the comment.
 	email := users.GitHubIDToEmail(ctx, event.Sender.Login)
-	_ = data.SwitchTurn(ctx, event.Issue.HTMLURL, email, false)
+	_ = data2.SwitchTurn(ctx, event.Issue.HTMLURL, email, false)
 
 	msg := markdown.GitHubToSlack(ctx, event.Comment.Body, event.Comment.HTMLURL)
 	logger.From(ctx).Warn("MSG", slog.String("MSG", msg))

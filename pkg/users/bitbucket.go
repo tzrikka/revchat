@@ -54,7 +54,7 @@ func BitbucketActorToEmail(ctx workflow.Context, actor bitbucket.User) string {
 // It exists only for architectural clarity (all "XxxToYyy" functions in this package).
 // However, outside the "data" package, we return "bot" instead of "" for non-user accounts.
 func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) string {
-	email := data.BitbucketIDToEmail(ctx, accountID, accountType)
+	email := "" // TODO: data.BitbucketIDToEmail(ctx, accountID, accountType)
 	if email == "" && accountType == "app_user" {
 		return "bot"
 	}

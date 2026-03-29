@@ -12,6 +12,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
@@ -23,8 +24,19 @@ const (
 func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
 
-	prs := slack.LoadPRTurns(ctx, true, true, true)
-	if len(prs) == 0 {
+	userPRs := data2.ListPRsPerSlackUser(ctx, true, true, true)
+	for user, prs := range userPRs {
+		if strings.HasSuffix(user, data2.SlackIDNotFound) {
+			details := make([]any, 0, 2*len(prs)+2)
+			details = append(details, "Email", strings.TrimSuffix(user, data2.SlackIDNotFound))
+			for i, prURL := range prs {
+				details = append(details, fmt.Sprintf("PR URL %d", i+1), prURL)
+			}
+			activities.AlertWarn(ctx, c.AlertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
+		}
+	}
+
+	if len(userPRs) == 0 {
 		return nil
 	}
 
@@ -44,17 +56,17 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 
 		// Send a reminder to the user if their reminder time matches
 		// the current time, and there are reminders to be sent to them.
-		if userPRs := prs[userID]; reminderTime.Equal(now) && len(userPRs) > 0 {
+		if prs := userPRs[userID]; reminderTime.Equal(now) && len(prs) > 0 {
 			logger.From(ctx).Info("sending scheduled Slack reminder to user",
-				slog.String("user_id", userID), slog.Int("pr_count", len(userPRs)))
-			slices.Sort(userPRs)
+				slog.String("user_id", userID), slog.Int("pr_count", len(prs)))
+			slices.Sort(prs)
 
 			var msg strings.Builder
 			msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
 			singleUser := []string{userID}
 
-			for _, url := range userPRs {
-				prDetails := slack.PRDetails(ctx, url, singleUser, true, c.ReportDrafts, false, "")
+			for _, prURL := range prs {
+				prDetails := slack.PRDetails(ctx, prURL, singleUser, true, c.ReportDrafts, false, "")
 
 				// If the message becomes too long, split it into multiple chunks,
 				// even if the Slack API could technically handle a bit more.

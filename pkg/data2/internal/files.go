@@ -70,15 +70,15 @@ func fixEmptyJSONFile(path string) {
 }
 
 // writeGenericJSONFile writes the given map as JSON to the specified file. It expects the caller to hold the appropriate mutex.
-func writeGenericJSONFile(_ context.Context, filename string, data any) error {
+func writeGenericJSONFile(filename string, data any) error {
 	path, err := dataPath(filename)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get data file path: %w", err)
 	}
 
 	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // Path specified by admin, or from signature-verified event.
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open file: %w", err)
 	}
 	defer f.Close()
 
@@ -96,14 +96,14 @@ func DeleteGenericPRFile(_ context.Context, prURLWithSuffix string) error {
 
 	path, err := dataPath(prURLWithSuffix)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get data file path: %w", err)
 	}
 
 	if err := os.Remove(path); err != nil { //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
-		return err
+		return fmt.Errorf("failed to delete file: %w", err)
 	}
 
 	return nil

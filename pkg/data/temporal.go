@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -92,24 +91,6 @@ func writeJSONActivity(_ context.Context, filename string, m map[string]string) 
 	e := json.NewEncoder(f)
 	e.SetIndent("", "  ")
 	return e.Encode(m)
-}
-
-// deletePRFileActivity deletes a file related to a specific PR. Unlike [os.Remove],
-// this function is idempotent: it does not return an error if the file does not exist.
-func deletePRFileActivity(_ context.Context, prURLWithSuffix string) error {
-	path, err := cachedDataPath(prURLWithSuffix)
-	if err != nil {
-		return err
-	}
-
-	if err := os.Remove(path); err != nil { //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-
-	return nil
 }
 
 // cachedDataPath returns the absolute path to a data file for the given relative path.

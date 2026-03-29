@@ -2,10 +2,8 @@ package slack
 
 import (
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -14,67 +12,11 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
-	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/users"
-	"github.com/tzrikka/xdg"
 )
-
-// LoadPRTurns scans all stored PR turn files, and returns a map of
-// Slack user IDs to all the PR URLs they need to be reminded about.
-func LoadPRTurns(ctx workflow.Context, onlyCurrentTurn, authors, reviewers bool) map[string][]string {
-	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
-	if err != nil {
-		return nil
-	}
-
-	usersToPRs := map[string][]string{}
-	err = fs.WalkDir(os.DirFS(root), ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() || !strings.HasSuffix(d.Name(), data.TurnsFileSuffix) {
-			return nil
-		}
-
-		prURL := "https://" + strings.TrimSuffix(path, data.TurnsFileSuffix)
-		var emails []string
-		if onlyCurrentTurn {
-			emails, err = data.GetCurrentTurns(ctx, prURL)
-		} else {
-			emails, err = data.GetAllTurns(ctx, prURL, authors, reviewers)
-		}
-		if err != nil {
-			return nil
-		}
-
-		for _, email := range emails {
-			if email == "" || email == "bot" {
-				continue // Nothing to check/remove.
-			}
-			if id := users.EmailToSlackID(ctx, email); id != "" {
-				usersToPRs[id] = append(usersToPRs[id], prURL)
-				continue
-			}
-			logger.From(ctx).Warn("Slack email lookup error - removing from turn",
-				slog.String("missing_email", email), slog.String("pr_url", prURL))
-
-			// Example: user deactivated after being added to the PR.
-			_ = data.RemoveReviewerFromTurns(ctx, prURL, email, false)
-		}
-
-		return nil
-	})
-	if err != nil {
-		logger.From(ctx).Error("failed to get current attention state for PRs", slog.Any("error", err))
-		return nil
-	}
-
-	return usersToPRs
-}
 
 // PRDetails returns a summary of a Bitbucket or GitHub PR's metadata and activity.
 // The output is empty if the PR is in draft mode and the "reportDrafts" parameter is false.
@@ -117,7 +59,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	}
 
 	if len(userIDs) == 1 {
-		if activity := data.GetActivityTime(ctx, url, users.SlackIDToEmail(ctx, userIDs[0])); !activity.IsZero() {
+		if activity := data2.GetActivityTime(ctx, url, users.SlackIDToEmail(ctx, userIDs[0])); !activity.IsZero() {
 			fmt.Fprintf(summary, ", touched by you `%s` ago", timeSince(now, activity))
 		}
 	}

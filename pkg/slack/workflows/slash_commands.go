@@ -33,7 +33,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 	case "explain":
 		return commands.Explain(ctx, event)
 	case "stat", "state", "status":
-		return commands.SelfStatus(ctx, event, c.ReportDrafts)
+		return commands.SelfStatus(ctx, event, c.ReportDrafts, c.AlertsChannel)
 
 	case "who", "whose", "whose turn":
 		return commands.WhoseTurn(ctx, event)
@@ -65,7 +65,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 			return commands.Nudge(ctx, event, c.ThrippyHTTPAddress)
 		default:
 			user, _, _ := data.SelectUserBySlackID(ctx, event.UserID)
-			return commands.StatusOfOthers(ctx, event, c.ReportDrafts, user.ThrippyLink)
+			return commands.StatusOfOthers(ctx, event, c.ReportDrafts, user.ThrippyLink, c.AlertsChannel)
 		}
 	}
 	if commands.RemindersSyntax.MatchString(event.Text) {

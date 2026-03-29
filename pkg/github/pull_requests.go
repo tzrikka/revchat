@@ -33,7 +33,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 		return
 	}
 
-	data.InitTurns(ctx, event.PullRequest.HTMLURL, email)
+	data2.InitTurns(ctx, event.PullRequest.HTMLURL, email)
 }
 
 func userLogins(us []User) []string {
