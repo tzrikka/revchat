@@ -43,7 +43,7 @@ func ListScheduledUserReminders(ctx workflow.Context) (map[string]string, error)
 
 	var reminders map[string]string
 	if err := executeLocalActivity(ctx, internal.ListReminders, &reminders); err != nil {
-		logger.From(ctx).Error("failed to list user's scheduled reminder", slog.Any("error", err))
+		logger.From(ctx).Error("failed to list scheduled user reminders", slog.Any("error", err))
 		return nil, err
 	}
 
