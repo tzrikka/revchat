@@ -1,23 +1,21 @@
-package data
+package data2
 
 import (
 	"go.temporal.io/sdk/workflow"
-
-	"github.com/tzrikka/revchat/pkg/data2"
 )
 
 // CleanupPRData deletes all the data associated with a PR. If there are errors,
 // they are logged but ignored, as they do not affect the overall need to clean up.
 func CleanupPRData(ctx workflow.Context, channelID, prURL string) {
-	data2.LogSlackChannelArchived(ctx, channelID, prURL)
+	LogSlackChannelArchived(ctx, channelID, prURL)
 	if prURL == "" {
 		return
 	}
 
-	data2.DeleteBitbucketBuilds(ctx, prURL)
-	data2.DeleteDiffstat(ctx, prURL)
-	data2.DeletePRSnapshot(ctx, prURL)
-	data2.DeleteTurns(ctx, prURL)
+	DeleteBitbucketBuilds(ctx, prURL)
+	DeleteDiffstat(ctx, prURL)
+	DeletePRSnapshot(ctx, prURL)
+	DeleteTurns(ctx, prURL)
 
 	DeleteURLAndIDMapping(ctx, prURL)
 }

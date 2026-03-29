@@ -75,9 +75,9 @@ func TestReminders(t *testing.T) {
 				}
 			}
 
-			gotReminders, gotErr := data2.ListScheduledUserReminders(nil)
-			if gotErr != nil {
-				t.Errorf("ListScheduledUserReminders() error = %v", gotErr)
+			gotReminders, err := data2.ListScheduledUserReminders(nil)
+			if err != nil {
+				t.Errorf("ListScheduledUserReminders() error = %v", err)
 			}
 			if !reflect.DeepEqual(gotReminders, tt.wantReminders) {
 				t.Errorf("ListScheduledUserReminders() = %q, want %q", gotReminders, tt.wantReminders)

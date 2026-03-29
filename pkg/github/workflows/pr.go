@@ -106,7 +106,7 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 		}
 		// Undo channel creation and PR data initialization.
 		err = errors.Join(err, activities.ArchiveChannel(ctx, channelID, pr.HTMLURL))
-		data.CleanupPRData(ctx, channelID, pr.HTMLURL)
+		data2.CleanupPRData(ctx, channelID, pr.HTMLURL)
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to invite users to Slack channel for "+pr.HTMLURL, err)
 	}
 
@@ -132,7 +132,7 @@ func (c Config) prClosed(ctx workflow.Context, event github.PullRequestEvent) er
 	}
 	github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
-	data.CleanupPRData(ctx, channelID, prURL)
+	data2.CleanupPRData(ctx, channelID, prURL)
 
 	if err := activities.ArchiveChannel(ctx, channelID, prURL); err != nil {
 		msg = ":boom: Failed to archive this channel, even though its PR was " + strings.Replace(msg, " this PR", "", 1)

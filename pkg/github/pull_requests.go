@@ -7,7 +7,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -17,7 +16,7 @@ import (
 // and a 2-way ID mapping for syncs between GitHub and Slack. If there are
 // errors, they are logged but ignored, as we can try to recreate the data later.
 func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slackAlertsChannel string) {
-	if err := data.MapURLAndID(ctx, event.PullRequest.HTMLURL, prChannelID); err != nil {
+	if err := data2.MapURLAndID(ctx, event.PullRequest.HTMLURL, prChannelID); err != nil {
 		_ = activities.AlertError(ctx, slackAlertsChannel, "failed to set mapping between a PR and its Slack channel",
 			err, "PR URL", event.PullRequest.HTMLURL, "Slack channel ID", prChannelID)
 	}

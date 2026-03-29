@@ -12,7 +12,6 @@ import (
 	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
@@ -74,7 +73,7 @@ func updateCommitStatus(ctx workflow.Context, cs *bitbucket.CommitStatus, pr *bi
 
 	// If the channel is archived but we still store data for it, clean it up. We don't consider this a server error.
 	if err != nil && strings.Contains(err.Error(), "is_archived") {
-		data.CleanupPRData(ctx, channelID, prURL)
+		data2.CleanupPRData(ctx, channelID, prURL)
 		return nil
 	}
 

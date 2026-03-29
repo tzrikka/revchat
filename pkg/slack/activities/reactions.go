@@ -7,14 +7,14 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
 // AddOKReaction adds the ":ok:" emoji as a reaction to the
 // Slack message identified by the given PR comment URL.
 func AddOKReaction(ctx workflow.Context, url string) {
-	ids, err := data.SwitchURLAndID(ctx, url)
+	ids, err := data2.SwitchURLAndID(ctx, url)
 	if err != nil {
 		return
 	}
@@ -32,7 +32,7 @@ func AddOKReaction(ctx workflow.Context, url string) {
 // RemoveOKReaction removes the ":ok:" emoji from the Slack bot's reactions
 // in the Slack message identified by the given PR comment URL.
 func RemoveOKReaction(ctx workflow.Context, url string) {
-	ids, err := data.SwitchURLAndID(ctx, url)
+	ids, err := data2.SwitchURLAndID(ctx, url)
 	if err != nil {
 		return
 	}

@@ -99,7 +99,7 @@ func (c Config) CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 
 func (c Config) updateCommentInWorkflow(ctx workflow.Context, comment *bitbucket.Comment) error {
 	// If the comment previously had an attached diff file, delete it - it's obsolete now.
-	if fileID, _ := data.SwitchURLAndID(ctx, bitbucket.HTMLURL(comment.Links)+"/slack_file_id"); fileID != "" {
+	if fileID, _ := data2.SwitchURLAndID(ctx, bitbucket.HTMLURL(comment.Links)+"/slack_file_id"); fileID != "" {
 		slack.DeleteFile(ctx, fileID)
 	}
 
@@ -150,7 +150,7 @@ func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	commentURL := bitbucket.HTMLURL(event.Comment.Links)
-	if fileID, _ := data.SwitchURLAndID(ctx, commentURL+"/slack_file_id"); fileID != "" {
+	if fileID, _ := data2.SwitchURLAndID(ctx, commentURL+"/slack_file_id"); fileID != "" {
 		slack.DeleteFile(ctx, fileID)
 	}
 

@@ -4,7 +4,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
@@ -14,7 +14,7 @@ func (c *Config) isRevChatChannel(ctx workflow.Context, channelID string) bool {
 }
 
 func (c *Config) switchURLAndID(ctx workflow.Context, key string) (string, error) {
-	url, err := data.SwitchURLAndID(ctx, key)
+	url, err := data2.SwitchURLAndID(ctx, key)
 	if err != nil {
 		return "", activities.AlertError(ctx, c.AlertsChannel, "", err, "Key", key)
 	}

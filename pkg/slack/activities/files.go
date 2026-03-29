@@ -8,7 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -25,7 +25,7 @@ func DeleteFile(ctx workflow.Context, ids string) {
 			slog.Any("error", err), slog.String("file_id", fileID))
 	}
 
-	data.DeleteURLAndIDMapping(ctx, ids)
+	data2.DeleteURLAndIDMapping(ctx, ids)
 }
 
 func Upload(ctx workflow.Context, content []byte, filename, title, snippetType, mimeType, channelID, threadTS string) (*slack.File, error) {

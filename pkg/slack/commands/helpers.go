@@ -68,7 +68,7 @@ func PostEphemeralError(ctx workflow.Context, event SlashCommandEvent, msg strin
 // This also ensures that the slash command is being run inside a RevChat channel, and
 // indirectly that the user is opted-in since these channels are accessible only to them.
 func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) ([]string, error) {
-	url, err := data.SwitchURLAndID(ctx, event.ChannelID)
+	url, err := data2.SwitchURLAndID(ctx, event.ChannelID)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about this channel.")
 		return nil, err

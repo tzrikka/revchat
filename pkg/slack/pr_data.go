@@ -12,7 +12,6 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -27,7 +26,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	if err != nil {
 		fmt.Fprintf(summary, "\n\n<%s|*%s*>", url, url)
 		if selfReport {
-			if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
+			if channelID, _ := data2.SwitchURLAndID(ctx, url); channelID != "" {
 				fmt.Fprintf(summary, "\n><#%s>", channelID)
 			}
 		}
@@ -45,7 +44,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 
 	// Slack channel link (unless this is a status report about other users).
 	if selfReport {
-		if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
+		if channelID, _ := data2.SwitchURLAndID(ctx, url); channelID != "" {
 			fmt.Fprintf(summary, "\n><#%s>", channelID)
 		}
 	}

@@ -10,7 +10,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/slack"
@@ -26,7 +25,7 @@ func LookupChannel(ctx workflow.Context, prURL string) (string, bool) {
 		return "", false
 	}
 
-	channelID, _ := data.SwitchURLAndID(ctx, prURL)
+	channelID, _ := data2.SwitchURLAndID(ctx, prURL)
 	return channelID, channelID != ""
 }
 
