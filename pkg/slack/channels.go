@@ -10,7 +10,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
@@ -34,7 +34,7 @@ func CreateChannel(ctx workflow.Context, prID int, prTitle, prURL string, maxLen
 			return "", err
 		}
 
-		data.LogSlackChannelCreated(ctx, id, prURL, name)
+		data2.LogSlackChannelCreated(ctx, id, prURL, name)
 		return id, nil
 	}
 
