@@ -54,15 +54,21 @@ func BitbucketActorToEmail(ctx workflow.Context, actor bitbucket.User) string {
 // account ID is not found, and "bot" for non-user app accounts. It uses persistent data storage, or API calls as a fallback.
 func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) string {
 	if accountID == "" {
-		return ""
+		if accountType == "app_user" {
+			return "bot" // Not a real user, so no point to look-up in Jira.
+		}
+		return "" // Unknown user, so no point to look-up in Jira.
 	}
 
 	if user := data.SelectUserByBitbucketID(ctx, accountID); user.Email != "" {
 		return user.Email
 	}
 
-	if accountType == "app_user" {
-		return "bot" // Not a real user, so no point to look-up in Jira.
+	if ctx == nil { // For unit testing.
+		if accountType == "app_user" {
+			return "bot" // Not a real user, so no point to look-up in Jira.
+		}
+		return "" // Unknown user, so no point to look-up in Jira.
 	}
 
 	// We use the Jira API as a fallback because the Bitbucket API doesn't expose email addresses.

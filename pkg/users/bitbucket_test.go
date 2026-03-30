@@ -22,6 +22,10 @@ func TestBitbucketActorToEmail(t *testing.T) {
 		want  string
 	}{
 		{
+			name:  "empty_actor",
+			actor: bitbucket.User{},
+		},
+		{
 			name: "app_with_account_id",
 			actor: bitbucket.User{
 				Type:      "app_user",

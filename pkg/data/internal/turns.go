@@ -580,7 +580,7 @@ func userEmailAndType(ctx context.Context, detailsMap any) (email, accountType s
 // which receives a [workflow.Context] instead of a [context.Context], and returns "bot" instead of "" for non-user app accounts.
 func bitbucketIDToEmail(ctx context.Context, accountID, accountType string) string {
 	if accountID == "" {
-		return ""
+		return "" // Unknown user, so no point to look-up in Jira.
 	}
 
 	if user, _ := SelectUser(ctx, IndexByBitbucketID, accountID); user.Email != "" {
@@ -588,7 +588,7 @@ func bitbucketIDToEmail(ctx context.Context, accountID, accountType string) stri
 	}
 
 	if accountType == "app_user" {
-		return "" // Not a real user, so no point to check in Jira.
+		return "" // Not a real user, so no point to look-up in Jira.
 	}
 
 	return ""
