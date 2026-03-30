@@ -87,18 +87,18 @@ func SetReviewerTurn(ctx workflow.Context, prURL, email string, nudge bool) (don
 	}
 
 	if ctx == nil { // For unit testing.
-		state, err := internal.SetReviewerTurn(context.Background(), prURL, email, nudge)
-		return state[0], state[1], err
+		states, err := internal.SetReviewerTurn(context.Background(), prURL, email, nudge)
+		return states[0], states[1], err
 	}
 
-	var state []bool
-	if err := executeLocalActivity(ctx, internal.SetReviewerTurn, &state, prURL, email, nudge); err != nil {
+	var states [2]bool
+	if err := executeLocalActivity(ctx, internal.SetReviewerTurn, &states, prURL, email, nudge); err != nil {
 		logger.From(ctx).Error("failed to set reviewer in PR attention state", slog.Any("error", err),
 			slog.String("pr_url", prURL), slog.String("email", email))
 		return false, false, err
 	}
 
-	return state[0], state[1], nil
+	return states[0], states[1], nil
 }
 
 // SwitchTurn switches the turn of a specific user in a specific PR to others.
@@ -204,13 +204,14 @@ func FreezeTurns(ctx workflow.Context, prURL, email string) (bool, error) {
 		return internal.FreezeTurns(context.Background(), prURL, email)
 	}
 
-	if err := executeLocalActivity(ctx, internal.FreezeTurns, nil, prURL, email); err != nil {
+	var frozen bool
+	if err := executeLocalActivity(ctx, internal.FreezeTurns, &frozen, prURL, email); err != nil {
 		logger.From(ctx).Error("failed to freeze PR attention state", slog.Any("error", err),
 			slog.String("pr_url", prURL), slog.String("email", email))
 		return false, err
 	}
 
-	return true, nil
+	return frozen, nil
 }
 
 // UnfreezeTurns is the inverse of [FreezeTurns].
@@ -220,13 +221,14 @@ func UnfreezeTurns(ctx workflow.Context, prURL string) (bool, error) {
 		return internal.UnfreezeTurns(context.Background(), prURL)
 	}
 
-	if err := executeLocalActivity(ctx, internal.UnfreezeTurns, nil, prURL); err != nil {
+	var unfrozen bool
+	if err := executeLocalActivity(ctx, internal.UnfreezeTurns, &unfrozen, prURL); err != nil {
 		logger.From(ctx).Error("failed to unfreeze PR attention state", slog.Any("error", err),
 			slog.String("pr_url", prURL))
 		return false, err
 	}
 
-	return true, nil
+	return unfrozen, nil
 }
 
 // IsFrozen returns the timestamp and user email of when and who froze the attention state of
