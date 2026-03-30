@@ -261,7 +261,7 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 
 			// Valid but unrecognized (and specifically not opted-in) emails - remove from turns.
 			// Example: user deactivated after being added to the PR.
-			id := "" // TODO: users.EmailToSlackID(ctx, email)
+			id := ""
 			if id == "" {
 				id = email + SlackIDNotFound
 				users[id] = append(users[id], prURL)
@@ -477,6 +477,16 @@ func resetTurns(ctx context.Context, prURL string, t *PRTurns) (*PRTurns, error)
 	// If the only thing that needs fixing is the author's email, do just that.
 	if t != nil && len(t.Reviewers)+len(t.Activity)+len(t.Approvers) > 0 {
 		t.Author = author
+		if t.Reviewers == nil {
+			t.Reviewers = make(map[string]bool)
+		}
+		if t.Activity == nil {
+			t.Activity = make(map[string]time.Time)
+		}
+		if t.Approvers == nil {
+			t.Approvers = make(map[string]time.Time)
+		}
+
 		if err := writeTurns(prURL, t); err != nil {
 			return nil, fmt.Errorf("failed to reset turns file: %w", err)
 		}
