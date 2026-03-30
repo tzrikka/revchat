@@ -7,7 +7,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/commands"
 )
 
@@ -64,7 +64,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		case "nudge", "ping", "poke":
 			return commands.Nudge(ctx, event, c.ThrippyHTTPAddress)
 		default:
-			user, _, _ := data.SelectUserBySlackID(ctx, event.UserID)
+			user, _, _ := data2.SelectUserBySlackID(ctx, event.UserID)
 			return commands.StatusOfOthers(ctx, event, c.ReportDrafts, user.ThrippyLink, c.AlertsChannel)
 		}
 	}

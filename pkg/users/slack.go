@@ -10,7 +10,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
 
@@ -30,7 +30,7 @@ func EmailToSlackID(ctx workflow.Context, email string) string {
 		return ""
 	}
 
-	if user := data.SelectUserByEmail(ctx, email); user.SlackID != "" {
+	if user := data2.SelectUserByEmail(ctx, email); user.SlackID != "" {
 		return user.SlackID
 	}
 
@@ -41,7 +41,7 @@ func EmailToSlackID(ctx workflow.Context, email string) string {
 	}
 
 	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-	_ = data.UpsertUser(ctx, email, slackUser.RealName, "", "", slackUser.ID, "")
+	_ = data2.UpsertUser(ctx, email, slackUser.RealName, "", "", slackUser.ID, "")
 	displayNameCache.Set(slackUser.ID, slackUser.Profile.DisplayName, cache.DefaultExpiration)
 	iconCache.Set(slackUser.ID, slackUser.Profile.Image48, cache.DefaultExpiration)
 
@@ -55,7 +55,7 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 		return ""
 	}
 
-	user, _, _ := data.SelectUserBySlackID(ctx, userID)
+	user, _, _ := data2.SelectUserBySlackID(ctx, userID)
 	if user.Email != "" {
 		return user.Email
 	}
@@ -68,7 +68,7 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 
 	if info.IsBot {
 		// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-		_ = data.UpsertUser(ctx, "bot", "", "", "", userID, "")
+		_ = data2.UpsertUser(ctx, "bot", "", "", "", userID, "")
 		return "bot"
 	}
 
@@ -80,7 +80,7 @@ func SlackIDToEmail(ctx workflow.Context, userID string) string {
 	}
 
 	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-	_ = data.UpsertUser(ctx, email, info.RealName, "", "", userID, "")
+	_ = data2.UpsertUser(ctx, email, info.RealName, "", "", userID, "")
 	displayNameCache.Set(userID, info.Profile.DisplayName, cache.DefaultExpiration)
 	iconCache.Set(userID, info.Profile.Image48, cache.DefaultExpiration)
 
@@ -142,7 +142,7 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 		return ""
 	}
 
-	user, _, _ := data.SelectUserBySlackID(ctx, userID)
+	user, _, _ := data2.SelectUserBySlackID(ctx, userID)
 	if user.RealName != "" {
 		return user.RealName
 	}
@@ -160,7 +160,7 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 	}
 
 	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-	_ = data.UpsertUser(ctx, email, info.RealName, "", "", userID, "")
+	_ = data2.UpsertUser(ctx, email, info.RealName, "", "", userID, "")
 	displayNameCache.Set(userID, info.Profile.DisplayName, cache.DefaultExpiration)
 	iconCache.Set(userID, info.Profile.Image48, cache.DefaultExpiration)
 
@@ -172,10 +172,10 @@ func SlackIDToRealName(ctx workflow.Context, userID string) string {
 // the user is not found. It uses persistent data storage, or API calls as a fallback.
 func SlackMentionToBitbucketRef(ctx workflow.Context, slackUserRef string) string {
 	userID := slackUserRef[2 : len(slackUserRef)-1]
-	user, _, _ := data.SelectUserBySlackID(ctx, userID)
+	user, _, _ := data2.SelectUserBySlackID(ctx, userID)
 	if user.BitbucketID == "" {
 		// Workaround in case only the user's Slack ID isn't stored yet, but the rest is.
-		user = data.SelectUserByEmail(ctx, SlackIDToEmail(ctx, userID))
+		user = data2.SelectUserByEmail(ctx, SlackIDToEmail(ctx, userID))
 	}
 
 	if user.BitbucketID != "" {

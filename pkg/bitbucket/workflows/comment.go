@@ -17,7 +17,6 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	slack "github.com/tzrikka/revchat/pkg/slack/activities"
@@ -219,7 +218,7 @@ func checksum(s string) string {
 
 // pollCommentForUpdates is a convenience wrapper for [setScheduleActivity].
 func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentURL, rawText string) error {
-	user := data.SelectUserByBitbucketID(ctx, accountID)
+	user := data2.SelectUserByBitbucketID(ctx, accountID)
 
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		StartToCloseTimeout: CommentPollingInterval + CommentPollingJitter,

@@ -8,7 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
@@ -20,7 +20,7 @@ func Commits(ctx workflow.Context, event PullRequestEvent) []Commit {
 		return nil
 	}
 
-	user := data.SelectUserByBitbucketID(ctx, event.Actor.AccountID)
+	user := data2.SelectUserByBitbucketID(ctx, event.Actor.AccountID)
 
 	cs, err := bitbucket.PullRequestsListCommits(ctx, user.ThrippyLink, workspace, repo, strconv.Itoa(event.PullRequest.ID))
 	if err != nil {

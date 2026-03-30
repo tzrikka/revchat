@@ -84,7 +84,7 @@ func readGenericJSONFile(filename string) (map[string]string, error) {
 
 	var m map[string]string
 	if err := json.NewDecoder(f).Decode(&m); err != nil {
-		return nil, fmt.Errorf("failed to decode JSON: %w", err)
+		return nil, fmt.Errorf("failed to read/decode JSON: %w", err)
 	}
 
 	return m, nil

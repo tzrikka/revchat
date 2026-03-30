@@ -1,31 +1,32 @@
-package data
+package data2_test
 
 import (
 	"testing"
+
+	"github.com/tzrikka/revchat/pkg/data2"
 )
 
 func TestUsers(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache.Clear()
 
 	id := "user_id"
 	name := "First Last"
 	email := "email@example.com"
 
 	// Before adding the user.
-	got := SelectUserByBitbucketID(nil, id)
+	got := data2.SelectUserByBitbucketID(nil, id)
 	if got.Email != "" {
 		t.Fatalf("SelectUserByBitbucketID() email = %q, want %q", got.Email, "")
 	}
 
 	// Add the user.
-	if err := UpsertUser(nil, email, name, id, "", "", ""); err != nil {
+	if err := data2.UpsertUser(nil, email, name, id, "", "", ""); err != nil {
 		t.Fatalf("UpsertUser() error = %v", err)
 	}
 
 	// After adding the user.
-	got = SelectUserByBitbucketID(nil, id)
+	got = data2.SelectUserByBitbucketID(nil, id)
 	if got.Email != email {
 		t.Errorf("SelectUserByBitbucketID() email = %q, want %q", got.Email, email)
 	}
@@ -33,12 +34,12 @@ func TestUsers(t *testing.T) {
 		t.Errorf("SelectUserByBitbucketID() name = %q, want %q", got.RealName, name)
 	}
 
-	got = SelectUserByGitHubID(nil, id)
+	got = data2.SelectUserByGitHubID(nil, id)
 	if got.Email != "" {
 		t.Errorf("SelectUserByGitHubID() email = %q, want %q", got.Email, "")
 	}
 
-	gotUser, gotOptedIn, gotErr := SelectUserBySlackID(nil, id)
+	gotUser, gotOptedIn, gotErr := data2.SelectUserBySlackID(nil, id)
 	if gotErr != nil {
 		t.Fatalf("SelectUserBySlackID() error = %v", gotErr)
 	}

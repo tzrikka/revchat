@@ -8,7 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
 	"github.com/tzrikka/timpani-api/pkg/jira"
 )
@@ -20,7 +20,7 @@ func EmailToBitbucketID(ctx workflow.Context, email string) string {
 		return ""
 	}
 
-	if user := data.SelectUserByEmail(ctx, email); user.BitbucketID != "" {
+	if user := data2.SelectUserByEmail(ctx, email); user.BitbucketID != "" {
 		return user.BitbucketID
 	}
 
@@ -40,7 +40,7 @@ func EmailToBitbucketID(ctx workflow.Context, email string) string {
 	}
 
 	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-	_ = data.UpsertUser(ctx, email, "", users[0].AccountID, "", "", "")
+	_ = data2.UpsertUser(ctx, email, "", users[0].AccountID, "", "", "")
 
 	return users[0].AccountID
 }
@@ -54,7 +54,7 @@ func BitbucketActorToEmail(ctx workflow.Context, actor bitbucket.User) string {
 // It exists only for architectural clarity (all "XxxToYyy" functions in this package).
 // However, outside the "data" package, we return "bot" instead of "" for non-user accounts.
 func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) string {
-	email := "" // TODO: data.BitbucketIDToEmail(ctx, accountID, accountType)
+	email := ""
 	if email == "" && accountType == "app_user" {
 		return "bot"
 	}
@@ -73,10 +73,10 @@ func BitbucketActorToSlackID(ctx workflow.Context, actor bitbucket.User, checkOp
 // BitbucketIDToSlackID converts a Bitbucket account ID into a Slack user ID. This function returns an empty
 // string if the account ID is not found. It uses persistent data storage, or API calls as a fallback.
 func BitbucketIDToSlackID(ctx workflow.Context, accountID string, checkOptIn bool) string {
-	user := data.SelectUserByBitbucketID(ctx, accountID)
+	user := data2.SelectUserByBitbucketID(ctx, accountID)
 	if user.SlackID == "" {
 		// Workaround in case only the user's Bitbucket account ID isn't stored yet, but the rest is.
-		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID, "user"))
+		user = data2.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID, "user"))
 	}
 
 	if checkOptIn && !user.IsOptedIn() {
@@ -89,10 +89,10 @@ func BitbucketIDToSlackID(ctx workflow.Context, accountID string, checkOptIn boo
 // BitbucketIDToSlackRef converts a Bitbucket account ID into a Slack user mention. This function returns a
 // display name if the account ID is not found. It uses persistent data storage, or API calls as a fallback.
 func BitbucketIDToSlackRef(ctx workflow.Context, accountID, displayName string) string {
-	user := data.SelectUserByBitbucketID(ctx, accountID)
+	user := data2.SelectUserByBitbucketID(ctx, accountID)
 	if user.SlackID == "" {
 		// Workaround in case only the user's Bitbucket account ID isn't stored yet, but the rest is.
-		user = data.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID, "user"))
+		user = data2.SelectUserByEmail(ctx, BitbucketIDToEmail(ctx, accountID, "user"))
 	}
 
 	if user.SlackID != "" {
@@ -120,7 +120,7 @@ func BitbucketIDToSlackRef(ctx workflow.Context, accountID, displayName string) 
 
 	if apiUser.DisplayName != "" {
 		// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-		_ = data.UpsertUser(ctx, "", apiUser.DisplayName, accountID, "", "", "")
+		_ = data2.UpsertUser(ctx, "", apiUser.DisplayName, accountID, "", "", "")
 		return apiUser.DisplayName
 	}
 

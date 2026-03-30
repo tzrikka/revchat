@@ -10,7 +10,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/github"
 	"github.com/tzrikka/revchat/pkg/markdown"
@@ -97,7 +96,7 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 	}
 	github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
-	followerIDs := data.SelectUserByGitHubID(ctx, pr.User.Login).Followers
+	followerIDs := data2.SelectUserByGitHubID(ctx, pr.User.Login).Followers
 	err = activities.InviteUsersToChannel(ctx, channelID, pr.HTMLURL, github.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send an error DM only if the user is opted-in.

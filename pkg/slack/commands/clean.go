@@ -7,7 +7,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/timpani-api/pkg/bitbucket"
@@ -23,7 +23,7 @@ func Clean(ctx workflow.Context, event SlashCommandEvent) error {
 	owners, _ := files.OwnersPerPath(ctx, workspace, repo, branch, commit, paths, true)
 	reviewers := requiredReviewers(paths, owners)
 	for i, fullName := range reviewers {
-		if user := data.SelectUserByRealName(ctx, fullName); user.BitbucketID != "" {
+		if user := data2.SelectUserByRealName(ctx, fullName); user.BitbucketID != "" {
 			reviewers[i] = user.BitbucketID
 		}
 	}

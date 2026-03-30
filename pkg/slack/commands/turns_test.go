@@ -3,7 +3,7 @@ package commands
 import (
 	"testing"
 
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 )
 
 func TestWhoseTurnText(t *testing.T) {
@@ -13,45 +13,45 @@ func TestWhoseTurnText(t *testing.T) {
 	tests := []struct {
 		name   string
 		emails []string
-		user   data.User
+		user   data2.User
 		tweak  string
 		want   string
 	}{
 		{
 			name:   "no_one",
 			emails: []string{"", "bot"},
-			user:   data.User{Email: "author@example.com"},
+			user:   data2.User{Email: "author@example.com"},
 			want:   "I think it's no one's turn to review this PR.",
 		},
 		{
 			name:   "author_only_with_tweak",
 			emails: []string{"author@example.com"},
-			user:   data.User{Email: "author@example.com"},
+			user:   data2.User{Email: "author@example.com"},
 			tweak:  " now",
 			want:   ":eyes: I think it's now *your* turn to review this PR.",
 		},
 		{
 			name:   "author_and_1_reviewer",
 			emails: []string{"author@example.com", "reviewer@example.com"},
-			user:   data.User{Email: "author@example.com"},
+			user:   data2.User{Email: "author@example.com"},
 			want:   ":eyes: I think it's *your* turn - along with reviewer@example.com - to review this PR.",
 		},
 		{
 			name:   "author_and_3_reviewers",
 			emails: []string{"reviewer1@example.com", "author@example.com", "reviewer2@example.com", "reviewer3@example.com"},
-			user:   data.User{Email: "author@example.com"},
+			user:   data2.User{Email: "author@example.com"},
 			want:   ":eyes: I think it's *your* turn - along with reviewer1@example.com, reviewer2@example.com, reviewer3@example.com - to review this PR.",
 		},
 		{
 			name:   "1_reviewer",
 			emails: []string{"reviewer@example.com"},
-			user:   data.User{Email: "author@example.com"},
+			user:   data2.User{Email: "author@example.com"},
 			want:   "I think it's the turn of reviewer@example.com to review this PR.",
 		},
 		{
 			name:   "2_reviewers",
 			emails: []string{"reviewer1@example.com", "reviewer2@example.com"},
-			user:   data.User{Email: "author@example.com"},
+			user:   data2.User{Email: "author@example.com"},
 			want:   "I think it's the turn of reviewer1@example.com, reviewer2@example.com to review this PR.",
 		},
 	}

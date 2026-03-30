@@ -8,7 +8,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
@@ -148,7 +148,7 @@ func ownerMention(ctx workflow.Context, owner string, approvers map[string]bool)
 		plusOne = " :+1:"
 	}
 
-	user := data.SelectUserByRealName(ctx, owner)
+	user := data2.SelectUserByRealName(ctx, owner)
 	if user.SlackID == "" {
 		return owner + plusOne
 	}

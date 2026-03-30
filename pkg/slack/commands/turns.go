@@ -9,27 +9,26 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []string, data.User, error) {
+func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []string, data2.User, error) {
 	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
-		return "", nil, data.User{}, err // The error may or may not be nil.
+		return "", nil, data2.User{}, err // The error may or may not be nil.
 	}
 
 	emails, err := data2.LoadCurrentTurnEmails(ctx, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about the PR.")
-		return "", nil, data.User{}, err
+		return "", nil, data2.User{}, err
 	}
 
 	user, _, err := UserDetails(ctx, event, event.UserID)
 	if err != nil {
-		return "", nil, data.User{}, err
+		return "", nil, data2.User{}, err
 	}
 
 	return url[0], emails, user, nil
@@ -170,7 +169,7 @@ func WhoseTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 // whoseTurnText builds a "whose turn is it" summary message, reused by multiple slash commands.
 // The emails slice must be deduped, but may contain invalid/bot email addresses (which are removed).
-func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak string) string {
+func whoseTurnText(ctx workflow.Context, emails []string, user data2.User, tweak string) string {
 	// Ignore invalid/bot email addresses.
 	if i := slices.Index(emails, ""); i > -1 {
 		emails = slices.Delete(emails, i, i+1)
@@ -208,7 +207,7 @@ func whoseTurnText(ctx workflow.Context, emails []string, user data.User, tweak 
 		if j > 0 {
 			msg.WriteString(", ")
 		}
-		switch user := data.SelectUserByEmail(ctx, email); {
+		switch user := data2.SelectUserByEmail(ctx, email); {
 		case user.SlackID != "":
 			msg.WriteString("<@" + user.SlackID + ">")
 		case user.RealName != "":

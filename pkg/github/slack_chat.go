@@ -10,7 +10,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -51,10 +50,10 @@ func SlackDisplayName(ctx workflow.Context, user User) string {
 		return fmt.Sprintf("<%s?preview=no|@%s>", user.HTMLURL, user.Login)
 	}
 
-	u := data.SelectUserByGitHubID(ctx, user.Login)
+	u := data2.SelectUserByGitHubID(ctx, user.Login)
 	if u.SlackID == "" {
 		// Workaround in case only the user's GitHub account ID isn't stored yet, but the rest is.
-		u = data.SelectUserByEmail(ctx, users.GitHubIDToEmail(ctx, user.Login))
+		u = data2.SelectUserByEmail(ctx, users.GitHubIDToEmail(ctx, user.Login))
 	}
 
 	displayName := users.SlackIDToDisplayName(ctx, u.SlackID)

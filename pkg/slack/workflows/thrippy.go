@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
+	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	thrippypb "github.com/tzrikka/thrippy-api/thrippy/v1"
 )
@@ -252,7 +252,7 @@ func (c *Config) thrippyLinkID(ctx workflow.Context, userID, channelID string) (
 		return "", nil // Slack bot, not a real user.
 	}
 
-	user, optedIn, err := data.SelectUserBySlackID(ctx, userID)
+	user, optedIn, err := data2.SelectUserBySlackID(ctx, userID)
 	if err != nil {
 		return "", activities.AlertError(ctx, c.AlertsChannel, "", err, "User ID", userID)
 	}

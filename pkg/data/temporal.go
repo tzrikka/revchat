@@ -4,19 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
-	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	"go.temporal.io/sdk/temporal"
-	"go.temporal.io/sdk/workflow"
-
 	"github.com/tzrikka/revchat/internal/cache"
-	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/xdg"
@@ -27,30 +20,10 @@ const (
 	filePerms = xdg.NewFilePermissions
 )
 
-var localActivityOpts = workflow.LocalActivityOptions{
-	StartToCloseTimeout: 3 * time.Second,
-	RetryPolicy: &temporal.RetryPolicy{
-		BackoffCoefficient: 1.0,
-		MaximumAttempts:    3,
-	},
-}
-
 // pathCache caches the absolute paths to data files to avoid repeated filesystem operations.
 // Entries expire after 7 days, and the cache is cleaned every about once a day (1,399
 // is a prime number of minutes close to 23.5 hours to avoid a repeated spike pattern).
 var pathCache = cache.New[string](7*24*time.Hour, 1433*time.Minute)
-
-func executeLocalActivity(ctx workflow.Context, activity, result any, args ...any) error {
-	f := runtime.FuncForPC(reflect.ValueOf(activity).Pointer())
-	ctx = workflow.WithLocalActivityOptions(ctx, localActivityOpts)
-
-	start := time.Now()
-	err := workflow.ExecuteLocalActivity(ctx, activity, args...).Get(ctx, result)
-	logger.From(ctx).Debug("executed local Temporal activity for data access", slog.String("activity", f.Name()),
-		slog.Duration("duration", time.Since(start)), slog.Any("error", err))
-
-	return err
-}
 
 // readJSONActivity runs as a Temporal local activity (using
 // [executeLocalActivity]), and expects the caller to hold the appropriate mutex.

@@ -12,7 +12,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/slack/commands"
@@ -189,11 +188,11 @@ func checkAndNudgeUser(ctx workflow.Context, event MessageEvent, prURL, userID s
 
 // userDetails retrieves the user details from internal data based on
 // their Slack ID, and (based on that) whether they are opted-in or not.
-func userDetails(ctx workflow.Context, event MessageEvent, userID string) (data.User, bool, error) {
-	user, optedIn, err := data.SelectUserBySlackID(ctx, userID)
+func userDetails(ctx workflow.Context, event MessageEvent, userID string) (data2.User, bool, error) {
+	user, optedIn, err := data2.SelectUserBySlackID(ctx, userID)
 	if err != nil {
 		postEphemeralError(ctx, event, userID, fmt.Sprintf("failed to read internal data about <@%s>.", userID))
-		return data.User{}, false, err
+		return data2.User{}, false, err
 	}
 	return user, optedIn, nil
 }

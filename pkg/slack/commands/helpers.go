@@ -10,7 +10,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/timpani-api/pkg/slack"
@@ -111,15 +110,15 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 
 // UserDetails retrieves the user details from internal data based on
 // their Slack ID, and (based on that) whether they are opted-in or not.
-func UserDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (data.User, bool, error) {
-	user, optedIn, err := data.SelectUserBySlackID(ctx, userID)
+func UserDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (data2.User, bool, error) {
+	user, optedIn, err := data2.SelectUserBySlackID(ctx, userID)
 	if err != nil {
 		msg := "failed to read internal data about you."
 		if userID != event.UserID {
 			msg = fmt.Sprintf("failed to read internal data about <@%s>.", userID)
 		}
 		PostEphemeralError(ctx, event, msg)
-		return data.User{}, false, err
+		return data2.User{}, false, err
 	}
 
 	return user, optedIn, nil

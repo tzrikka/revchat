@@ -53,6 +53,5 @@ func DeleteURLAndIDMapping(ctx workflow.Context, key string) {
 	if err := executeLocalActivity(ctx, internal.DelURLAndIDMapping, nil, key); err != nil {
 		logger.From(ctx).Error("failed to delete mapping between PR URLs and Slack IDs",
 			slog.Any("error", err), slog.String("key", key))
-		return
 	}
 }

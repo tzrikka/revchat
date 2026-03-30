@@ -12,7 +12,6 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
-	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/data2"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
@@ -50,7 +49,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	}
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 
-	followerIDs := data.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers
+	followerIDs := data2.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers
 	err = activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send an error DM only if the user is opted-in.
@@ -261,7 +260,7 @@ func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucke
 		data2.UpdateActivityTime(ctx, prURL, email)
 		// If the user isn't opted-in, or isn't a member of the Slack channel, don't add them back to the
 		// PR's attention state (just like the logic in other places, e.g. PR creation and PR updates).
-		if user := data.SelectUserByEmail(ctx, email); user.IsOptedIn() {
+		if user := data2.SelectUserByEmail(ctx, email); user.IsOptedIn() {
 			slackUserIDs := []string{users.EmailToSlackID(ctx, email)}
 			err = errors.Join(err, activities.InviteUsersToChannel(ctx, channelID, prURL, slackUserIDs, nil))
 		}
