@@ -1,9 +1,9 @@
-package data2_test
+package data_test
 
 import (
 	"testing"
 
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func TestUsers(t *testing.T) {
@@ -15,18 +15,18 @@ func TestUsers(t *testing.T) {
 	email := "email@example.com"
 
 	// Before adding the user.
-	got := data2.SelectUserByBitbucketID(nil, id)
+	got := data.SelectUserByBitbucketID(nil, id)
 	if got.Email != "" {
 		t.Fatalf("SelectUserByBitbucketID() email = %q, want %q", got.Email, "")
 	}
 
 	// Add the user.
-	if err := data2.UpsertUser(nil, email, name, id, "", "", ""); err != nil {
+	if err := data.UpsertUser(nil, email, name, id, "", "", ""); err != nil {
 		t.Fatalf("UpsertUser() error = %v", err)
 	}
 
 	// After adding the user.
-	got = data2.SelectUserByBitbucketID(nil, id)
+	got = data.SelectUserByBitbucketID(nil, id)
 	if got.Email != email {
 		t.Errorf("SelectUserByBitbucketID() email = %q, want %q", got.Email, email)
 	}
@@ -34,12 +34,12 @@ func TestUsers(t *testing.T) {
 		t.Errorf("SelectUserByBitbucketID() name = %q, want %q", got.RealName, name)
 	}
 
-	got = data2.SelectUserByGitHubID(nil, id)
+	got = data.SelectUserByGitHubID(nil, id)
 	if got.Email != "" {
 		t.Errorf("SelectUserByGitHubID() email = %q, want %q", got.Email, "")
 	}
 
-	gotUser, gotOptedIn, gotErr := data2.SelectUserBySlackID(nil, id)
+	gotUser, gotOptedIn, gotErr := data.SelectUserBySlackID(nil, id)
 	if gotErr != nil {
 		t.Fatalf("SelectUserBySlackID() error = %v", gotErr)
 	}

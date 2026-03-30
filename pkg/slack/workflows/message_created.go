@@ -8,7 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	bitbucket "github.com/tzrikka/revchat/pkg/bitbucket/activities"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	github "github.com/tzrikka/revchat/pkg/github/activities"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
@@ -53,7 +53,7 @@ func (c *Config) createMessage(ctx workflow.Context, event MessageEvent, userID 
 
 	slackIDs = fmt.Sprintf("%s/%s", slackIDs, event.TS)
 	return activities.AlertError(ctx, c.AlertsChannel, "failed to set mapping between a new PR comment and its Slack IDs",
-		data2.MapURLAndID(ctx, newCommentURL, slackIDs), "Comment URL", newCommentURL, "Slack IDs", slackIDs)
+		data.MapURLAndID(ctx, newCommentURL, slackIDs), "Comment URL", newCommentURL, "Slack IDs", slackIDs)
 }
 
 func createCommentInBitbucket(ctx workflow.Context, event MessageEvent, thrippyID string, url []string) (string, error) {

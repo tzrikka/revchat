@@ -1,4 +1,4 @@
-package data2
+package data
 
 import (
 	"go.temporal.io/sdk/workflow"

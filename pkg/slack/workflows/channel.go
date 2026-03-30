@@ -7,7 +7,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
@@ -38,6 +38,6 @@ func (c *Config) ChannelArchivedWorkflow(ctx workflow.Context, event archiveEven
 	activities.AlertWarn(ctx, c.AlertsChannel, "RevChat channel archived by someone else",
 		"Channel ID", event.InnerEvent.Channel, "User", mention)
 
-	data2.CleanupPRData(ctx, event.InnerEvent.Channel, prURL)
+	data.CleanupPRData(ctx, event.InnerEvent.Channel, prURL)
 	return nil
 }

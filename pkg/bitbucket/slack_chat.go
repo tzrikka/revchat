@@ -10,7 +10,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -96,7 +96,7 @@ func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPre
 
 	slackIDs := fmt.Sprintf("%s/%s", idPrefix, ts)
 	_ = activities.AlertError(ctx, alertsChannel, "failed to set mapping between a new Slack message and its Bitbucket URL",
-		data2.MapURLAndID(ctx, url, slackIDs), "Comment URL", url, "Slack IDs", slackIDs)
+		data.MapURLAndID(ctx, url, slackIDs), "Comment URL", url, "Slack IDs", slackIDs)
 
 	if fileID == "" {
 		return nil
@@ -106,7 +106,7 @@ func impersonateUserInBoth(ctx workflow.Context, url, channelID, threadTS, idPre
 	fakeURL := url + "/slack_file_id"
 	slackIDs = fmt.Sprintf("%s/%s", slackIDs, fileID)
 	_ = activities.AlertError(ctx, alertsChannel, "failed to set mapping between a PR code suggestion and its diff file in Slack",
-		data2.MapURLAndID(ctx, fakeURL, slackIDs), "Fake URL", fakeURL, "Slack IDs", slackIDs)
+		data.MapURLAndID(ctx, fakeURL, slackIDs), "Fake URL", fakeURL, "Slack IDs", slackIDs)
 
 	return nil
 }
@@ -198,7 +198,7 @@ func DeleteSlackMsg(ctx workflow.Context, url string) error {
 		return err
 	}
 
-	data2.DeleteURLAndIDMapping(ctx, url)
+	data.DeleteURLAndIDMapping(ctx, url)
 
 	return activities.DeleteMessage(ctx, ids[0], ids[len(ids)-1])
 }
@@ -214,7 +214,7 @@ func EditSlackMsg(ctx workflow.Context, url, msg string) error {
 }
 
 func msgIDsForCommentURL(ctx workflow.Context, url string) ([]string, error) {
-	ids, err := data2.SwitchURLAndID(ctx, url)
+	ids, err := data.SwitchURLAndID(ctx, url)
 	if err != nil {
 		return nil, err
 	}

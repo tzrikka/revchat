@@ -1,10 +1,10 @@
-package data2_test
+package data_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func TestPRSnapshot(t *testing.T) {
@@ -14,7 +14,7 @@ func TestPRSnapshot(t *testing.T) {
 	prURL := "https://bitbucket.org/workspace/repo/pull-requests/12345"
 
 	// Initial state.
-	got, err := data2.LoadPRSnapshot(nil, prURL)
+	got, err := data.LoadPRSnapshot(nil, prURL)
 	if err != nil {
 		t.Fatalf("LoadPRSnapshot() error = %v", err)
 	}
@@ -24,9 +24,9 @@ func TestPRSnapshot(t *testing.T) {
 
 	// Initial snapshot.
 	pr1 := map[string]any{"title": "pr1"}
-	data2.StorePRSnapshot(nil, prURL, pr1)
+	data.StorePRSnapshot(nil, prURL, pr1)
 
-	got, err = data2.LoadPRSnapshot(nil, prURL)
+	got, err = data.LoadPRSnapshot(nil, prURL)
 	if err != nil {
 		t.Fatalf("LoadPRSnapshot() error = %v", err)
 	}
@@ -36,9 +36,9 @@ func TestPRSnapshot(t *testing.T) {
 
 	// Update snapshot.
 	pr2 := map[string]any{"title": "pr2"}
-	data2.StorePRSnapshot(nil, prURL, pr2)
+	data.StorePRSnapshot(nil, prURL, pr2)
 
-	got, err = data2.LoadPRSnapshot(nil, prURL)
+	got, err = data.LoadPRSnapshot(nil, prURL)
 	if err != nil {
 		t.Fatalf("LoadPRSnapshot() error = %v", err)
 	}
@@ -47,9 +47,9 @@ func TestPRSnapshot(t *testing.T) {
 	}
 
 	// Delete snapshot.
-	data2.DeletePRSnapshot(nil, prURL)
+	data.DeletePRSnapshot(nil, prURL)
 
-	got, err = data2.LoadPRSnapshot(nil, prURL)
+	got, err = data.LoadPRSnapshot(nil, prURL)
 	if err != nil {
 		t.Fatalf("LoadPRSnapshot() error = %v", err)
 	}

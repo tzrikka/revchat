@@ -1,4 +1,4 @@
-package data2
+package data
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2/internal"
+	"github.com/tzrikka/revchat/pkg/data/internal"
 )
 
 // MapURLAndID saves a 2-way mapping between PR and PR-comment URLs and their corresponding Slack channel and

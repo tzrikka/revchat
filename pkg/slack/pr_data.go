@@ -12,7 +12,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/files"
 	"github.com/tzrikka/revchat/pkg/users"
 )
@@ -22,11 +22,11 @@ import (
 // The "thrippyID" parameter is only used to report Bitbucket PR tasks, and can be left empty otherwise.
 func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, showDrafts, showTasks bool, thrippyID string) string {
 	summary := new(strings.Builder)
-	pr, err := data2.LoadPRSnapshot(ctx, url)
+	pr, err := data.LoadPRSnapshot(ctx, url)
 	if err != nil {
 		fmt.Fprintf(summary, "\n\n<%s|*%s*>", url, url)
 		if selfReport {
-			if channelID, _ := data2.SwitchURLAndID(ctx, url); channelID != "" {
+			if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
 				fmt.Fprintf(summary, "\n><#%s>", channelID)
 			}
 		}
@@ -44,7 +44,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 
 	// Slack channel link (unless this is a status report about other users).
 	if selfReport {
-		if channelID, _ := data2.SwitchURLAndID(ctx, url); channelID != "" {
+		if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
 			fmt.Fprintf(summary, "\n><#%s>", channelID)
 		}
 	}
@@ -58,14 +58,14 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	}
 
 	if len(userIDs) == 1 {
-		if activity := data2.GetActivityTime(ctx, url, users.SlackIDToEmail(ctx, userIDs[0])); !activity.IsZero() {
+		if activity := data.GetActivityTime(ctx, url, users.SlackIDToEmail(ctx, userIDs[0])); !activity.IsZero() {
 			fmt.Fprintf(summary, ", touched by you `%s` ago", timeSince(now, activity))
 		}
 	}
 
 	// File-related details.
 	summary.WriteString(branchNameMarkdown(ctx, url, pr))
-	paths := data2.LoadDiffstatPaths(ctx, url)
+	paths := data.LoadDiffstatPaths(ctx, url)
 	if len(paths) > 0 {
 		owner, repo, branch, commit := PRIdentifiers(ctx, url, pr)
 
@@ -311,7 +311,7 @@ const (
 
 func states(ctx workflow.Context, url string) string {
 	if isBitbucketPR(url) {
-		prStatus := data2.ReadBitbucketBuilds(ctx, url)
+		prStatus := data.ReadBitbucketBuilds(ctx, url)
 		keys := slices.Sorted(maps.Keys(prStatus.Builds))
 		var summary []string
 		for _, k := range keys {

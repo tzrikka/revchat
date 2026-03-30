@@ -8,7 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/timpani-api/pkg/github"
 )
 
@@ -19,7 +19,7 @@ func GitHubIDToEmail(ctx workflow.Context, username string) string {
 		return ""
 	}
 
-	if user := data2.SelectUserByGitHubID(ctx, username); user.Email != "" {
+	if user := data.SelectUserByGitHubID(ctx, username); user.Email != "" {
 		return user.Email
 	}
 
@@ -38,7 +38,7 @@ func GitHubIDToEmail(ctx workflow.Context, username string) string {
 
 	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
 	email := strings.ToLower(ghUser.Email)
-	_ = data2.UpsertUser(ctx, email, "", "", username, "", "")
+	_ = data.UpsertUser(ctx, email, "", "", username, "", "")
 
 	return email
 }
@@ -52,10 +52,10 @@ func GitHubIDToSlackID(ctx workflow.Context, username string, checkOptIn bool) s
 		return ""
 	}
 
-	user := data2.SelectUserByGitHubID(ctx, username)
+	user := data.SelectUserByGitHubID(ctx, username)
 	if user.SlackID == "" {
 		// Workaround in case only the user's GitHub account ID isn't stored yet, but the rest is.
-		user = data2.SelectUserByEmail(ctx, GitHubIDToEmail(ctx, username))
+		user = data.SelectUserByEmail(ctx, GitHubIDToEmail(ctx, username))
 	}
 
 	if user.SlackID == "" {

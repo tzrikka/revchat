@@ -1,4 +1,4 @@
-package data2
+package data
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2/internal"
+	"github.com/tzrikka/revchat/pkg/data/internal"
 )
 
 func LogSlackChannelArchived(ctx workflow.Context, channelID, prURL string) {

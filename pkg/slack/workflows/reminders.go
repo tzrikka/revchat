@@ -11,7 +11,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
@@ -23,11 +23,11 @@ const (
 func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
 
-	userPRs := data2.ListPRsPerSlackUser(ctx, true, true, true)
+	userPRs := data.ListPRsPerSlackUser(ctx, true, true, true)
 	for user, prs := range userPRs {
-		if strings.HasSuffix(user, data2.SlackIDNotFound) {
+		if strings.HasSuffix(user, data.SlackIDNotFound) {
 			details := make([]any, 0, 2*len(prs)+2)
-			details = append(details, "Email", strings.TrimSuffix(user, data2.SlackIDNotFound))
+			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
 			for i, prURL := range prs {
 				details = append(details, fmt.Sprintf("PR URL %d", i+1), prURL)
 			}
@@ -39,7 +39,7 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 		return nil
 	}
 
-	reminders, err := data2.ListScheduledUserReminders(ctx)
+	reminders, err := data.ListScheduledUserReminders(ctx)
 	if err != nil {
 		return activities.AlertError(ctx, c.AlertsChannel, "", err)
 	}

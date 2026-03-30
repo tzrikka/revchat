@@ -10,7 +10,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	data "github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/users"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -25,7 +25,7 @@ func LookupChannel(ctx workflow.Context, prURL string) (string, bool) {
 		return "", false
 	}
 
-	channelID, _ := data2.SwitchURLAndID(ctx, prURL)
+	channelID, _ := data.SwitchURLAndID(ctx, prURL)
 	return channelID, channelID != ""
 }
 
@@ -76,7 +76,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, partici
 			dontInvite = append(dontInvite, id)
 			continue
 		}
-		if _, _, err := data2.SetReviewerTurn(ctx, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
+		if _, _, err := data.SetReviewerTurn(ctx, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
 			dontInvite = append(dontInvite, id)
 			errs = append(errs, err)
 		}
@@ -140,7 +140,7 @@ func KickUsersFromChannel(ctx workflow.Context, channelID, prURL string, userIDs
 			}
 		}
 
-		if err := data2.RemoveReviewerFromTurns(ctx, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
+		if err := data.RemoveReviewerFromTurns(ctx, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -166,7 +166,7 @@ func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
 }
 
 func SetChannelDescription(ctx workflow.Context, channelID, title, prURL, email string) {
-	data2.UpdateActivityTime(ctx, prURL, email)
+	data.UpdateActivityTime(ctx, prURL, email)
 
 	desc := fmt.Sprintf("`%s`", title)
 	if len(desc) > channelMetadataMaxLen {

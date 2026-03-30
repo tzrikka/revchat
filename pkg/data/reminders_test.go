@@ -1,10 +1,10 @@
-package data2_test
+package data_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func TestReminders(t *testing.T) {
@@ -67,15 +67,15 @@ func TestReminders(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.userID != "" {
 				if tt.kitchenTime != "" {
-					if err := data2.SetScheduledUserReminder(nil, tt.userID, tt.kitchenTime, tt.tz); err != nil {
+					if err := data.SetScheduledUserReminder(nil, tt.userID, tt.kitchenTime, tt.tz); err != nil {
 						t.Fatalf("SetScheduledUserReminder() error = %v", err)
 					}
 				} else {
-					data2.DeleteScheduledUserReminder(nil, tt.userID)
+					data.DeleteScheduledUserReminder(nil, tt.userID)
 				}
 			}
 
-			gotReminders, err := data2.ListScheduledUserReminders(nil)
+			gotReminders, err := data.ListScheduledUserReminders(nil)
 			if err != nil {
 				t.Errorf("ListScheduledUserReminders() error = %v", err)
 			}

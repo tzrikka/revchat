@@ -1,10 +1,10 @@
-package data2_test
+package data_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func TestDiffstat(t *testing.T) {
@@ -12,7 +12,7 @@ func TestDiffstat(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", d)
 
 	// Initial state.
-	got := data2.LoadDiffstatPaths(nil, "url")
+	got := data.LoadDiffstatPaths(nil, "url")
 	if got != nil {
 		t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, nil)
 	}
@@ -43,8 +43,8 @@ func TestDiffstat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data2.StoreDiffstat(nil, "url", tt.files)
-			got := data2.LoadDiffstatPaths(nil, "url")
+			data.StoreDiffstat(nil, "url", tt.files)
+			got := data.LoadDiffstatPaths(nil, "url")
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, tt.want)
 			}
@@ -52,9 +52,9 @@ func TestDiffstat(t *testing.T) {
 	}
 
 	// PR closed.
-	data2.DeleteDiffstat(nil, "url")
+	data.DeleteDiffstat(nil, "url")
 
-	got = data2.LoadDiffstatPaths(nil, "url")
+	got = data.LoadDiffstatPaths(nil, "url")
 	if got != nil {
 		t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, nil)
 	}

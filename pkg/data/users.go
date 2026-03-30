@@ -1,4 +1,4 @@
-package data2
+package data
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2/internal"
+	"github.com/tzrikka/revchat/pkg/data/internal"
 )
 
 type User = internal.User

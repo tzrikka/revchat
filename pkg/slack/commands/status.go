@@ -8,7 +8,7 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
@@ -16,11 +16,11 @@ import (
 // SelfStatus is similar to [StatusOfOthers] but lists all the PRs that require the calling user's attention,
 // i.e. PRs where it's their turn to review or respond. The user must be opted-in to use this command.
 func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, alertsChannel string) error {
-	users := data2.ListPRsPerSlackUser(ctx, true, true, true)
+	users := data.ListPRsPerSlackUser(ctx, true, true, true)
 	for user, prs := range users {
-		if strings.HasSuffix(user, data2.SlackIDNotFound) {
+		if strings.HasSuffix(user, data.SlackIDNotFound) {
 			details := make([]any, 0, 2*len(prs)+2)
-			details = append(details, "Email", strings.TrimSuffix(user, data2.SlackIDNotFound))
+			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
 			for i, prURL := range prs {
 				details = append(details, fmt.Sprintf("PR URL %d", i+1), prURL)
 			}
@@ -82,11 +82,11 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bo
 	}
 
 	authors, reviewers := statusMode(event.Text)
-	allUserPRs := data2.ListPRsPerSlackUser(ctx, false, authors, reviewers)
+	allUserPRs := data.ListPRsPerSlackUser(ctx, false, authors, reviewers)
 	for user, prs := range allUserPRs {
-		if strings.HasSuffix(user, data2.SlackIDNotFound) {
+		if strings.HasSuffix(user, data.SlackIDNotFound) {
 			details := make([]any, 0, 2*len(prs)+2)
-			details = append(details, "Email", strings.TrimSuffix(user, data2.SlackIDNotFound))
+			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
 			for i, prURL := range prs {
 				details = append(details, fmt.Sprintf("PR URL %d", i+1), prURL)
 			}

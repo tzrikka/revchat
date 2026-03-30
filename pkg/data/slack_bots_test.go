@@ -1,9 +1,9 @@
-package data2_test
+package data_test
 
 import (
 	"testing"
 
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func TestSlackBots(t *testing.T) {
@@ -45,15 +45,15 @@ func TestSlackBots(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.botID != "" {
-				data2.SetSlackBotUserID(nil, tt.botID, tt.userID)
+				data.SetSlackBotUserID(nil, tt.botID, tt.userID)
 			}
 
-			got1 := data2.GetSlackBotUserID(nil, "bot1")
+			got1 := data.GetSlackBotUserID(nil, "bot1")
 			if got1 != tt.want1 {
 				t.Errorf("GetSlackBotUserID(bot1) = %q, want %q", got1, tt.want1)
 			}
 
-			got2 := data2.GetSlackBotUserID(nil, "bot2")
+			got2 := data.GetSlackBotUserID(nil, "bot2")
 			if got2 != tt.want2 {
 				t.Errorf("GetSlackBotUserID(bot2) = %q, want %q", got2, tt.want2)
 			}

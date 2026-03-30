@@ -10,7 +10,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	tslack "github.com/tzrikka/timpani-api/pkg/slack"
@@ -85,7 +85,7 @@ func SetReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 			err, "User", fmt.Sprintf("<@%s>", event.UserID), "Time", t, "TZ", user.TZ)
 	}
 
-	if err := data2.SetScheduledUserReminder(ctx, event.UserID, t, user.TZ); err != nil {
+	if err := data.SetScheduledUserReminder(ctx, event.UserID, t, user.TZ); err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about you.")
 		return activities.AlertError(ctx, alertsChannel, "failed to set user's scheduled reminder time",
 			err, "User", fmt.Sprintf("<@%s>", event.UserID), "Time", t, "TZ", user.TZ)

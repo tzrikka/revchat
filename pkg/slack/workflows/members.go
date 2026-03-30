@@ -7,7 +7,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
@@ -19,7 +19,7 @@ func (c *Config) MemberJoinedWorkflow(ctx workflow.Context, event memberEventWra
 		return nil
 	}
 
-	if _, optedIn, err := data2.SelectUserBySlackID(ctx, e.User); err != nil || optedIn {
+	if _, optedIn, err := data.SelectUserBySlackID(ctx, e.User); err != nil || optedIn {
 		// The error is nil (and there's no alert) if the user is opted-in.
 		return activities.AlertError(ctx, c.AlertsChannel, "", err, "User ID", e.User)
 	}

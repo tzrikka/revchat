@@ -11,7 +11,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
@@ -78,7 +78,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 }
 
 func authorSlackID(ctx workflow.Context, prURL string) string {
-	pr, err := data2.LoadPRSnapshot(ctx, prURL)
+	pr, err := data.LoadPRSnapshot(ctx, prURL)
 	if err != nil {
 		return ""
 	}
@@ -117,7 +117,7 @@ func checkAndNudgeUser(ctx workflow.Context, event SlashCommandEvent, url, userI
 	}
 
 	// Update the PR's attention state.
-	ok, approved, err := data2.SetReviewerTurn(ctx, url, user.Email, true)
+	ok, approved, err := data.SetReviewerTurn(ctx, url, user.Email, true)
 	if err != nil {
 		PostEphemeralError(ctx, event, fmt.Sprintf("internal data error while nudging <@%s>.", userID))
 		return ok // May be true despite the error: a valid reviewer, but failed to save it.

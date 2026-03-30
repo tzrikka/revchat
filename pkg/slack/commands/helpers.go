@@ -10,7 +10,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/timpani-api/pkg/slack"
 )
@@ -67,7 +67,7 @@ func PostEphemeralError(ctx workflow.Context, event SlashCommandEvent, msg strin
 // This also ensures that the slash command is being run inside a RevChat channel, and
 // indirectly that the user is opted-in since these channels are accessible only to them.
 func prDetailsFromChannel(ctx workflow.Context, event SlashCommandEvent) ([]string, error) {
-	url, err := data2.SwitchURLAndID(ctx, event.ChannelID)
+	url, err := data.SwitchURLAndID(ctx, event.ChannelID)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about this channel.")
 		return nil, err
@@ -93,13 +93,13 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 		return nil, nil, nil, err // The error may or may not be nil.
 	}
 
-	pr, err = data2.LoadPRSnapshot(ctx, url[0])
+	pr, err = data.LoadPRSnapshot(ctx, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to load PR snapshot.")
 		return url, nil, nil, err
 	}
 
-	paths = data2.LoadDiffstatPaths(ctx, url[0])
+	paths = data.LoadDiffstatPaths(ctx, url[0])
 	if len(paths) == 0 {
 		PostEphemeralError(ctx, event, "no file paths found in PR diffstat.")
 		return url, nil, pr, nil
@@ -110,15 +110,15 @@ func reviewerData(ctx workflow.Context, event SlashCommandEvent) (url, paths []s
 
 // UserDetails retrieves the user details from internal data based on
 // their Slack ID, and (based on that) whether they are opted-in or not.
-func UserDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (data2.User, bool, error) {
-	user, optedIn, err := data2.SelectUserBySlackID(ctx, userID)
+func UserDetails(ctx workflow.Context, event SlashCommandEvent, userID string) (data.User, bool, error) {
+	user, optedIn, err := data.SelectUserBySlackID(ctx, userID)
 	if err != nil {
 		msg := "failed to read internal data about you."
 		if userID != event.UserID {
 			msg = fmt.Sprintf("failed to read internal data about <@%s>.", userID)
 		}
 		PostEphemeralError(ctx, event, msg)
-		return data2.User{}, false, err
+		return data.User{}, false, err
 	}
 
 	return user, optedIn, nil

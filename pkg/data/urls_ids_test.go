@@ -1,9 +1,9 @@
-package data2_test
+package data_test
 
 import (
 	"testing"
 
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func TestURLsIDs(t *testing.T) {
@@ -66,15 +66,15 @@ func TestURLsIDs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.url != "" {
 				if tt.ids != "" {
-					if err := data2.MapURLAndID(nil, tt.url, tt.ids); err != nil {
+					if err := data.MapURLAndID(nil, tt.url, tt.ids); err != nil {
 						t.Fatalf("MapURLAndID() error = %v", err)
 					}
 				} else {
-					data2.DeleteURLAndIDMapping(nil, tt.url)
+					data.DeleteURLAndIDMapping(nil, tt.url)
 				}
 			}
 
-			got, err := data2.SwitchURLAndID(nil, "url1")
+			got, err := data.SwitchURLAndID(nil, "url1")
 			if err != nil {
 				t.Fatalf("SwitchURLAndID(url1) error = %v", err)
 			}
@@ -82,7 +82,7 @@ func TestURLsIDs(t *testing.T) {
 				t.Errorf("SwitchURLAndID(url1) = %q, want %q", got, tt.wantVal1)
 			}
 
-			got, err = data2.SwitchURLAndID(nil, "ids1")
+			got, err = data.SwitchURLAndID(nil, "ids1")
 			if err != nil {
 				t.Fatalf("SwitchURLAndID(ids1) error = %v", err)
 			}
@@ -90,7 +90,7 @@ func TestURLsIDs(t *testing.T) {
 				t.Errorf("SwitchURLAndID(ids1) = %q, want %q", got, tt.wantKey1)
 			}
 
-			got, err = data2.SwitchURLAndID(nil, "url2")
+			got, err = data.SwitchURLAndID(nil, "url2")
 			if err != nil {
 				t.Fatalf("SwitchURLAndID(url2) error = %v", err)
 			}
@@ -98,7 +98,7 @@ func TestURLsIDs(t *testing.T) {
 				t.Errorf("SwitchURLAndID(url2) = %q, want %q", got, tt.wantVal2)
 			}
 
-			got, err = data2.SwitchURLAndID(nil, "ids2")
+			got, err = data.SwitchURLAndID(nil, "ids2")
 			if err != nil {
 				t.Fatalf("SwitchURLAndID(ids2) error = %v", err)
 			}
@@ -106,7 +106,7 @@ func TestURLsIDs(t *testing.T) {
 				t.Errorf("SwitchURLAndID(ids2) = %q, want %q", got, tt.wantKey2)
 			}
 
-			got, err = data2.SwitchURLAndID(nil, "url3")
+			got, err = data.SwitchURLAndID(nil, "url3")
 			if err != nil {
 				t.Fatalf("SwitchURLAndID(url3) error = %v", err)
 			}
@@ -114,7 +114,7 @@ func TestURLsIDs(t *testing.T) {
 				t.Errorf("SwitchURLAndID(url3) = %q, want %q", got, tt.wantVal3)
 			}
 
-			got, err = data2.SwitchURLAndID(nil, "ids3")
+			got, err = data.SwitchURLAndID(nil, "ids3")
 			if err != nil {
 				t.Fatalf("SwitchURLAndID(ids3) error = %v", err)
 			}
@@ -154,20 +154,20 @@ func TestDeleteURLAndIDMapping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := data2.MapURLAndID(nil, "https://example.com/pr/12345", "C12345678"); err != nil {
+			if err := data.MapURLAndID(nil, "https://example.com/pr/12345", "C12345678"); err != nil {
 				t.Fatalf("MapURLAndID(PR) error = %v", err)
 			}
-			if err := data2.MapURLAndID(nil, "https://example.com/pr/12345/comment1", "C12345678/commentA"); err != nil {
+			if err := data.MapURLAndID(nil, "https://example.com/pr/12345/comment1", "C12345678/commentA"); err != nil {
 				t.Fatalf("MapURLAndID(PR comment1) error = %v", err)
 			}
-			if err := data2.MapURLAndID(nil, "https://example.com/pr/12345/comment2", "C12345678/commentA/commentB"); err != nil {
+			if err := data.MapURLAndID(nil, "https://example.com/pr/12345/comment2", "C12345678/commentA/commentB"); err != nil {
 				t.Fatalf("MapURLAndID(PR comment2) error = %v", err)
 			}
 
-			data2.DeleteURLAndIDMapping(nil, tt.key)
+			data.DeleteURLAndIDMapping(nil, tt.key)
 
 			for _, key := range keys {
-				got, err := data2.SwitchURLAndID(nil, key)
+				got, err := data.SwitchURLAndID(nil, key)
 				if err != nil {
 					t.Errorf("SwitchURLAndID(%q) error = %v", key, err)
 				}

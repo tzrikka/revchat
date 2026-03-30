@@ -8,7 +8,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID string, isBitbucket bool) error {
@@ -39,7 +39,7 @@ func (c *Config) deleteMessage(ctx workflow.Context, event MessageEvent, userID 
 }
 
 func deleteMessageInBitbucket(ctx workflow.Context, thrippyID string, url []string) error {
-	data2.DeleteURLAndIDMapping(ctx, url[0])
+	data.DeleteURLAndIDMapping(ctx, url[0])
 	return activities.DeletePullRequestComment(ctx, thrippyID, url[2], url[3], url[5], url[7])
 }
 

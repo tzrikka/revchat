@@ -9,7 +9,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/slack/commands"
 	"github.com/tzrikka/timpani-api/pkg/slack"
@@ -85,7 +85,7 @@ func (c *Config) OptInSlashCommand(ctx workflow.Context, event commands.SlashCom
 			"User", fmt.Sprintf("<@%s>", event.UserID), "Thrippy ID", fmt.Sprintf("`%s`", thrippyID))
 	}
 
-	if err := data2.UpsertUser(ctx, user.Email, user.RealName, "", "", user.SlackID, thrippyID); err != nil {
+	if err := data.UpsertUser(ctx, user.Email, user.RealName, "", "", user.SlackID, thrippyID); err != nil {
 		commands.PostEphemeralError(ctx, event, "failed to write internal data about you.")
 		err = errors.Join(err, c.deleteThrippyLink(ctx, thrippyID))
 		return activities.AlertError(ctx, c.AlertsChannel, "upsert user", err,
@@ -111,10 +111,10 @@ func (c *Config) OptOutSlashCommand(ctx workflow.Context, event commands.SlashCo
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
-	data2.DeleteScheduledUserReminder(ctx, user.SlackID)
-	data2.RemoveFollower(ctx, user.SlackID)
+	data.DeleteScheduledUserReminder(ctx, user.SlackID)
+	data.RemoveFollower(ctx, user.SlackID)
 
-	if err := data2.UpsertUser(ctx, user.Email, "", user.BitbucketID, user.GitHubID, user.SlackID, "X"); err != nil {
+	if err := data.UpsertUser(ctx, user.Email, "", user.BitbucketID, user.GitHubID, user.SlackID, "X"); err != nil {
 		commands.PostEphemeralError(ctx, event, "failed to write internal data about you.")
 		return activities.AlertError(ctx, c.AlertsChannel, "upsert user", err, "User", fmt.Sprintf("<@%s>", event.UserID))
 	}

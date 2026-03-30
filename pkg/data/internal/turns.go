@@ -261,7 +261,7 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 
 			// Valid but unrecognized (and specifically not opted-in) emails - remove from turns.
 			// Example: user deactivated after being added to the PR.
-			id := ""
+			id := emailToSlackID(ctx, email)
 			if id == "" {
 				id = email + SlackIDNotFound
 				users[id] = append(users[id], prURL)
@@ -466,7 +466,7 @@ func resetTurns(ctx context.Context, prURL string, t *PRTurns) (*PRTurns, error)
 		return nil, fmt.Errorf("failed to reset turns file due to PR snapshot error: %w", err)
 	}
 	if pr == nil {
-		return nil, fmt.Errorf("failed to reset turns file due to missing PR snapshot")
+		return nil, errors.New("failed to reset turns file due to missing PR snapshot")
 	}
 
 	author, accountType := userEmailAndType(ctx, pr["author"])
@@ -584,11 +584,26 @@ func bitbucketIDToEmail(ctx context.Context, accountID, accountType string) stri
 	}
 
 	if user, _ := SelectUser(ctx, IndexByBitbucketID, accountID); user.Email != "" {
-		return user.Email // No need to check for errors here, it's a prerequisite for the email to be non-empty.
+		return user.Email // No need to check for errors here, it's a prerequisite for the result to be non-empty.
 	}
 
 	if accountType == "app_user" {
 		return "" // Not a real user, so no point to check in Jira.
+	}
+
+	return ""
+}
+
+// emailToSlackID retrieves a Slack user's ID based on their email address. This function returns an
+// empty string if the user ID is not found. It uses persistent data storage, or API calls as a fallback.
+// Compare this function with [users.EmailToSlackID], which receives a [workflow.Context] instead of a [context.Context].
+func emailToSlackID(ctx context.Context, email string) string {
+	if email == "" || email == "bot" {
+		return ""
+	}
+
+	if user, _ := SelectUser(ctx, IndexByEmail, email); user.SlackID != "" {
+		return user.SlackID // No need to check for errors here, it's a prerequisite for the result to be non-empty.
 	}
 
 	return ""

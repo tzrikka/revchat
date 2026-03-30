@@ -12,7 +12,7 @@ import (
 
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
@@ -49,7 +49,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	}
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 
-	followerIDs := data2.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers
+	followerIDs := data.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers
 	err = activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send an error DM only if the user is opted-in.
@@ -58,7 +58,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 		}
 		// Undo channel creation and PR data initialization.
 		err = errors.Join(err, activities.ArchiveChannel(ctx, channelID, prURL))
-		data2.CleanupPRData(ctx, channelID, prURL)
+		data.CleanupPRData(ctx, channelID, prURL)
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to invite users to Slack channel for "+prURL, err)
 	}
 
@@ -90,7 +90,7 @@ func (c Config) PullRequestClosedWorkflow(ctx workflow.Context, event bitbucket.
 		msg += "."
 	}
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
-	data2.CleanupPRData(ctx, channelID, prURL)
+	data.CleanupPRData(ctx, channelID, prURL)
 
 	if err := activities.ArchiveChannel(ctx, channelID, prURL); err != nil {
 		msg = ":boom: Failed to archive this channel, even though its PR was " + strings.Replace(msg, " this PR", "", 1)
@@ -141,11 +141,11 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	// Announce transitions between draft and ready-to-review modes.
 	if !snapshot.Draft && pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
-		_, _, err := data2.SetReviewerTurn(ctx, prURL, users.BitbucketActorToEmail(ctx, event.PullRequest.Author), true)
+		_, _, err := data.SetReviewerTurn(ctx, prURL, users.BitbucketActorToEmail(ctx, event.PullRequest.Author), true)
 		errs = append(errs, err)
 	} else if snapshot.Draft && !pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
-		errs = append(errs, data2.SwitchTurn(ctx, prURL, email, true))
+		errs = append(errs, data.SwitchTurn(ctx, prURL, email, true))
 		errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), nil))
 	}
 
@@ -165,7 +165,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.BitbucketToSlack(ctx, text, prURL)
 		}
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
-		data2.UpdateActivityTime(ctx, prURL, email)
+		data.UpdateActivityTime(ctx, prURL, email)
 	}
 
 	// Reviewers added/removed.
@@ -186,12 +186,12 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		msg := "changed the target branch from <%s/branch/%s|`%s`> to <%s/branch/%s|`%s`>."
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg)
-		data2.UpdateActivityTime(ctx, prURL, email)
+		data.UpdateActivityTime(ctx, prURL, email)
 	}
 
 	// Commit(s) pushed to the PR branch.
 	if pr.CommitCount > 0 && snapshot.Source.Commit.Hash != pr.Source.Commit.Hash {
-		data2.StoreDiffstat(ctx, prURL, bitbucket.Diffstat(ctx, event))
+		data.StoreDiffstat(ctx, prURL, bitbucket.Diffstat(ctx, event))
 
 		slices.Reverse(commits) // Switch from reverse order to chronological order.
 
@@ -217,7 +217,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		}
 
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg.String())
-		data2.UpdateActivityTime(ctx, prURL, email)
+		data.UpdateActivityTime(ctx, prURL, email)
 	}
 
 	return errors.Join(errs...)
@@ -249,7 +249,7 @@ func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucke
 	case "approved":
 		msg += "approved this PR. :+1:"
 
-		err = data2.RemoveReviewerFromTurns(ctx, prURL, email, true)
+		err = data.RemoveReviewerFromTurns(ctx, prURL, email, true)
 		if err != nil {
 			_ = activities.AlertError(ctx, c.SlackAlertsChannel, "failed to remove approver from PR turns", err, "Email", email)
 		}
@@ -257,10 +257,10 @@ func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucke
 	case "unapproved":
 		msg += "unapproved this PR. :-1:"
 
-		data2.UpdateActivityTime(ctx, prURL, email)
+		data.UpdateActivityTime(ctx, prURL, email)
 		// If the user isn't opted-in, or isn't a member of the Slack channel, don't add them back to the
 		// PR's attention state (just like the logic in other places, e.g. PR creation and PR updates).
-		if user := data2.SelectUserByEmail(ctx, email); user.IsOptedIn() {
+		if user := data.SelectUserByEmail(ctx, email); user.IsOptedIn() {
 			slackUserIDs := []string{users.EmailToSlackID(ctx, email)}
 			err = errors.Join(err, activities.InviteUsersToChannel(ctx, channelID, prURL, slackUserIDs, nil))
 		}
@@ -269,7 +269,7 @@ func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucke
 		msg += "requested changes in this PR. :warning:"
 
 		pr.ChangeRequestCount++
-		err = data2.SwitchTurn(ctx, prURL, email, false)
+		err = data.SwitchTurn(ctx, prURL, email, false)
 
 	// This case is different: we handle - but don't announce - it in the PR channel. Should we announce it?
 	case "changes_request_removed":
@@ -279,7 +279,7 @@ func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucke
 		if pr.ChangeRequestCount < 0 {
 			pr.ChangeRequestCount = 0 // Should not happen, but just in case.
 		}
-		data2.UpdateActivityTime(ctx, prURL, email)
+		data.UpdateActivityTime(ctx, prURL, email)
 
 	default:
 		logger.From(ctx).Error("unrecognized Bitbucket PR review event type", slog.String("event_type", event.Type))

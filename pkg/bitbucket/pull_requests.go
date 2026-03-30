@@ -9,7 +9,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
 )
@@ -19,13 +19,13 @@ import (
 // errors, they are logged but ignored, as we can try to recreate the data later.
 func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slackAlertsChannel string) {
 	prURL := HTMLURL(event.PullRequest.Links)
-	if err := data2.MapURLAndID(ctx, prURL, prChannelID); err != nil {
+	if err := data.MapURLAndID(ctx, prURL, prChannelID); err != nil {
 		_ = activities.AlertError(ctx, slackAlertsChannel, "failed to set mapping between a PR and its Slack channel",
 			err, "PR URL", prURL, "Slack channel ID", prChannelID)
 	}
 
-	data2.StorePRSnapshot(ctx, prURL, event.PullRequest)
-	data2.StoreDiffstat(ctx, prURL, Diffstat(ctx, event))
+	data.StorePRSnapshot(ctx, prURL, event.PullRequest)
+	data.StoreDiffstat(ctx, prURL, Diffstat(ctx, event))
 
 	email := users.BitbucketActorToEmail(ctx, event.Actor)
 	if email == "" {
@@ -36,7 +36,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 		return
 	}
 
-	data2.InitTurns(ctx, prURL, email)
+	data.InitTurns(ctx, prURL, email)
 }
 
 // accountIDs extracts the IDs from a slice of [Account]s. The output is guaranteed
@@ -64,7 +64,7 @@ func HTMLURL(links map[string]Link) string {
 // LoadPRSnapshot reads a snapshot of a PR, which is used to detect and analyze metadata
 // changes. If a snapshot doesn't exist, this function returns a nil map and no error.
 func LoadPRSnapshot(ctx workflow.Context, prURL string) (*PullRequest, error) {
-	prev, err := data2.LoadPRSnapshot(ctx, prURL)
+	prev, err := data.LoadPRSnapshot(ctx, prURL)
 	if err != nil || prev == nil {
 		return nil, err // Error may or may not be nil, but in either case there's no snapshot to return.
 	}
@@ -81,7 +81,7 @@ func LoadPRSnapshot(ctx workflow.Context, prURL string) (*PullRequest, error) {
 
 // SwitchPRSnapshot stores the given new PR snapshot, and returns the previous one (if there is one).
 func SwitchPRSnapshot(ctx workflow.Context, prURL string, snapshot PullRequest) (*PullRequest, error) {
-	defer data2.StorePRSnapshot(ctx, prURL, &snapshot) // Pointer - to include potential updates below.
+	defer data.StorePRSnapshot(ctx, prURL, &snapshot) // Pointer - to include potential updates below.
 
 	pr, err := LoadPRSnapshot(ctx, prURL)
 	if err != nil || pr == nil {
@@ -102,7 +102,7 @@ func SwitchPRSnapshot(ctx workflow.Context, prURL string, snapshot PullRequest) 
 
 // FindPRsByCommit returns all (0 or more) the PR snapshots that are currently associated with the given commit hash.
 func FindPRsByCommit(ctx workflow.Context, hash string) ([]*PullRequest, error) {
-	ms, err := data2.FindPRsByCommit(ctx, hash)
+	ms, err := data.FindPRsByCommit(ctx, hash)
 	if err != nil || ms == nil {
 		return nil, err
 	}

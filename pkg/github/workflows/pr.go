@@ -10,7 +10,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/github"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	"github.com/tzrikka/revchat/pkg/slack"
@@ -96,7 +96,7 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 	}
 	github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
-	followerIDs := data2.SelectUserByGitHubID(ctx, pr.User.Login).Followers
+	followerIDs := data.SelectUserByGitHubID(ctx, pr.User.Login).Followers
 	err = activities.InviteUsersToChannel(ctx, channelID, pr.HTMLURL, github.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send an error DM only if the user is opted-in.
@@ -105,7 +105,7 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 		}
 		// Undo channel creation and PR data initialization.
 		err = errors.Join(err, activities.ArchiveChannel(ctx, channelID, pr.HTMLURL))
-		data2.CleanupPRData(ctx, channelID, pr.HTMLURL)
+		data.CleanupPRData(ctx, channelID, pr.HTMLURL)
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to invite users to Slack channel for "+pr.HTMLURL, err)
 	}
 
@@ -131,7 +131,7 @@ func (c Config) prClosed(ctx workflow.Context, event github.PullRequestEvent) er
 	}
 	github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
-	data2.CleanupPRData(ctx, channelID, prURL)
+	data.CleanupPRData(ctx, channelID, prURL)
 
 	if err := activities.ArchiveChannel(ctx, channelID, prURL); err != nil {
 		msg = ":boom: Failed to archive this channel, even though its PR was " + strings.Replace(msg, " this PR", "", 1)
@@ -153,7 +153,7 @@ func prConvertedToDraft(ctx workflow.Context, event github.PullRequestEvent) err
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as a draft. :construction:")
-	_, _, err := data2.SetReviewerTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.PullRequest.User.Login), true)
+	_, _, err := data.SetReviewerTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.PullRequest.User.Login), true)
 	return err
 }
 
@@ -168,7 +168,7 @@ func prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as ready for review. :eyes:")
-	err1 := data2.SwitchTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
+	err1 := data.SwitchTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
 	err2 := activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest), nil)
 	return errors.Join(err1, err2)
 }
@@ -286,7 +286,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.GitHubToSlack(ctx, body, pr.HTMLURL)
 		}
 		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
-		data2.UpdateActivityTime(ctx, pr.HTMLURL, email)
+		data.UpdateActivityTime(ctx, pr.HTMLURL, email)
 	}
 
 	// Base branch was changed.
@@ -295,7 +295,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 		repoURL, oldBranch, newBranch := pr.Base.Repo.HTMLURL, event.Changes.Base.Ref, pr.Base.Ref
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
 		github.MentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
-		data2.UpdateActivityTime(ctx, pr.HTMLURL, email)
+		data.UpdateActivityTime(ctx, pr.HTMLURL, email)
 	}
 
 	return err
@@ -310,7 +310,7 @@ func prSynchronized(ctx workflow.Context, event github.PullRequestEvent) error {
 		return nil
 	}
 
-	data2.UpdateActivityTime(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login))
+	data.UpdateActivityTime(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login))
 	defer github.UpdateChannelBookmarks(ctx, &event.PullRequest, nil, channelID)
 
 	if event.After == nil {

@@ -17,7 +17,7 @@ import (
 	"github.com/tzrikka/revchat/internal/logger"
 	"github.com/tzrikka/revchat/pkg/bitbucket"
 	"github.com/tzrikka/revchat/pkg/bitbucket/activities"
-	"github.com/tzrikka/revchat/pkg/data2"
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/markdown"
 	slack "github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
@@ -36,7 +36,7 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	// Don't abort if this fails - it's more important to post the comment.
-	_ = data2.SwitchTurn(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor), false)
+	_ = data.SwitchTurn(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor), false)
 
 	// If the comment was created by RevChat, i.e. mirrored from Slack, don't repost it.
 	// Also, don't poll Bitbucket for updates because we expect them to come from Slack.
@@ -98,7 +98,7 @@ func (c Config) CommentUpdatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 
 func (c Config) updateCommentInWorkflow(ctx workflow.Context, comment *bitbucket.Comment) error {
 	// If the comment previously had an attached diff file, delete it - it's obsolete now.
-	if fileID, _ := data2.SwitchURLAndID(ctx, bitbucket.HTMLURL(comment.Links)+"/slack_file_id"); fileID != "" {
+	if fileID, _ := data.SwitchURLAndID(ctx, bitbucket.HTMLURL(comment.Links)+"/slack_file_id"); fileID != "" {
 		slack.DeleteFile(ctx, fileID)
 	}
 
@@ -149,7 +149,7 @@ func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	commentURL := bitbucket.HTMLURL(event.Comment.Links)
-	if fileID, _ := data2.SwitchURLAndID(ctx, commentURL+"/slack_file_id"); fileID != "" {
+	if fileID, _ := data.SwitchURLAndID(ctx, commentURL+"/slack_file_id"); fileID != "" {
 		slack.DeleteFile(ctx, fileID)
 	}
 
@@ -167,7 +167,7 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
-	data2.UpdateActivityTime(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
+	data.UpdateActivityTime(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
@@ -186,7 +186,7 @@ func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
-	data2.UpdateActivityTime(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
+	data.UpdateActivityTime(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
@@ -218,7 +218,7 @@ func checksum(s string) string {
 
 // pollCommentForUpdates is a convenience wrapper for [setScheduleActivity].
 func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentURL, rawText string) error {
-	user := data2.SelectUserByBitbucketID(ctx, accountID)
+	user := data.SelectUserByBitbucketID(ctx, accountID)
 
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		StartToCloseTimeout: CommentPollingInterval + CommentPollingJitter,
