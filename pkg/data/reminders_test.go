@@ -1,76 +1,87 @@
-package data
+package data_test
 
 import (
-	"fmt"
+	"reflect"
 	"testing"
+
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func TestReminders(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache.Clear()
 
-	uid1 := "U123456"
-	kt1 := "9:00AM"
-	tz1 := "America/Los_Angeles"
-	reminder1 := fmt.Sprintf("%s %s", kt1, tz1)
+	tests := []struct {
+		name          string
+		userID        string
+		kitchenTime   string
+		tz            string
+		wantReminders map[string]string
+	}{
+		{
+			name:          "initial_state",
+			wantReminders: map[string]string{},
+		},
+		{
+			name:          "first_set",
+			userID:        "user1",
+			kitchenTime:   "9:00AM",
+			tz:            "America/Los_Angeles",
+			wantReminders: map[string]string{"user1": "9:00AM America/Los_Angeles"},
+		},
+		{
+			name:        "another_set",
+			userID:      "user2",
+			kitchenTime: "5:00PM",
+			tz:          "America/Los_Angeles",
+			wantReminders: map[string]string{
+				"user1": "9:00AM America/Los_Angeles",
+				"user2": "5:00PM America/Los_Angeles",
+			},
+		},
+		{
+			name:        "update",
+			userID:      "user1",
+			kitchenTime: "10:00AM",
+			tz:          "America/Los_Angeles",
+			wantReminders: map[string]string{
+				"user1": "10:00AM America/Los_Angeles",
+				"user2": "5:00PM America/Los_Angeles",
+			},
+		},
+		{
+			name:   "first_delete",
+			userID: "user2",
+			wantReminders: map[string]string{
+				"user1": "10:00AM America/Los_Angeles",
+			},
+		},
+		{
+			name:          "last_delete",
+			userID:        "user1",
+			wantReminders: map[string]string{},
+		},
+	}
 
-	kt2 := "5:00PM"
-	tz2 := "America/Los_Angeles"
-	reminder2 := fmt.Sprintf("%s %s", kt2, tz2)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.userID != "" {
+				if tt.kitchenTime != "" {
+					if err := data.SetScheduledUserReminder(nil, tt.userID, tt.kitchenTime, tt.tz); err != nil {
+						t.Fatalf("SetScheduledUserReminder() error = %v", err)
+					}
+				} else {
+					data.DeleteScheduledUserReminder(nil, tt.userID)
+				}
+			}
 
-	// Before mapping.
-	got, err := ListReminders(nil)
-	if err != nil {
-		t.Fatalf("ListReminders() error = %v", err)
-	}
-	if len(got) > 0 {
-		t.Fatalf("ListReminders() = %v, want empty/nil", got)
-	}
-
-	// Set a reminder.
-	if err := SetReminder(nil, uid1, kt1, tz1); err != nil {
-		t.Fatalf("SetReminder() error = %v", err)
-	}
-
-	// After mapping.
-	got, err = ListReminders(nil)
-	if err != nil {
-		t.Fatalf("ListReminders() error = %v", err)
-	}
-	want := map[string]string{uid1: reminder1}
-	if len(got) != 1 {
-		t.Fatalf("ListReminders() = %v, want %v", got, want)
-	}
-	if got[uid1] != want[uid1] {
-		t.Fatalf("ListReminders()[key] = %v, want %v", got[uid1], want[uid1])
-	}
-
-	// Modify mapping.
-	if err := SetReminder(nil, uid1, kt2, tz2); err != nil {
-		t.Fatalf("SetReminder() error = %v", err)
-	}
-	got, err = ListReminders(nil)
-	if err != nil {
-		t.Fatalf("ListReminders() error = %v", err)
-	}
-	want = map[string]string{uid1: reminder2}
-	if len(got) != 1 {
-		t.Fatalf("ListReminders() = %v, want %v", got, want)
-	}
-	if got[uid1] != want[uid1] {
-		t.Fatalf("ListReminders()[key] = %v, want %v", got[uid1], want[uid1])
-	}
-
-	// Remove mapping.
-	DeleteReminder(nil, uid1)
-
-	// After removal.
-	got, err = ListReminders(nil)
-	if err != nil {
-		t.Fatalf("ListReminders() error = %v", err)
-	}
-	if len(got) > 0 {
-		t.Fatalf("ListReminders() = %v, want empty/nil", got)
+			gotReminders, err := data.ListScheduledUserReminders(nil)
+			if err != nil {
+				t.Errorf("ListScheduledUserReminders() error = %v", err)
+			}
+			if !reflect.DeepEqual(gotReminders, tt.wantReminders) {
+				t.Errorf("ListScheduledUserReminders() = %q, want %q", gotReminders, tt.wantReminders)
+			}
+		})
 	}
 }

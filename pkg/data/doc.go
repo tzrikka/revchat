@@ -1,4 +1,4 @@
-// Package data provides functions to manage persistent data storage.
-// For the time being, storage is file-based on the local filesystem.
-// Future implementations may include remote key-value stores and databases.
+// Package data provides Temporal activity wrappers for nondeterministic functions to manage
+// persistent data. For the time being, storage is file-based on the local filesystem.
+// Future implementations may include a database and/or a key-value store.
 package data

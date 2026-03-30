@@ -1,36 +1,37 @@
-package data
+package data_test
 
 import (
 	"reflect"
 	"testing"
+
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
 func TestBitbucketBuilds(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
-	pathCache.Clear()
 
-	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
+	prURL := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Initial state.
-	got := ReadBitbucketBuilds(nil, url)
+	got := data.ReadBitbucketBuilds(nil, prURL)
 	if got.Builds != nil {
-		t.Fatalf("ReadBitbucketBuilds() = %#v, want %#v", got, PRStatus{})
+		t.Fatalf("ReadBitbucketBuilds() = %#v, want %#v", got, data.PRStatus{})
 	}
 
 	// Update build status.
-	cs1 := CommitStatus{
+	cs1 := data.CommitStatus{
 		Name:  "build1",
 		State: "SUCCESS",
 		Desc:  "Build passed",
 		URL:   "http://build1",
 	}
-	UpdateBitbucketBuilds(nil, url, "commit1", "build1", cs1)
+	data.UpdateBitbucketBuilds(nil, prURL, "commit1", "build1", cs1)
 
-	got = ReadBitbucketBuilds(nil, url)
-	want := PRStatus{
+	got = data.ReadBitbucketBuilds(nil, prURL)
+	want := data.PRStatus{
 		CommitHash: "commit1",
-		Builds: map[string]CommitStatus{
+		Builds: map[string]data.CommitStatus{
 			"build1": cs1,
 		},
 	}
@@ -39,18 +40,18 @@ func TestBitbucketBuilds(t *testing.T) {
 	}
 
 	// Update with new commit.
-	cs2 := CommitStatus{
+	cs2 := data.CommitStatus{
 		Name:  "build2",
 		State: "FAILED",
 		Desc:  "Build failed",
 		URL:   "http://build2",
 	}
-	UpdateBitbucketBuilds(nil, url, "commit2", "build2", cs2)
+	data.UpdateBitbucketBuilds(nil, prURL, "commit2", "build2", cs2)
 
-	got = ReadBitbucketBuilds(nil, url)
-	want = PRStatus{
+	got = data.ReadBitbucketBuilds(nil, prURL)
+	want = data.PRStatus{
 		CommitHash: "commit2",
-		Builds: map[string]CommitStatus{
+		Builds: map[string]data.CommitStatus{
 			"build2": cs2,
 		},
 	}
@@ -59,10 +60,10 @@ func TestBitbucketBuilds(t *testing.T) {
 	}
 
 	// Delete builds.
-	DeleteBitbucketBuilds(nil, url)
+	data.DeleteBitbucketBuilds(nil, prURL)
 
-	got = ReadBitbucketBuilds(nil, url)
+	got = data.ReadBitbucketBuilds(nil, prURL)
 	if got.Builds != nil {
-		t.Fatalf("ReadBitbucketBuilds() = %v, want %v", got, PRStatus{})
+		t.Fatalf("ReadBitbucketBuilds() = %v, want %v", got, data.PRStatus{})
 	}
 }

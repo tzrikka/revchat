@@ -28,7 +28,7 @@ func (c *Config) MemberJoinedWorkflow(ctx workflow.Context, event memberEventWra
 	mention := fmt.Sprintf("<@%s>", e.User)
 	logger.From(ctx).Warn("user joined Slack channel but is not opted-in",
 		slog.String("user_id", e.User), slog.String("channel_id", e.Channel))
-	activities.AlertWarn(ctx, c.AlertsChannel, "User joined Slack channel but is not opted-in!",
+	activities.AlertWarn(ctx, c.AlertsChannel, "User joined Slack channel but is not opted-in",
 		"User", mention, "Channel ID", e.Channel)
 
 	msg := ":wave: Hi %s! You joined a RevChat channel, but you have to opt-in for this to work! Please run "

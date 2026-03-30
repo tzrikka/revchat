@@ -92,9 +92,8 @@ func (c *Config) OptInSlashCommand(ctx workflow.Context, event commands.SlashCom
 			"User", fmt.Sprintf("<@%s>", event.UserID), "Thrippy ID", fmt.Sprintf("`%s`", thrippyID))
 	}
 
-	if err := commands.SetReminder(ctx, event, DefaultReminderTime, true); err != nil {
-		err = errors.Join(err, c.deleteThrippyLink(ctx, thrippyID))
-		return activities.AlertError(ctx, c.AlertsChannel, "set reminder", err, "User", fmt.Sprintf("<@%s>", event.UserID))
+	if err := commands.SetReminder(ctx, event, DefaultReminderTime, true, c.AlertsChannel); err != nil {
+		return errors.Join(err, c.deleteThrippyLink(ctx, thrippyID))
 	}
 
 	msg = ":bell: You are now opted into using RevChat.\n\n"
@@ -112,7 +111,7 @@ func (c *Config) OptOutSlashCommand(ctx workflow.Context, event commands.SlashCo
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, ":no_bell: You're already opted out.")
 	}
 
-	data.DeleteReminder(ctx, user.SlackID)
+	data.DeleteScheduledUserReminder(ctx, user.SlackID)
 	data.RemoveFollower(ctx, user.SlackID)
 
 	if err := data.UpsertUser(ctx, user.Email, "", user.BitbucketID, user.GitHubID, user.SlackID, "X"); err != nil {

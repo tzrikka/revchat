@@ -168,7 +168,7 @@ func checkAndNudgeUser(ctx workflow.Context, event MessageEvent, prURL, userID s
 	}
 
 	// Update the PR's attention state.
-	ok, approved, err := data.Nudge(ctx, prURL, user.Email)
+	ok, approved, err := data.SetReviewerTurn(ctx, prURL, user.Email, true)
 	if err != nil {
 		postEphemeralError(ctx, event, userID, fmt.Sprintf("internal data error while nudging <@%s>.", userID))
 		return ok // May be true despite the error: a valid reviewer, but failed to save it.

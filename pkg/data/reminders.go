@@ -2,67 +2,50 @@ package data
 
 import (
 	"context"
-	"fmt"
-	"sync"
+	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/data/internal"
 )
 
-const (
-	remindersFile = "reminders.json"
-)
+func SetScheduledUserReminder(ctx workflow.Context, userID, kitchenTime, tz string) error {
+	if ctx == nil { // For unit testing.
+		return internal.SetReminder(context.Background(), userID, kitchenTime, tz)
+	}
 
-var remindersMutex sync.RWMutex
-
-func SetReminder(ctx workflow.Context, userID, kitchenTime, tz string) error {
-	m, err := ListReminders(ctx)
-	if err != nil {
+	if err := executeLocalActivity(ctx, internal.SetReminder, nil, userID, kitchenTime, tz); err != nil {
+		logger.From(ctx).Error("failed to set user's scheduled reminder", slog.Any("error", err),
+			slog.String("user_id", userID), slog.String("time", kitchenTime), slog.String("zone", tz))
 		return err
 	}
 
-	m[userID] = fmt.Sprintf("%s %s", kitchenTime, tz)
-
-	remindersMutex.Lock()
-	defer remindersMutex.Unlock()
-
-	if ctx == nil { // For unit testing.
-		return writeJSONActivity(context.Background(), remindersFile, m)
-	}
-
-	return executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
+	return nil
 }
 
-func DeleteReminder(ctx workflow.Context, userID string) {
-	m, err := ListReminders(ctx)
-	if err != nil {
+func DeleteScheduledUserReminder(ctx workflow.Context, userID string) {
+	if ctx == nil { // For unit testing.
+		_ = internal.DeleteReminder(context.Background(), userID)
 		return
 	}
 
-	delete(m, userID)
-
-	remindersMutex.Lock()
-	defer remindersMutex.Unlock()
-
-	if ctx == nil { // For unit testing.
-		_ = writeJSONActivity(context.Background(), remindersFile, m)
-		return
+	if err := executeLocalActivity(ctx, internal.DeleteReminder, nil, userID); err != nil {
+		logger.From(ctx).Error("failed to delete user's scheduled reminder",
+			slog.Any("error", err), slog.String("user_id", userID))
 	}
-
-	_ = executeLocalActivity(ctx, writeJSONActivity, nil, remindersFile, m)
 }
 
-func ListReminders(ctx workflow.Context) (map[string]string, error) {
-	remindersMutex.RLock()
-	defer remindersMutex.RUnlock()
-
+func ListScheduledUserReminders(ctx workflow.Context) (map[string]string, error) {
 	if ctx == nil { // For unit testing.
-		return readJSONActivity(context.Background(), remindersFile)
+		return internal.ListReminders(context.Background())
 	}
 
-	file := map[string]string{}
-	if err := executeLocalActivity(ctx, readJSONActivity, &file, remindersFile); err != nil {
+	var reminders map[string]string
+	if err := executeLocalActivity(ctx, internal.ListReminders, &reminders); err != nil {
+		logger.From(ctx).Error("failed to list scheduled user reminders", slog.Any("error", err))
 		return nil, err
 	}
 
-	return file, nil
+	return reminders, nil
 }

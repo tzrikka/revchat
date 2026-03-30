@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -19,7 +20,7 @@ func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []st
 		return "", nil, data.User{}, err // The error may or may not be nil.
 	}
 
-	emails, err := data.GetCurrentTurns(ctx, url[0])
+	emails, err := data.LoadCurrentTurnEmails(ctx, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about the PR.")
 		return "", nil, data.User{}, err
@@ -50,19 +51,18 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 	msg := "Thanks for letting me know!\n\n"
 
-	ok, _, err := data.Nudge(ctx, url, user.Email)
+	ok, _, err := data.SetReviewerTurn(ctx, url, user.Email, true)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 	}
 	if !ok {
 		msg = ":thinking_face: I didn't think you're supposed to review this PR, thanks for letting me know!\n\n"
-
-		if err := data.AddReviewerToTurns(ctx, url, user.Email); err != nil {
+		if _, _, err := data.SetReviewerTurn(ctx, url, user.Email, false); err != nil {
 			PostEphemeralError(ctx, event, "failed to write internal data about this.")
 		}
 	}
 
-	emails, err = data.GetCurrentTurns(ctx, url)
+	emails, err = data.LoadCurrentTurnEmails(ctx, url)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
@@ -92,7 +92,7 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		return err
 	}
 
-	newTurn, err := data.GetCurrentTurns(ctx, url)
+	newTurn, err := data.LoadCurrentTurnEmails(ctx, url)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
@@ -115,13 +115,13 @@ func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 	}
 
 	// Also switch turns to the user who froze them (if possible), but ignore errors.
-	_, _, _ = data.Nudge(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID))
+	_, _, err = data.SetReviewerTurn(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID), true)
 
 	msg := ":snowflake: Turn switching is now frozen in this PR."
 	if !ok {
 		msg = ":snowflake: Turn switching is already frozen in this PR."
 	}
-	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
+	return errors.Join(err, activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg))
 }
 
 func UnfreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
@@ -154,7 +154,7 @@ func WhoseTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 	msg := whoseTurnText(ctx, emails, user, "")
 
-	if at, by := data.Frozen(ctx, url); !at.IsZero() {
+	if at, by := data.IsFrozen(ctx, url); !at.IsZero() {
 		id := fmt.Sprintf("<@%s>", users.EmailToSlackID(ctx, by))
 		if id == "<@>" {
 			id = by

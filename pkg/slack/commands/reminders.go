@@ -22,7 +22,7 @@ import (
 //	/revchat reminder[s] [at] <time in 12h or 24h format> [am|pm|a|p]
 var RemindersSyntax = regexp.MustCompile(`^reminders?(\s+at)?\s+([0-9:]+)\s*(am|pm|a|p)?`)
 
-func Reminders(ctx workflow.Context, event SlashCommandEvent) error {
+func Reminders(ctx workflow.Context, event SlashCommandEvent, alertsChannel string) error {
 	// Ensure that the calling user is opted-in, i.e. authorized us & allowed to join PR channels.
 	_, optedIn, err := UserDetails(ctx, event, event.UserID)
 	if err != nil {
@@ -59,10 +59,10 @@ func Reminders(ctx workflow.Context, event SlashCommandEvent) error {
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	return SetReminder(ctx, event, kitchenTime, false)
+	return SetReminder(ctx, event, kitchenTime, false, alertsChannel)
 }
 
-func SetReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet bool) error {
+func SetReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet bool, alertsChannel string) error {
 	user, err := tslack.UsersInfo(ctx, event.UserID)
 	if err != nil {
 		logger.From(ctx).Error("failed to retrieve Slack user info",
@@ -81,14 +81,14 @@ func SetReminder(ctx workflow.Context, event SlashCommandEvent, t string, quiet 
 		logger.From(ctx).Error("unrecognized user timezone", slog.Any("error", err),
 			slog.String("user_id", event.UserID), slog.String("tz", user.TZ))
 		PostEphemeralError(ctx, event, fmt.Sprintf("your Slack timezone is unrecognized: `%s`", user.TZ))
-		return err
+		return activities.AlertError(ctx, alertsChannel, "unrecognized user timezone",
+			err, "User", fmt.Sprintf("<@%s>", event.UserID), "Time", t, "TZ", user.TZ)
 	}
 
-	if err := data.SetReminder(ctx, event.UserID, t, user.TZ); err != nil {
-		logger.From(ctx).Error("failed to store user reminder time", slog.Any("error", err),
-			slog.String("user_id", event.UserID), slog.String("time", t), slog.String("zone", user.TZ))
+	if err := data.SetScheduledUserReminder(ctx, event.UserID, t, user.TZ); err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about you.")
-		return err
+		return activities.AlertError(ctx, alertsChannel, "failed to set user's scheduled reminder time",
+			err, "User", fmt.Sprintf("<@%s>", event.UserID), "Time", t, "TZ", user.TZ)
 	}
 
 	if !quiet {

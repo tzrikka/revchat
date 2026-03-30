@@ -2,98 +2,55 @@ package data
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
-	"os"
-	"slices"
 
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
-	"github.com/tzrikka/timpani-api/pkg/bitbucket"
+	"github.com/tzrikka/revchat/pkg/data/internal"
 )
 
 const (
-	diffstatFileSuffix = "_diffstat.json"
+	DiffstatFileSuffix = internal.DiffstatFileSuffix
 )
 
-var prDiffstatMutexes RWMutexMap
-
-func ReadBitbucketDiffstatPaths(url string) []string {
-	return diffstatPaths(readBitbucketDiffstat(url))
-}
-
-func UpdateBitbucketDiffstat(url string, ds []bitbucket.Diffstat) error {
-	mu := prDiffstatMutexes.Get(url)
-	mu.Lock()
-	defer mu.Unlock()
-
-	path, err := cachedDataPath(url + diffstatFileSuffix)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.OpenFile(path, fileFlags, filePerms) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	e := json.NewEncoder(f)
-	e.SetIndent("", "  ")
-	return e.Encode(ds)
-}
-
-func DeleteDiffstat(ctx workflow.Context, url string) {
-	mu := prDiffstatMutexes.Get(url)
-	mu.Lock()
-	defer mu.Unlock()
-
+func StoreDiffstat(ctx workflow.Context, prURL string, files any) {
 	if ctx == nil { // For unit testing.
-		_ = deletePRFileActivity(context.Background(), url+diffstatFileSuffix)
+		_ = internal.WriteDiffstat(context.Background(), prURL, files)
 		return
 	}
 
-	if err := executeLocalActivity(ctx, deletePRFileActivity, nil, url+diffstatFileSuffix); err != nil {
-		logger.From(ctx).Warn("failed to delete PR diffstat", slog.Any("error", err), slog.String("pr_url", url))
+	if err := executeLocalActivity(ctx, internal.WriteDiffstat, nil, prURL, files); err != nil {
+		logger.From(ctx).Error("failed to write PR diffstat", slog.Any("error", err), slog.String("pr_url", prURL))
 	}
 }
 
-func readBitbucketDiffstat(url string) []bitbucket.Diffstat {
-	mu := prDiffstatMutexes.Get(url)
-	mu.RLock()
-	defer mu.RUnlock()
+func LoadDiffstatPaths(ctx workflow.Context, prURL string) []string {
+	if ctx == nil { // For unit testing.
+		paths, err := internal.ReadDiffstatPaths(context.Background(), prURL)
+		if err != nil {
+			return nil
+		}
+		return paths
+	}
 
-	path, err := cachedDataPath(url + diffstatFileSuffix)
+	paths := []string{}
+	err := executeLocalActivity(ctx, internal.ReadDiffstatPaths, &paths, prURL)
 	if err != nil {
+		logger.From(ctx).Error("failed to read PR diffstat", slog.Any("error", err), slog.String("pr_url", prURL))
 		return nil
 	}
 
-	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-
-	ds := []bitbucket.Diffstat{}
-	if err := json.NewDecoder(f).Decode(&ds); err != nil {
-		return nil
-	}
-
-	return ds
+	return paths
 }
 
-func diffstatPaths(ds []bitbucket.Diffstat) []string {
-	var paths []string
-	for _, d := range ds {
-		if d.New != nil {
-			paths = append(paths, d.New.Path)
-		}
-		if d.Old != nil {
-			paths = append(paths, d.Old.Path)
-		}
+func DeleteDiffstat(ctx workflow.Context, prURL string) {
+	if ctx == nil { // For unit testing.
+		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.DiffstatFileSuffix)
+		return
 	}
 
-	slices.Sort(paths)
-	return slices.Compact(paths)
+	if err := executeLocalActivity(ctx, internal.DeleteGenericPRFile, nil, prURL+internal.DiffstatFileSuffix); err != nil {
+		logger.From(ctx).Warn("failed to delete PR diffstat", slog.Any("error", err), slog.String("pr_url", prURL))
+	}
 }

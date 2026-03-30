@@ -116,7 +116,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	commits := bitbucket.Commits(ctx, event)
 	pr.CommitCount = len(commits)
 
-	snapshot, err := bitbucket.SwitchSnapshot(ctx, prURL, pr)
+	snapshot, err := bitbucket.SwitchPRSnapshot(ctx, prURL, pr)
 	if err != nil {
 		// In Bitbucket's case, not having the previous PR snapshot for comparison with
 		// the current state prevents us from identifying the actual update(s) in this event.
@@ -141,11 +141,11 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	// Announce transitions between draft and ready-to-review modes.
 	if !snapshot.Draft && pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as a draft. :construction:")
-		_, _, _ = data.Nudge(ctx, prURL, users.BitbucketActorToEmail(ctx, event.PullRequest.Author))
+		_, _, err := data.SetReviewerTurn(ctx, prURL, users.BitbucketActorToEmail(ctx, event.PullRequest.Author), true)
+		errs = append(errs, err)
 	} else if snapshot.Draft && !pr.Draft {
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s marked this PR as ready for review. :eyes:")
-		_ = data.SwitchTurn(ctx, prURL, email, true)
-
+		errs = append(errs, data.SwitchTurn(ctx, prURL, email, true))
 		errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), nil))
 	}
 
@@ -153,9 +153,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 	if snapshot.Title != pr.Title {
 		msg := ":pencil2: %s edited the PR title: " + markdown.LinkifyTitle(ctx, c.LinkifyMap, prURL, pr.Title)
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
-
 		activities.SetChannelDescription(ctx, channelID, pr.Title, prURL, email)
-
 		err := slack.RenameChannel(ctx, pr.ID, pr.Title, prURL, channelID, c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix)
 		errs = append(errs, err)
 	}
@@ -193,12 +191,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 
 	// Commit(s) pushed to the PR branch.
 	if pr.CommitCount > 0 && snapshot.Source.Commit.Hash != pr.Source.Commit.Hash {
-		if err := data.UpdateBitbucketDiffstat(prURL, bitbucket.Diffstat(ctx, event)); err != nil {
-			logger.From(ctx).Error("failed to update Bitbucket PR diffstat",
-				slog.Any("error", err), slog.String("pr_url", prURL))
-			errs = append(errs, err)
-			// Don't abort - it's more important to announce this, even if our internal state is stale.
-		}
+		data.StoreDiffstat(ctx, prURL, bitbucket.Diffstat(ctx, event))
 
 		slices.Reverse(commits) // Switch from reverse order to chronological order.
 
@@ -294,7 +287,7 @@ func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucke
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "", err)
 	}
 
-	_, err2 := bitbucket.SwitchSnapshot(ctx, prURL, pr)
+	_, err2 := bitbucket.SwitchPRSnapshot(ctx, prURL, pr)
 	if strings.HasPrefix(event.Type, "changes_request") && err2 != nil {
 		_ = activities.AlertError(ctx, c.SlackAlertsChannel, "failed to update change-request count in PR snapshot",
 			err2, "PR URL", prURL, "New count", pr.ChangeRequestCount)

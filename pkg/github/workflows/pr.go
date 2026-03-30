@@ -153,8 +153,8 @@ func prConvertedToDraft(ctx workflow.Context, event github.PullRequestEvent) err
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as a draft. :construction:")
-	_, _, _ = data.Nudge(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.PullRequest.User.Login))
-	return nil
+	_, _, err := data.SetReviewerTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.PullRequest.User.Login), true)
+	return err
 }
 
 // prReadyForReview announces that a draft PR was marked as ready for review.
@@ -168,9 +168,9 @@ func prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as ready for review. :eyes:")
-	_ = data.SwitchTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
-
-	return activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest), nil)
+	err1 := data.SwitchTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
+	err2 := activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest), nil)
+	return errors.Join(err1, err2)
 }
 
 // lookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.

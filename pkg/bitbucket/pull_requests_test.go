@@ -86,30 +86,48 @@ func TestHTMLURL(t *testing.T) {
 	}
 }
 
-func TestSwitchSnapshot(t *testing.T) {
+func TestSwitchPRSnapshot(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", d)
 
 	// Initial state.
-	snapshot1 := PullRequest{ID: 1}
-	pr, err := SwitchSnapshot(nil, "url", snapshot1)
+	snapshot1 := PullRequest{ID: 1, CommitCount: 2, ChangeRequestCount: 3}
+	got, err := SwitchPRSnapshot(nil, "url", snapshot1)
 	if err != nil {
-		t.Fatalf("SwitchSnapshot() error = %v", err)
+		t.Fatalf("SwitchSnapshot(1) error = %v", err)
 	}
-	if pr != nil {
-		t.Fatalf("SwitchSnapshot() = %#v, want %#v", pr, nil)
+	if got != nil {
+		t.Fatalf("SwitchSnapshot(1) = %#v, want %v", got, nil)
 	}
 
-	// Replace initial snapshot.
-	snapshot2 := PullRequest{ID: 2}
-	pr, err = SwitchSnapshot(nil, "url", snapshot2)
+	// Update snapshot.
+	snapshot2 := PullRequest{ID: 2, CommitCount: 0, ChangeRequestCount: 0}
+	got, err = SwitchPRSnapshot(nil, "url", snapshot2)
 	if err != nil {
-		t.Fatalf("SwitchSnapshot() error = %v", err)
+		t.Fatalf("SwitchSnapshot(2) error = %v", err)
 	}
-	if pr == nil {
-		t.Fatalf("SwitchSnapshot() = %#v, want %#v", pr, snapshot2)
+	if !reflect.DeepEqual(got, &snapshot1) {
+		t.Fatalf("SwitchSnapshot(2) = %#v, want %#v", got, &snapshot1)
 	}
-	if pr.ID != snapshot1.ID {
-		t.Fatalf("SwitchSnapshot() = %#v, want %#v", pr.ID, snapshot1.ID)
+
+	// Update snapshot - test that the counters carry over.
+	snapshot3 := PullRequest{ID: 3, CommitCount: 5, ChangeRequestCount: 6}
+	got, err = SwitchPRSnapshot(nil, "url", snapshot3)
+	if err != nil {
+		t.Fatalf("SwitchSnapshot(3) error = %v", err)
+	}
+	snapshot2.CommitCount = snapshot1.CommitCount
+	snapshot2.ChangeRequestCount = snapshot1.ChangeRequestCount
+	if !reflect.DeepEqual(got, &snapshot2) {
+		t.Fatalf("SwitchSnapshot(3) = %#v, want %#v", got, &snapshot2)
+	}
+
+	// Update again - test that the counters can be updated.
+	got, err = SwitchPRSnapshot(nil, "url", snapshot3)
+	if err != nil {
+		t.Fatalf("SwitchSnapshot(4) error = %v", err)
+	}
+	if !reflect.DeepEqual(got, &snapshot3) {
+		t.Fatalf("SwitchSnapshot(4) = %#v, want %#v", got, &snapshot3)
 	}
 }

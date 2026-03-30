@@ -7,6 +7,9 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/tzrikka/revchat/pkg/config"
+	"github.com/tzrikka/xdg"
 )
 
 func TestPRIdentifiers(t *testing.T) {
@@ -464,8 +467,8 @@ func TestStates(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", d)
 
 	// Test data for Bitbucket happy path.
-	path := filepath.Join(d, "revchat", "bitbucket.org", "workspace", "repo", "pull-requests", "67890_builds.json")
-	err := os.MkdirAll(filepath.Dir(path), 0o700)
+	path := filepath.Join(d, config.DirName, "bitbucket.org", "workspace", "repo", "pull-requests", "67890_builds.json")
+	err := os.MkdirAll(filepath.Dir(path), xdg.NewDirectoryPermissions)
 	if err != nil {
 		t.Fatal(err)
 	}

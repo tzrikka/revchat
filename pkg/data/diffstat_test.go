@@ -1,65 +1,61 @@
-package data
+package data_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/tzrikka/timpani-api/pkg/bitbucket"
+	"github.com/tzrikka/revchat/pkg/data"
 )
 
-func TestDiffstatPaths(t *testing.T) {
+func TestDiffstat(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", d)
+
+	// Initial state.
+	got := data.LoadDiffstatPaths(nil, "url")
+	if got != nil {
+		t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, nil)
+	}
+
+	// New PR.
 	tests := []struct {
-		name string
-		ds   []bitbucket.Diffstat
-		want []string
+		name  string
+		files []map[string]any
+		want  []string
 	}{
 		{
-			name: "nil",
-		},
-		{
-			name: "empty",
-			ds:   []bitbucket.Diffstat{},
-		},
-		{
-			name: "single_new_path",
-			ds: []bitbucket.Diffstat{
-				{New: &bitbucket.CommitFile{Path: "path/new.txt"}},
+			name: "github_pr_created",
+			files: []map[string]any{
+				{"filename": "file1"},
+				{"filename": "file2"},
 			},
-			want: []string{"path/new.txt"},
+			want: []string{"file1", "file2"},
 		},
 		{
-			name: "single_old_path",
-			ds: []bitbucket.Diffstat{
-				{Old: &bitbucket.CommitFile{Path: "path/old.txt"}},
+			name: "github_pr_updated",
+			files: []map[string]any{
+				{"old": map[string]any{"path": "file4"}},
+				{"new": map[string]any{"path": "file3"}},
 			},
-			want: []string{"path/old.txt"},
-		},
-		{
-			name: "single_old_and_new_path",
-			ds: []bitbucket.Diffstat{
-				{New: &bitbucket.CommitFile{Path: "path/file"}},
-				{Old: &bitbucket.CommitFile{Path: "path/file"}},
-			},
-			want: []string{"path/file"},
-		},
-		{
-			name: "multiple_paths",
-			ds: []bitbucket.Diffstat{
-				{New: &bitbucket.CommitFile{Path: "1"}},
-				{Old: &bitbucket.CommitFile{Path: "1"}},
-				{New: &bitbucket.CommitFile{Path: "3"}},
-				{Old: &bitbucket.CommitFile{Path: "2"}},
-			},
-			want: []string{"1", "2", "3"},
+			want: []string{"file3", "file4"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := diffstatPaths(tt.ds)
+			data.StoreDiffstat(nil, "url", tt.files)
+			got := data.LoadDiffstatPaths(nil, "url")
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("diffstatPaths() = %q, want %q", got, tt.want)
+				t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, tt.want)
 			}
 		})
+	}
+
+	// PR closed.
+	data.DeleteDiffstat(nil, "url")
+
+	got = data.LoadDiffstatPaths(nil, "url")
+	if got != nil {
+		t.Fatalf("LoadDiffstatPaths() = %#v, want %v", got, nil)
 	}
 }

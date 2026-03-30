@@ -8,14 +8,31 @@ import (
 
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/tzrikka/revchat/pkg/data"
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 )
 
 // SelfStatus is similar to [StatusOfOthers] but lists all the PRs that require the calling user's attention,
 // i.e. PRs where it's their turn to review or respond. The user must be opted-in to use this command.
-func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool) error {
-	prs := slack.LoadPRTurns(ctx, true, true, true)[event.UserID]
+func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, alertsChannel string) error {
+	users := data.ListPRsPerSlackUser(ctx, true, true, true)
+	for user, prs := range users {
+		if strings.HasSuffix(user, data.SlackIDNotFound) {
+			details := make([]any, 0, 2*len(prs)+2)
+			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
+			for i, prURL := range prs {
+				details = append(details, fmt.Sprintf("PR URL %d", i+1), prURL)
+			}
+			activities.AlertWarn(ctx, alertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
+		}
+	}
+
+	if len(users) == 0 {
+		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
+			":joy: No PRs require your attention at this time!")
+	}
+	prs := users[event.UserID]
 	if len(prs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
@@ -47,12 +64,13 @@ func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool) 
 	if msg == header {
 		msg = "\n:joy: No PRs require your attention at this time!"
 	}
+
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
 // StatusOfOthers is similar to [SelfStatus] but lists all the PRs associated with the given users
 // and/or groups. This is the only command that doesn't require the calling user to be opted-in.
-func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, thrippyID string) error {
+func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, thrippyID, alertsChannel string) error {
 	showDrafts = showDraftsOption(showDrafts, event.Text)
 	showTasks := strings.Contains(event.Text, " tasks")
 
@@ -64,15 +82,26 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bo
 	}
 
 	authors, reviewers := statusMode(event.Text)
-	allPRs := slack.LoadPRTurns(ctx, false, authors, reviewers)
-	if len(allPRs) == 0 {
+	allUserPRs := data.ListPRsPerSlackUser(ctx, false, authors, reviewers)
+	for user, prs := range allUserPRs {
+		if strings.HasSuffix(user, data.SlackIDNotFound) {
+			details := make([]any, 0, 2*len(prs)+2)
+			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
+			for i, prURL := range prs {
+				details = append(details, fmt.Sprintf("PR URL %d", i+1), prURL)
+			}
+			activities.AlertWarn(ctx, alertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
+		}
+	}
+
+	if len(allUserPRs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
 	}
 
 	var filteredPRs []string
 	for _, userID := range users {
-		filteredPRs = append(filteredPRs, allPRs[userID]...)
+		filteredPRs = append(filteredPRs, allUserPRs[userID]...)
 	}
 	if len(filteredPRs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
@@ -113,6 +142,7 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bo
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
 	}
+
 	return activities.PostMessage(ctx, event.ChannelID, msg)
 }
 

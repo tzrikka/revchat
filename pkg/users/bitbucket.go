@@ -50,14 +50,39 @@ func BitbucketActorToEmail(ctx workflow.Context, actor bitbucket.User) string {
 	return BitbucketIDToEmail(ctx, actor.AccountID, actor.Type)
 }
 
-// BitbucketIDToEmail is a trivial wrapper around [data.BitbucketIDToEmail].
-// It exists only for architectural clarity (all "XxxToYyy" functions in this package).
-// However, outside the "data" package, we return "bot" instead of "" for non-user accounts.
+// BitbucketIDToEmail converts a Bitbucket account ID into an email address. This function returns an empty string if the
+// account ID is not found, and "bot" for non-user app accounts. It uses persistent data storage, or API calls as a fallback.
 func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) string {
-	email := data.BitbucketIDToEmail(ctx, accountID, accountType)
-	if email == "" && accountType == "app_user" {
-		return "bot"
+	if accountID == "" {
+		if accountType == "app_user" {
+			return "bot" // Not a real user, so no point to look-up in Jira.
+		}
+		return "" // Unknown user, so no point to look-up in Jira.
 	}
+
+	if user := data.SelectUserByBitbucketID(ctx, accountID); user.Email != "" {
+		return user.Email
+	}
+
+	if ctx == nil { // For unit testing.
+		if accountType == "app_user" {
+			return "bot" // Not a real user, so no point to look-up in Jira.
+		}
+		return "" // Unknown user, so no point to look-up in Jira.
+	}
+
+	// We use the Jira API as a fallback because the Bitbucket API doesn't expose email addresses.
+	jiraUser, err := jira.UsersGet(ctx, accountID)
+	if err != nil {
+		logger.From(ctx).Warn("failed to retrieve Jira user info",
+			slog.Any("error", err), slog.String("account_id", accountID))
+		return ""
+	}
+
+	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+	email := strings.ToLower(jiraUser.Email)
+	_ = data.UpsertUser(ctx, email, "", accountID, "", "", "")
+
 	return email
 }
 

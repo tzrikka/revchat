@@ -32,7 +32,7 @@ func newBookmarkTitles(pr PullRequest, files int) []string {
 }
 
 func SetChannelBookmarks(ctx workflow.Context, channelID, prURL string, pr PullRequest) {
-	titles := newBookmarkTitles(pr, len(data.ReadBitbucketDiffstatPaths(prURL)))
+	titles := newBookmarkTitles(pr, len(data.LoadDiffstatPaths(ctx, prURL)))
 	_ = slack.BookmarksAdd(ctx, channelID, titles[0], prURL+"/overview", ":eyes:")
 	_ = slack.BookmarksAdd(ctx, channelID, titles[1], prURL+"/overview", ":speech_balloon:")
 	_ = slack.BookmarksAdd(ctx, channelID, titles[2], prURL+"/overview", ":white_check_mark:")
@@ -51,7 +51,7 @@ func UpdateChannelBookmarks(ctx workflow.Context, pr PullRequest, prURL, channel
 		return
 	}
 
-	newTitles := newBookmarkTitles(pr, len(data.ReadBitbucketDiffstatPaths(prURL)))
+	newTitles := newBookmarkTitles(pr, len(data.LoadDiffstatPaths(ctx, prURL)))
 	for i, b := range bookmarks {
 		if i >= len(newTitles) {
 			break

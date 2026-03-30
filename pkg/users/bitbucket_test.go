@@ -24,7 +24,6 @@ func TestBitbucketActorToEmail(t *testing.T) {
 		{
 			name:  "empty_actor",
 			actor: bitbucket.User{},
-			want:  "",
 		},
 		{
 			name: "app_with_account_id",

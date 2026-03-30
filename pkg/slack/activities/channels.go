@@ -76,7 +76,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, partici
 			dontInvite = append(dontInvite, id)
 			continue
 		}
-		if err := data.AddReviewerToTurns(ctx, prURL, users.SlackIDToEmail(ctx, id)); err != nil {
+		if _, _, err := data.SetReviewerTurn(ctx, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
 			dontInvite = append(dontInvite, id)
 			errs = append(errs, err)
 		}

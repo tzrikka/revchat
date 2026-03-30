@@ -1,63 +1,39 @@
 package data
 
 import (
-	"sync"
+	"context"
+	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/tzrikka/revchat/internal/logger"
+	"github.com/tzrikka/revchat/pkg/data/internal"
 )
 
-const (
-	slackBotsFile = "slack_bots.json"
-)
-
-var slackBotsMutex sync.RWMutex
-
-func SetSlackBotUserID(ctx workflow.Context, botID, userID string) error {
-	m, err := readSlackBotsFile(ctx)
-	if err != nil {
-		return err
+func SetSlackBotUserID(ctx workflow.Context, botID, userID string) {
+	if ctx == nil { // For unit testing.
+		_ = internal.SetSlackBotUserID(context.Background(), botID, userID)
+		return
 	}
 
-	m[botID] = userID
-
-	slackBotsMutex.Lock()
-	defer slackBotsMutex.Unlock()
-
-	return executeLocalActivity(ctx, writeJSONActivity, nil, slackBotsFile, m)
+	if err := executeLocalActivity(ctx, internal.SetSlackBotUserID, nil, botID, userID); err != nil {
+		logger.From(ctx).Error("failed to store Slack bot's user ID", slog.Any("error", err),
+			slog.String("bot_id", botID), slog.String("user_id", userID))
+	}
 }
 
-func DeleteSlackBotIDs(ctx workflow.Context, botID string) error {
-	m, err := readSlackBotsFile(ctx)
-	if err != nil {
-		return err
+func GetSlackBotUserID(ctx workflow.Context, botID string) string {
+	if ctx == nil { // For unit testing.
+		userID, _ := internal.GetSlackBotUserID(context.Background(), botID)
+		return userID
 	}
 
-	delete(m, botID)
-
-	slackBotsMutex.Lock()
-	defer slackBotsMutex.Unlock()
-
-	return executeLocalActivity(ctx, writeJSONActivity, nil, slackBotsFile, m)
-}
-
-func GetSlackBotUserID(ctx workflow.Context, botID string) (string, error) {
-	m, err := readSlackBotsFile(ctx)
-	if err != nil {
-		return "", err
+	var userID string
+	if err := executeLocalActivity(ctx, internal.GetSlackBotUserID, &userID, botID); err != nil {
+		logger.From(ctx).Error("failed to retrieve Slack bot's user ID",
+			slog.Any("error", err), slog.String("bot_id", botID))
+		return ""
 	}
 
-	return m[botID], nil
-}
-
-// readSlackBotsFile is a thin wrapper over [readJSONActivity].
-func readSlackBotsFile(ctx workflow.Context) (map[string]string, error) {
-	slackBotsMutex.RLock()
-	defer slackBotsMutex.RUnlock()
-
-	file := map[string]string{}
-	if err := executeLocalActivity(ctx, readJSONActivity, &file, slackBotsFile); err != nil {
-		return nil, err
-	}
-
-	return file, nil
+	return userID
 }
