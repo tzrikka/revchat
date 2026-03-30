@@ -101,7 +101,7 @@ func GitHubToSlackEmoji(text string) string {
 	}
 
 	// Special cases related to ":ok_woman:": the order matters, so we can't
-	// rely on regular map iteration because it's non-deterministic by design.
+	// rely on regular map iteration because it's nondeterministic by design.
 	text = strings.ReplaceAll(text, ":ok_woman:", ":woman-gesturing-ok:")
 	text = strings.ReplaceAll(text, ":ok_person:", ":ok_woman:")
 
@@ -117,7 +117,7 @@ func SlackToGitHubEmoji(text string) string {
 	}
 
 	// Special cases related to ":ok_woman:": the order matters, so we can't
-	// rely on regular map iteration because it's non-deterministic by design.
+	// rely on regular map iteration because it's nondeterministic by design.
 	text = strings.ReplaceAll(text, ":ok_woman:", ":ok_person:")
 	text = strings.ReplaceAll(text, ":woman-gesturing-ok:", ":ok_woman:")
 

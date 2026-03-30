@@ -29,7 +29,7 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 			details := make([]any, 0, 2*len(prs)+2)
 			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
 			for i, prURL := range prs {
-				details = append(details, fmt.Sprintf("PR URL %d", i+1), prURL)
+				details = append(details, fmt.Sprintf("PR %d", i+1), prURL)
 			}
 			activities.AlertWarn(ctx, c.AlertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
 		}

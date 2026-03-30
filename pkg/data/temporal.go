@@ -20,8 +20,8 @@ var localActivityOpts = workflow.LocalActivityOptions{
 	},
 }
 
-// executeLocalActivity runs a Temporal local activity. Use it when you want to execute a
-// short-lived, non-deterministic, idempotent function without logging its input or output.
+// executeLocalActivity runs a Temporal local activity. Use it when you want to run
+// a short-lived, nondeterministic, idempotent function without logging its input.
 func executeLocalActivity(ctx workflow.Context, activity, result any, args ...any) error {
 	fn := runtime.FuncForPC(reflect.ValueOf(activity).Pointer()).Name()
 	ctx = workflow.WithLocalActivityOptions(ctx, localActivityOpts)

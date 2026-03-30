@@ -3,6 +3,7 @@ package bitbucket
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"slices"
 
@@ -21,7 +22,7 @@ func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slack
 	prURL := HTMLURL(event.PullRequest.Links)
 	if err := data.MapURLAndID(ctx, prURL, prChannelID); err != nil {
 		_ = activities.AlertError(ctx, slackAlertsChannel, "failed to set mapping between a PR and its Slack channel",
-			err, "PR URL", prURL, "Slack channel ID", prChannelID)
+			err, "PR", prURL, "Channel", fmt.Sprintf("`%s` (<#%s>)", prChannelID, prChannelID))
 	}
 
 	data.StorePRSnapshot(ctx, prURL, event.PullRequest)

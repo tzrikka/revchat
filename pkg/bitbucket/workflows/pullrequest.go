@@ -122,14 +122,14 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		// the current state prevents us from identifying the actual update(s) in this event.
 		logger.From(ctx).Error("can't handle PR update event without previous PR snapshot",
 			slog.Any("error", err), slog.String("pr_url", prURL))
-		return activities.AlertError(ctx, c.SlackAlertsChannel, "can't handle PR update event", err, "PR URL", prURL)
+		return activities.AlertError(ctx, c.SlackAlertsChannel, "can't handle PR update event", err, "PR", prURL)
 	}
 
 	// Support PR data recovery.
 	if snapshot == nil {
 		bitbucket.InitPRData(ctx, event, channelID, c.SlackAlertsChannel)
 		logger.From(ctx).Warn("reinitialized PR snapshot instead of handling update event: loaded but empty", slog.String("pr_url", prURL))
-		activities.AlertWarn(ctx, c.SlackAlertsChannel, "Reinitialized PR snapshot instead of handling update event", "PR URL", prURL)
+		activities.AlertWarn(ctx, c.SlackAlertsChannel, "Reinitialized PR snapshot instead of handling update event", "PR", prURL)
 		return nil
 	}
 
@@ -290,7 +290,7 @@ func (c Config) PullRequestReviewedWorkflow(ctx workflow.Context, event bitbucke
 	_, err2 := bitbucket.SwitchPRSnapshot(ctx, prURL, pr)
 	if strings.HasPrefix(event.Type, "changes_request") && err2 != nil {
 		_ = activities.AlertError(ctx, c.SlackAlertsChannel, "failed to update change-request count in PR snapshot",
-			err2, "PR URL", prURL, "New count", pr.ChangeRequestCount)
+			err2, "PR", prURL, "New count", pr.ChangeRequestCount)
 		err = errors.Join(err, err2)
 	}
 

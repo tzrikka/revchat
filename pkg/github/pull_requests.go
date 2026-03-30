@@ -1,6 +1,7 @@
 package github
 
 import (
+	"fmt"
 	"log/slog"
 	"slices"
 
@@ -18,7 +19,7 @@ import (
 func InitPRData(ctx workflow.Context, event PullRequestEvent, prChannelID, slackAlertsChannel string) {
 	if err := data.MapURLAndID(ctx, event.PullRequest.HTMLURL, prChannelID); err != nil {
 		_ = activities.AlertError(ctx, slackAlertsChannel, "failed to set mapping between a PR and its Slack channel",
-			err, "PR URL", event.PullRequest.HTMLURL, "Slack channel ID", prChannelID)
+			err, "PR", event.PullRequest.HTMLURL, "Channel", fmt.Sprintf("`%s` (<#%s>)", prChannelID, prChannelID))
 	}
 
 	data.StorePRSnapshot(ctx, event.PullRequest.HTMLURL, event.PullRequest)

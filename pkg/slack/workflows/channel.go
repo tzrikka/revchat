@@ -31,12 +31,12 @@ func (c *Config) ChannelArchivedWorkflow(ctx workflow.Context, event archiveEven
 	logger.From(ctx).Info("RevChat channel archived by someone else",
 		slog.String("channel_id", event.InnerEvent.Channel), slog.String("user", event.InnerEvent.User))
 
+	channel := fmt.Sprintf("`%s` (<#%s>)", event.InnerEvent.Channel, event.InnerEvent.Channel)
 	mention := event.InnerEvent.User
 	if mention != "USLACKBOT" {
 		mention = fmt.Sprintf("<@%s>", mention)
 	}
-	activities.AlertWarn(ctx, c.AlertsChannel, "RevChat channel archived by someone else",
-		"Channel ID", event.InnerEvent.Channel, "User", mention)
+	activities.AlertWarn(ctx, c.AlertsChannel, "RevChat channel archived by someone else", "Channel", channel, "User", mention)
 
 	data.CleanupPRData(ctx, event.InnerEvent.Channel, prURL)
 	return nil
