@@ -12,11 +12,11 @@ import (
 )
 
 func LogSlackChannelArchived(ctx workflow.Context, channelID, prURL string) {
-	appendToCSVFile(ctx, []string{workflow.Now(ctx).UTC().Format(time.RFC3339), "archived", channelID, prURL})
+	appendToCSVFile(ctx, []string{now(ctx), "archived", channelID, prURL})
 }
 
 func LogSlackChannelCreated(ctx workflow.Context, channelID, prURL, name string) {
-	appendToCSVFile(ctx, []string{workflow.Now(ctx).UTC().Format(time.RFC3339), "created", channelID, prURL, name})
+	appendToCSVFile(ctx, []string{now(ctx), "created", channelID, prURL, name})
 }
 
 func appendToCSVFile(ctx workflow.Context, record []string) {
@@ -29,4 +29,11 @@ func appendToCSVFile(ctx workflow.Context, record []string) {
 		logger.From(ctx).Error("failed to append record to Slack channels log", slog.Any("error", err),
 			slog.String("event", record[1]), slog.String("channel_id", record[2]), slog.String("pr_url", record[3]))
 	}
+}
+
+func now(ctx workflow.Context) string {
+	if ctx == nil { // For unit testing.
+		return time.Now().UTC().Format(time.RFC3339)
+	}
+	return workflow.Now(ctx).UTC().Format(time.RFC3339)
 }
