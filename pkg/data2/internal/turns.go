@@ -565,13 +565,21 @@ func userEmailAndType(ctx context.Context, detailsMap any) (email, accountType s
 	return bitbucketIDToEmail(ctx, accountID, accountType), accountType
 }
 
-// bitbucketIDToEmail converts a Bitbucket account ID into an email address. This function returns an empty string if
-// the account ID is not found. It uses persistent data storage, or API calls as a fallback. Compare this function with
-// [users.BitbucketIDToEmail], which is the same but receives a [workflow.Context] instead of a [context.Context].
-func bitbucketIDToEmail(_ context.Context, accountID, _ string) string {
+// bitbucketIDToEmail converts a Bitbucket account ID into an email address. This function returns an empty string if the account ID
+// is not found. It uses persistent data storage, or API calls as a fallback. Compare this function with [users.BitbucketIDToEmail],
+// which receives a [workflow.Context] instead of a [context.Context], and returns "bot" instead of "" for non-user app accounts.
+func bitbucketIDToEmail(ctx context.Context, accountID, accountType string) string {
 	if accountID == "" {
 		return ""
 	}
 
-	return "" // TODO: email.
+	if user, _ := SelectUser(ctx, IndexByBitbucketID, accountID); user.Email != "" {
+		return user.Email // No need to check for errors here, it's a prerequisite for the email to be non-empty.
+	}
+
+	if accountType == "app_user" {
+		return "" // Not a real user, so no point to check in Jira.
+	}
+
+	return ""
 }
