@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	// SlackIDNotFound is a key prefix used in [ListPRsPerSlackUser] and by its callers.
+	// SlackIDNotFound is a key suffix used in [ListPRsPerSlackUser] and by its callers.
 	// It indicates that the key suffix (email address) couldn't be matched to a Slack user ID.
 	SlackIDNotFound = internal.SlackIDNotFound
 )
