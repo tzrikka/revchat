@@ -22,7 +22,7 @@ func AppendToCSVFile(_ context.Context, record []string) error {
 	}
 
 	appendFlags := os.O_APPEND | os.O_CREATE | os.O_WRONLY // != [fileFlags] to avoid truncation.
-	f, err := os.OpenFile(path, appendFlags, filePerms)
+	f, err := os.OpenFile(path, appendFlags, filePerms)    //gosec:disable G304 // Specified by admin by design.
 	if err != nil {
 		return fmt.Errorf("failed to open CSV file: %w", err)
 	}
