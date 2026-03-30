@@ -9,13 +9,13 @@ require (
 	github.com/tzrikka/timpani-api v1.13.1
 	github.com/tzrikka/xdg v1.4.1
 	github.com/urfave/cli-altsrc/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.7.0
+	github.com/urfave/cli/v3 v3.8.0
 	go.opentelemetry.io/otel v1.42.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.42.0
 	go.opentelemetry.io/otel/metric v1.42.0
 	go.opentelemetry.io/otel/sdk v1.42.0
 	go.opentelemetry.io/otel/sdk/metric v1.42.0
-	go.temporal.io/api v1.62.5
+	go.temporal.io/api v1.62.6
 	go.temporal.io/sdk v1.41.1
 	google.golang.org/grpc v1.79.3
 )
