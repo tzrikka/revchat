@@ -160,11 +160,16 @@ func UnfollowUser(_ context.Context, followerSlackID, followedSlackID string) (U
 		return User{}, err
 	}
 
-	return unfollowUserWithoutLock(followerSlackID, followedSlackID)
+	user, err := unfollowUserWithoutLock(followerSlackID, followedSlackID)
+	if err != nil {
+		return User{}, err
+	}
+
+	return user, usersDB.writeUsersFile()
 }
 
-// unfollowUserWithoutLock is the core logic of [UnfollowUser], extracted into a separate function to
-// avoid deadlocks when called by [RemoveFollower]. It expects the caller to hold the appropriate mutex.
+// unfollowUserWithoutLock is the core logic of [UnfollowUser], extracted into a
+// separate function to avoid deadlocks and extra writing when called by [RemoveFollower].
 func unfollowUserWithoutLock(followerSlackID, followedSlackID string) (User, error) {
 	i, err := usersDB.findUserIndex("", "", "", "", followedSlackID)
 	if err != nil || i < 0 {
@@ -180,7 +185,7 @@ func unfollowUserWithoutLock(followerSlackID, followedSlackID string) (User, err
 	usersDB.entries[i].Updated = time.Now().UTC()
 
 	user := usersDB.entries[i]
-	return user, usersDB.writeUsersFile()
+	return user, nil
 }
 
 func RemoveFollower(_ context.Context, followerSlackID string) error {
@@ -200,7 +205,7 @@ func RemoveFollower(_ context.Context, followerSlackID string) error {
 		}
 	}
 
-	return nil
+	return usersDB.writeUsersFile()
 }
 
 func (u *Users) findUserIndex(email, realName, bitbucketID, githubID, slackID string) (int, error) {
