@@ -27,7 +27,7 @@ type PRStatus struct {
 }
 
 func ReadBitbucketBuilds(_ context.Context, prURL string) (*PRStatus, error) {
-	mu := dataFileMutexes.Get(prURL + BuildsFileSuffix)
+	mu := getDataFileMutex(prURL + BuildsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -35,7 +35,7 @@ func ReadBitbucketBuilds(_ context.Context, prURL string) (*PRStatus, error) {
 }
 
 func UpdateBitbucketBuilds(_ context.Context, prURL, commitHash, key string, cs CommitStatus) error {
-	mu := dataFileMutexes.Get(prURL + BuildsFileSuffix)
+	mu := getDataFileMutex(prURL + BuildsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 

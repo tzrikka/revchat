@@ -8,7 +8,9 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/tzrikka/revchat/internal/cache"
 	"github.com/tzrikka/revchat/pkg/config"
 	"github.com/tzrikka/xdg"
 )
@@ -18,19 +20,23 @@ const (
 	filePerms = xdg.NewFilePermissions
 )
 
-// mutexMap is a concurrency-safe map of string keys to *sync.Mutex values. The zero value is ready to use.
-// This is useful for managing concurrent access to multiple files, where each file is identified by a string key.
-// We don't use [sync.RWMutex] because even "read" operations may call [fixEmptyJSONFile], which modifies the file.
-type mutexMap struct {
-	sm sync.Map
-}
+// dataFileMutexMap is a package-level, concurrency-safe cache that maps string keys to [sync.Mutex] pointers,
+// but with time-based expiration and garbage collection, unlike [sync.Map]. This is useful for managing
+// concurrent access to multiple files, where each file is identified by a string key. We don't use
+// [sync.RWMutex] because even "read" operations may call [fixEmptyJSONFile], which modifies the file.
+var dataFileMutexMap = cache.New[*sync.Mutex](24*time.Hour, cache.DefaultCleanupInterval)
 
-func (m *mutexMap) Get(key string) *sync.Mutex {
-	actual, _ := m.sm.LoadOrStore(key, &sync.Mutex{})
-	return actual.(*sync.Mutex) //nolint:errcheck // Safe type assertion, always succeeds by definition.
+// getDataFileMutex returns a mutex for the given key, creating it if it doesn't exist. The mutex is cached with an expiration time
+// to prevent unbounded growth of the map, which is refreshed on each call to ensure that active keys remain in the map.
+// The caller should hold the returned mutex while accessing the file associated with the key.
+func getDataFileMutex(key string) *sync.Mutex {
+	mu := &sync.Mutex{}
+	if !dataFileMutexMap.Add(key, mu, cache.DefaultExpiration) {
+		mu, _ = dataFileMutexMap.Get(key)
+		dataFileMutexMap.Set(key, mu, cache.DefaultExpiration) // Refresh expiration time on access.
+	}
+	return mu
 }
-
-var dataFileMutexes mutexMap
 
 // dataPath returns the absolute path to a data file with the given relative path.
 // The relative path can be a filename, or a PR's URL with a file-content-type suffix.
@@ -111,7 +117,7 @@ func writeGenericJSONFile(filename string, data any) error {
 // DeleteGenericPRFile deletes a file related to a specific PR. Unlike [os.Remove],
 // this is idempotent: it does not return an error if the file does not exist.
 func DeleteGenericPRFile(_ context.Context, prURLWithSuffix string) error {
-	mu := dataFileMutexes.Get(prURLWithSuffix)
+	mu := getDataFileMutex(prURLWithSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 

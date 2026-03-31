@@ -10,7 +10,7 @@ const (
 )
 
 func SetReminder(_ context.Context, userID, kitchenTime, tz string) error {
-	mu := dataFileMutexes.Get(remindersFile)
+	mu := getDataFileMutex(remindersFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -24,7 +24,7 @@ func SetReminder(_ context.Context, userID, kitchenTime, tz string) error {
 }
 
 func DeleteReminder(_ context.Context, userID string) error {
-	mu := dataFileMutexes.Get(remindersFile)
+	mu := getDataFileMutex(remindersFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -38,7 +38,7 @@ func DeleteReminder(_ context.Context, userID string) error {
 }
 
 func ListReminders(_ context.Context) (map[string]string, error) {
-	mu := dataFileMutexes.Get(remindersFile)
+	mu := getDataFileMutex(remindersFile)
 	mu.Lock()
 	defer mu.Unlock()
 

@@ -9,7 +9,7 @@ const (
 )
 
 func SetSlackBotUserID(_ context.Context, botID, userID string) error {
-	mu := dataFileMutexes.Get(slackBotsFile)
+	mu := getDataFileMutex(slackBotsFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -23,7 +23,7 @@ func SetSlackBotUserID(_ context.Context, botID, userID string) error {
 }
 
 func GetSlackBotUserID(_ context.Context, botID string) (string, error) {
-	mu := dataFileMutexes.Get(slackBotsFile)
+	mu := getDataFileMutex(slackBotsFile)
 	mu.Lock()
 	defer mu.Unlock()
 
