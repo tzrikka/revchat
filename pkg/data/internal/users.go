@@ -141,13 +141,18 @@ func FollowUser(_ context.Context, followerSlackID, followedSlackID string) (Use
 		return User{}, err
 	}
 
+	done := false
 	if !slices.Contains(usersDB.entries[i].Followers, followerSlackID) {
 		usersDB.entries[i].Updated = time.Now().UTC()
 		usersDB.entries[i].Followers = append(usersDB.entries[i].Followers, followerSlackID)
 		slices.Sort(usersDB.entries[i].Followers)
+		done = true
 	}
 
 	user := usersDB.entries[i]
+	if !done {
+		return user, nil
+	}
 	return user, usersDB.writeUsersFile()
 }
 
@@ -160,11 +165,20 @@ func UnfollowUser(_ context.Context, followerSlackID, followedSlackID string) (U
 		return User{}, err
 	}
 
-	return unfollowUserWithoutLock(followerSlackID, followedSlackID)
+	user, err := unfollowUserWithoutLock(followerSlackID, followedSlackID)
+	if err != nil {
+		return User{}, err
+	}
+
+	if user.Updated.IsZero() {
+		return user, nil
+	}
+	return user, usersDB.writeUsersFile()
 }
 
-// unfollowUserWithoutLock is the core logic of [UnfollowUser], extracted into a separate function to
-// avoid deadlocks when called by [RemoveFollower]. It expects the caller to hold the appropriate mutex.
+// unfollowUserWithoutLock is the core logic of [UnfollowUser], extracted
+// into a separate function to avoid deadlocks and extra writing when called by
+// [RemoveFollower]. This function expects the caller to hold the appropriate mutex.
 func unfollowUserWithoutLock(followerSlackID, followedSlackID string) (User, error) {
 	i, err := usersDB.findUserIndex("", "", "", "", followedSlackID)
 	if err != nil || i < 0 {
@@ -180,7 +194,7 @@ func unfollowUserWithoutLock(followerSlackID, followedSlackID string) (User, err
 	usersDB.entries[i].Updated = time.Now().UTC()
 
 	user := usersDB.entries[i]
-	return user, usersDB.writeUsersFile()
+	return user, nil
 }
 
 func RemoveFollower(_ context.Context, followerSlackID string) error {
@@ -192,15 +206,20 @@ func RemoveFollower(_ context.Context, followerSlackID string) error {
 		return err
 	}
 
+	done := false
 	for _, user := range usersDB.entries {
 		if slices.Contains(user.Followers, followerSlackID) {
 			if _, err := unfollowUserWithoutLock(followerSlackID, user.SlackID); err != nil {
 				return err
 			}
+			done = true
 		}
 	}
 
-	return nil
+	if !done {
+		return nil
+	}
+	return usersDB.writeUsersFile()
 }
 
 func (u *Users) findUserIndex(email, realName, bitbucketID, githubID, slackID string) (int, error) {
