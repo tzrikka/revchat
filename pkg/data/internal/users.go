@@ -141,13 +141,18 @@ func FollowUser(_ context.Context, followerSlackID, followedSlackID string) (Use
 		return User{}, err
 	}
 
+	done := false
 	if !slices.Contains(usersDB.entries[i].Followers, followerSlackID) {
 		usersDB.entries[i].Updated = time.Now().UTC()
 		usersDB.entries[i].Followers = append(usersDB.entries[i].Followers, followerSlackID)
 		slices.Sort(usersDB.entries[i].Followers)
+		done = true
 	}
 
 	user := usersDB.entries[i]
+	if !done {
+		return user, nil
+	}
 	return user, usersDB.writeUsersFile()
 }
 
@@ -165,11 +170,15 @@ func UnfollowUser(_ context.Context, followerSlackID, followedSlackID string) (U
 		return User{}, err
 	}
 
+	if user.Updated.IsZero() {
+		return user, nil
+	}
 	return user, usersDB.writeUsersFile()
 }
 
-// unfollowUserWithoutLock is the core logic of [UnfollowUser], extracted into a
-// separate function to avoid deadlocks and extra writing when called by [RemoveFollower].
+// unfollowUserWithoutLock is the core logic of [UnfollowUser], extracted
+// into a separate function to avoid deadlocks and extra writing when called by
+// [RemoveFollower]. This function expects the caller to hold the appropriate mutex.
 func unfollowUserWithoutLock(followerSlackID, followedSlackID string) (User, error) {
 	i, err := usersDB.findUserIndex("", "", "", "", followedSlackID)
 	if err != nil || i < 0 {
@@ -197,14 +206,19 @@ func RemoveFollower(_ context.Context, followerSlackID string) error {
 		return err
 	}
 
+	done := false
 	for _, user := range usersDB.entries {
 		if slices.Contains(user.Followers, followerSlackID) {
 			if _, err := unfollowUserWithoutLock(followerSlackID, user.SlackID); err != nil {
 				return err
 			}
+			done = true
 		}
 	}
 
+	if !done {
+		return nil
+	}
 	return usersDB.writeUsersFile()
 }
 
