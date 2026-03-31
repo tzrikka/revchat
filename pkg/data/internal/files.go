@@ -20,9 +20,10 @@ const (
 	filePerms = xdg.NewFilePermissions
 )
 
-// dataFileMutexMap is a concurrency-safe map of string keys to [sync.Mutex] pointers, but with garbage collection, unlike [sync.Map].
-// The zero value is ready to use. This is useful for managing concurrent access to multiple files, where each file is identified by
-// a string key. We don't use [sync.RWMutex] because even "read" operations may call [fixEmptyJSONFile], which modifies the file.
+// dataFileMutexMap is a package-level, concurrency-safe cache that maps string keys to [sync.Mutex] pointers,
+// but with time-based expiration and garbage collection, unlike [sync.Map]. This is useful for managing
+// concurrent access to multiple files, where each file is identified by a string key. We don't use
+// [sync.RWMutex] because even "read" operations may call [fixEmptyJSONFile], which modifies the file.
 var dataFileMutexMap = cache.New[*sync.Mutex](24*time.Hour, cache.DefaultCleanupInterval)
 
 // getDataFileMutex returns a mutex for the given key, creating it if it doesn't exist. The mutex is cached with an expiration time

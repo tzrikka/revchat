@@ -9,7 +9,6 @@ const (
 	urlsIDsFile = "urls_ids.json"
 )
 
-// GetURLAndIDMapping expects the caller to hold the appropriate mutex.
 func GetURLAndIDMapping(_ context.Context, key string) (string, error) {
 	mu := getDataFileMutex(urlsIDsFile)
 	mu.Lock()
@@ -23,7 +22,6 @@ func GetURLAndIDMapping(_ context.Context, key string) (string, error) {
 	return m[key], nil
 }
 
-// SetURLAndIDMapping expects the caller to hold the appropriate mutex.
 func SetURLAndIDMapping(_ context.Context, url, ids string) error {
 	mu := getDataFileMutex(urlsIDsFile)
 	mu.Lock()
@@ -40,7 +38,6 @@ func SetURLAndIDMapping(_ context.Context, url, ids string) error {
 	return writeGenericJSONFile(urlsIDsFile, m)
 }
 
-// DelURLAndIDMapping expects the caller to hold the appropriate mutex.
 func DelURLAndIDMapping(_ context.Context, key string) error {
 	mu := getDataFileMutex(urlsIDsFile)
 	mu.Lock()
