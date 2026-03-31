@@ -26,10 +26,14 @@ func (c *Config) MemberJoinedWorkflow(ctx workflow.Context, event memberEventWra
 
 	// If the user isn't opted-in, send them a DM explaining how to opt-in.
 	mention := fmt.Sprintf("<@%s>", e.User)
+	prURL, err := data.SwitchURLAndID(ctx, e.Channel)
+	if err != nil {
+		prURL = fmt.Sprintf("`%v`", err)
+	}
 	logger.From(ctx).Warn("user joined Slack channel but is not opted-in",
 		slog.String("user_id", e.User), slog.String("channel_id", e.Channel))
 	activities.AlertWarn(ctx, c.AlertsChannel, "User joined Slack channel but is not opted-in",
-		"User", mention, "Channel", fmt.Sprintf("`%s` (<#%s>)", e.Channel, e.Channel))
+		"User", mention, "Channel", fmt.Sprintf("`%s` (<#%s>)", e.Channel, e.Channel), "PR", prURL)
 
 	msg := ":wave: Hi %s! You joined a RevChat channel, but you have to opt-in for this to work! Please run "
 	return activities.PostMessage(ctx, e.User, fmt.Sprintf(msg, mention)+"this Slack command:\n\n```/revchat opt-in```")
