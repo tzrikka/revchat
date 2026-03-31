@@ -19,7 +19,7 @@ const (
 
 // WritePRSnapshot writes a snapshot of a PR, which is used to detect and analyze metadata changes.
 func WritePRSnapshot(_ context.Context, prURL string, pr any) error {
-	mu := dataFileMutexes.Get(prURL + PRSnapshotFileSuffix)
+	mu := getDataFileMutex(prURL + PRSnapshotFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -47,7 +47,7 @@ func WritePRSnapshot(_ context.Context, prURL string, pr any) error {
 // ReadPRSnapshot reads a snapshot of a PR, which is used to detect and analyze metadata
 // changes. If a snapshot doesn't exist, this function returns a nil map and no error.
 func ReadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
-	mu := dataFileMutexes.Get(prURL + PRSnapshotFileSuffix)
+	mu := getDataFileMutex(prURL + PRSnapshotFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 

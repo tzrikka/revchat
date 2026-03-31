@@ -12,7 +12,7 @@ const (
 )
 
 func AppendToCSVFile(_ context.Context, record []string) error {
-	mu := dataFileMutexes.Get(slackChannelsFile)
+	mu := getDataFileMutex(slackChannelsFile)
 	mu.Lock()
 	defer mu.Unlock()
 

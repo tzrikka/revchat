@@ -172,7 +172,7 @@ func selectUser(ctx workflow.Context, indexType int, id string, useCache bool) (
 		return internal.SelectUser(context.Background(), indexType, id)
 	}
 
-	if useCache { // Minimize Temporal history without risking staleness or non-determinism.
+	if useCache { // Minimize Temporal history without risking staleness or nondeterminism.
 		if user, found := usersCache.Get(id); found {
 			return user, nil
 		}

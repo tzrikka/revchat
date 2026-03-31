@@ -11,7 +11,7 @@ const (
 
 // GetURLAndIDMapping expects the caller to hold the appropriate mutex.
 func GetURLAndIDMapping(_ context.Context, key string) (string, error) {
-	mu := dataFileMutexes.Get(urlsIDsFile)
+	mu := getDataFileMutex(urlsIDsFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -25,7 +25,7 @@ func GetURLAndIDMapping(_ context.Context, key string) (string, error) {
 
 // SetURLAndIDMapping expects the caller to hold the appropriate mutex.
 func SetURLAndIDMapping(_ context.Context, url, ids string) error {
-	mu := dataFileMutexes.Get(urlsIDsFile)
+	mu := getDataFileMutex(urlsIDsFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -42,7 +42,7 @@ func SetURLAndIDMapping(_ context.Context, url, ids string) error {
 
 // DelURLAndIDMapping expects the caller to hold the appropriate mutex.
 func DelURLAndIDMapping(_ context.Context, key string) error {
-	mu := dataFileMutexes.Get(urlsIDsFile)
+	mu := getDataFileMutex(urlsIDsFile)
 	mu.Lock()
 	defer mu.Unlock()
 

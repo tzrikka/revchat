@@ -72,7 +72,7 @@ func initUsersDBIfNeeded() error {
 }
 
 func UpsertUser(_ context.Context, email, realName, bitbucketID, githubID, slackID, thrippyLink string) (User, error) {
-	mu := dataFileMutexes.Get(usersFile)
+	mu := getDataFileMutex(usersFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -128,7 +128,7 @@ func UpsertUser(_ context.Context, email, realName, bitbucketID, githubID, slack
 }
 
 func FollowUser(_ context.Context, followerSlackID, followedSlackID string) (User, error) {
-	mu := dataFileMutexes.Get(usersFile)
+	mu := getDataFileMutex(usersFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -152,7 +152,7 @@ func FollowUser(_ context.Context, followerSlackID, followedSlackID string) (Use
 }
 
 func UnfollowUser(_ context.Context, followerSlackID, followedSlackID string) (User, error) {
-	mu := dataFileMutexes.Get(usersFile)
+	mu := getDataFileMutex(usersFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -184,7 +184,7 @@ func unfollowUserWithoutLock(followerSlackID, followedSlackID string) (User, err
 }
 
 func RemoveFollower(_ context.Context, followerSlackID string) error {
-	mu := dataFileMutexes.Get(usersFile)
+	mu := getDataFileMutex(usersFile)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -243,7 +243,7 @@ func (u *Users) findUserIndex(email, realName, bitbucketID, githubID, slackID st
 }
 
 func SelectUser(_ context.Context, indexType int, id string) (User, error) {
-	mu := dataFileMutexes.Get(usersFile)
+	mu := getDataFileMutex(usersFile)
 	mu.Lock()
 	defer mu.Unlock()
 

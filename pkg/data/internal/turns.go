@@ -53,7 +53,7 @@ func InitTurns(prURL, authorEmail string) error {
 // The first boolean indicates whether the requested nudge is allowed (the user is tracked as a reviewer),
 // and the second one indicates whether the user already approved the PR (in case the first value is false).
 func SetReviewerTurn(ctx context.Context, prURL, email string, nudge bool) ([2]bool, error) {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -104,7 +104,7 @@ func SetReviewerTurn(ctx context.Context, prURL, email string, nudge bool) ([2]b
 // If the user is the PR author, it adds all reviewers to the attention state.
 // If the user is a reviewer, it adds the author to the attention state.
 func SwitchTurn(ctx context.Context, prURL, email string, force bool) error {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -138,7 +138,7 @@ func SwitchTurn(ctx context.Context, prURL, email string, force bool) error {
 // RemoveReviewerFromTurns completely removes a reviewer from the attention state of a specific PR. This is called when that
 // reviewer approves the PR, or is unassigned from it. This function is idempotent: if the reviewer does not exist, it does nothing.
 func RemoveReviewerFromTurns(ctx context.Context, prURL, email string, approved bool) error {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -170,7 +170,7 @@ func RemoveReviewerFromTurns(ctx context.Context, prURL, email string, approved 
 // returns the PR author (as a reminder for them to assign reviewers). If any assigned
 // reviewer has their turn flag set to false, we add the author to the list as well.
 func ReadCurrentTurnEmails(ctx context.Context, prURL string) ([]string, error) {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -204,7 +204,7 @@ func ReadCurrentTurnEmails(ctx context.Context, prURL string) ([]string, error) 
 // users that are currently tracked in the attention state of a specific PR, regardless of whether it's their
 // turn or not. This includes the author and all the reviewers, including those who already approved the PR.
 func readAllParticipantEmails(ctx context.Context, prURL string, authors, reviewers bool) ([]string, error) {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -284,7 +284,7 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 // GetActivityTime returns the last activity timestamp of a specific user in a specific PR.
 // If the user is not found or is a bot, this function returns a zero timestamp.
 func GetActivityTime(ctx context.Context, prURL, email string) (time.Time, error) {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -301,7 +301,7 @@ func GetActivityTime(ctx context.Context, prURL, email string) (time.Time, error
 // This is called when the user interacts with the PR in any way that doesn't
 // change their turn (such as PR edits, commit pushes, and review actions).
 func UpdateActivityTime(ctx context.Context, prURL, email string) error {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -323,7 +323,7 @@ func UpdateActivityTime(ctx context.Context, prURL, email string) error {
 // This prevents most changes by [SwitchTurn], and only by it, until it is unfrozen.
 // If the turn is already frozen, this function returns false and does nothing.
 func FreezeTurns(ctx context.Context, prURL, email string) (bool, error) {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -349,7 +349,7 @@ func FreezeTurns(ctx context.Context, prURL, email string) (bool, error) {
 // UnfreezeTurns is the inverse of [FreezeTurns].
 // If the turn is not frozen, this function returns false and does nothing.
 func UnfreezeTurns(ctx context.Context, prURL string) (bool, error) {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -375,7 +375,7 @@ func UnfreezeTurns(ctx context.Context, prURL string) (bool, error) {
 // IsFrozen returns the timestamp and user email of when and who froze the attention state of
 // a specific PR. If the turn is not frozen, it returns a zero timestamp and an empty string.
 func IsFrozen(ctx context.Context, prURL string) (Frozen, error) {
-	mu := dataFileMutexes.Get(prURL + TurnsFileSuffix)
+	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 

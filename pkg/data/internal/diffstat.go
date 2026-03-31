@@ -13,7 +13,7 @@ const (
 )
 
 func WriteDiffstat(_ context.Context, prURL string, files any) error {
-	mu := dataFileMutexes.Get(prURL + DiffstatFileSuffix)
+	mu := getDataFileMutex(prURL + DiffstatFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -21,7 +21,7 @@ func WriteDiffstat(_ context.Context, prURL string, files any) error {
 }
 
 func ReadDiffstatPaths(_ context.Context, prURL string) ([]string, error) {
-	mu := dataFileMutexes.Get(prURL + DiffstatFileSuffix)
+	mu := getDataFileMutex(prURL + DiffstatFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
