@@ -182,9 +182,12 @@ func selectUser(ctx workflow.Context, indexType int, id string, useCache bool) (
 	if err := executeLocalActivity(ctx, internal.SelectUser, &user, indexType, id); err != nil {
 		return User{}, err
 	}
-	if useCache {
+
+	if !user.Created.IsZero() && useCache {
 		usersCache.Set(id, user, cache.DefaultExpiration)
 	}
-
+	if user.Created.IsZero() {
+		workflow.SideEffect(ctx, func(_ workflow.Context) any { return fmt.Sprintf("User not found: %q", id) })
+	}
 	return user, nil
 }
