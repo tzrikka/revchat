@@ -78,8 +78,8 @@ func updateCommitStatus(ctx workflow.Context, cs *bitbucket.CommitStatus, pr *bi
 	}
 
 	// Other than announcing this specific event, also announce if the PR is ready to be merged
-	// (all builds are successful, the PR has at least 2 approvals, and no pending action items).
-	if cs.State != "SUCCESSFUL" || !allBuildsSuccessful(ctx, prURL) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
+	// (not a draft, all builds are successful, the PR has at least 2 approvals, and no pending action items).
+	if pr.Draft || cs.State != "SUCCESSFUL" || !allBuildsSuccessful(ctx, prURL) || pr.ChangeRequestCount > 0 || pr.TaskCount > 0 {
 		return err
 	}
 
