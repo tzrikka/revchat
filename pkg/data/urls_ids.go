@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"go.temporal.io/sdk/workflow"
@@ -41,7 +40,7 @@ func SwitchURLAndID(ctx workflow.Context, key string) (string, error) {
 	}
 
 	if val == "" {
-		workflow.SideEffect(ctx, func(_ workflow.Context) any { return fmt.Sprintf("URL/ID not found: %q", key) })
+		workflow.SideEffect(ctx, func(_ workflow.Context) any { return []string{"URL/ID not found", key} })
 	}
 	return val, nil
 }
