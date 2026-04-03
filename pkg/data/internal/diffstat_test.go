@@ -87,9 +87,12 @@ func TestDiffstat(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", d)
 
 	// Initial state.
-	got, err := ReadDiffstatPaths(nil, "url")
+	got, err := ReadDiffstatPaths(t.Context(), "url")
 	if err != nil {
 		t.Fatalf("ReadDiffstatPaths() error = %v", err)
+	}
+	if got != nil {
+		t.Fatalf("ReadDiffstatPaths() = %#v, want %v", got, nil)
 	}
 
 	// New PR.
