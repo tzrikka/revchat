@@ -175,10 +175,10 @@ func TestFindPRsByCommit_pruning(t *testing.T) {
 	if _, found := m["draft"]; !found {
 		t.Errorf("FindPRsByCommit() draft field not found")
 	}
-	if m["change_request_count"].(float64) != 1 {
+	if m["change_request_count"].(float64) != 1 { //nolint:errcheck // Type conversion always succeeds.
 		t.Errorf("FindPRsByCommit() change_request_count field = %v, want %v", m["change_request_count"], 1)
 	}
-	if m["task_count"].(float64) != 2 {
+	if m["task_count"].(float64) != 2 { //nolint:errcheck // Type conversion always succeeds.
 		t.Errorf("FindPRsByCommit() task_count field = %v, want %v", m["task_count"], 2)
 	}
 }
