@@ -77,8 +77,9 @@ func ReadPRSnapshot(_ context.Context, prURL string) (map[string]any, error) {
 }
 
 // FindPRsByCommit returns all (0 or more) the PR snapshots that are currently associated with the given
-// commit hash. This is used when processing commit events, to identify the relevant PR(s). To do this,
-// this function scans through all the PR snapshots and checks their current commit hashes.
+// commit hash. This is used when processing Bitbucket commit events, to identify the relevant PR(s).
+// To do this, this function scans through all the PR snapshots and checks their current commit hashes.
+// Lastly, this function prunes redundant PR details, to reduce Temporal log size and noise.
 func FindPRsByCommit(ctx context.Context, hash string) (prs []map[string]any, err error) {
 	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
 	if err != nil {
@@ -107,6 +108,44 @@ func FindPRsByCommit(ctx context.Context, hash string) (prs []map[string]any, er
 
 		return nil
 	})
+
+	// See pkg/bitbucket/workflows/repository.go#updateCommitStatus for the rationale behind this.
+	for _, pr := range prs {
+		for k := range pr {
+			switch k {
+			case "draft", "change_request_count", "task_count":
+				// Don't touch these fields.
+			case "links":
+				links, ok := pr["links"].(map[string]any)
+				if !ok {
+					break
+				}
+				for lk := range links {
+					if lk != "html" {
+						delete(links, lk)
+					}
+				}
+			case "participants":
+				ps, ok := pr["participants"].([]any)
+				if !ok {
+					break
+				}
+				for i := range ps {
+					p, ok := ps[i].(map[string]any)
+					if !ok {
+						continue
+					}
+					for pk := range p {
+						if pk != "approved" {
+							delete(p, pk)
+						}
+					}
+				}
+			default:
+				delete(pr, k)
+			}
+		}
+	}
 
 	return prs, err
 }

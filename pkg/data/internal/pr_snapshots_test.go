@@ -113,3 +113,72 @@ func TestFindPRsByCommit(t *testing.T) {
 		})
 	}
 }
+
+func TestFindPRsByCommit_pruning(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", d)
+
+	path, err := xdg.CreateDir(xdg.DataHome, config.DirName)
+	if err != nil {
+		t.Fatalf("xdg.CreateDir() error = %v", err)
+	}
+
+	pr := `{
+		"source": {"commit": {"hash": "abc123"}},
+		"links": {"html": {"href": "url1"}, "self": {"href": "url2"}},
+		"draft": true,
+		"change_request_count": 1,
+		"task_count": 2,
+		"participants": [
+			{"approved": true, "user": {"display_name": "Alice"}, "role": "REVIEWER", "state": "APPROVED"},
+			{"approved": false, "user": {"display_name": "Bob"}, "role": "REVIEWER", "state": "UNAPPROVED"}
+		],
+		"aaa": "bbb",
+		"ccc": 123,
+		"ddd": true,
+		"eee": null
+	}`
+
+	if err := os.WriteFile(filepath.Join(path, "pr1"+PRSnapshotFileSuffix), []byte(pr), xdg.NewFilePermissions); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	got, err := FindPRsByCommit(t.Context(), "abc123")
+	if err != nil {
+		t.Fatalf("FindPRsByCommit() error = %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("FindPRsByCommit() len = %d, want %d", len(got), 1)
+	}
+
+	m := got[0]
+	if len(m) != 5 {
+		t.Errorf("FindPRsByCommit() map len = %d, want %d", len(m), 5)
+	}
+
+	links, ok := m["links"].(map[string]any)
+	if !ok {
+		t.Error("FindPRsByCommit() - missing or bad links map")
+	}
+	if len(links) != 1 || links["html"] == nil {
+		t.Error("FindPRsByCommit() = links map not pruned correctly")
+	}
+
+	ps, ok := m["participants"].([]any)
+	if !ok {
+		t.Error("FindPRsByCommit() missing or bad participants block")
+	}
+	if len(ps) != 2 {
+		t.Errorf("FindPRsByCommit() participants slice len = %d, want %d", len(ps), 2)
+	}
+
+	if _, found := m["draft"]; !found {
+		t.Errorf("FindPRsByCommit() draft field not found")
+	}
+	if m["change_request_count"].(float64) != 1 {
+		t.Errorf("FindPRsByCommit() change_request_count field = %v, want %v", m["change_request_count"], 1)
+	}
+	if m["task_count"].(float64) != 2 {
+		t.Errorf("FindPRsByCommit() task_count field = %v, want %v", m["task_count"], 2)
+	}
+}

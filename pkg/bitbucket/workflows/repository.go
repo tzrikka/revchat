@@ -54,6 +54,13 @@ func (c Config) CommitStatusWorkflow(ctx workflow.Context, event bitbucket.Repos
 	return err
 }
 
+// updateCommitStatus announces a build status update in the PR's Slack channel.
+// If the PR is ready to be merged, it announces that too. If the PR's Slack channel is already archived
+// (but we still store data for it - otherwise we wouldn't have called this function), clean up the data.
+//
+// This function uses the following [bitbucket.PullRequest] details:
+// Links (map), draft flag (bool), ChangeRequestCount and TaskCount (int), and Participants (slice).
+// This is relevant for PR detail pruning in [data.FindPRsByCommit].
 func updateCommitStatus(ctx workflow.Context, cs *bitbucket.CommitStatus, pr *bitbucket.PullRequest) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	prURL := bitbucket.HTMLURL(pr.Links)
