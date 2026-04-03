@@ -62,7 +62,7 @@ func linkifyID(ctx workflow.Context, cfg map[string]string, id []string) string 
 }
 
 func buildLink(ctx workflow.Context, base, id string) string {
-	link, err := url.JoinPath(base, id)
+	link, err := url.JoinPath(base, id) //workflowcheck:ignore
 	if err != nil {
 		logger.From(ctx).Warn("failed to join URL paths", slog.Any("error", err),
 			slog.String("base_url", base), slog.String("key_id", id))

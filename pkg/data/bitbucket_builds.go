@@ -17,7 +17,7 @@ type (
 
 func ReadBitbucketBuilds(ctx workflow.Context, prURL string) PRStatus {
 	if ctx == nil { // For unit testing.
-		status, err := internal.ReadBitbucketBuilds(context.Background(), prURL)
+		status, err := internal.ReadBitbucketBuilds(context.Background(), prURL) //workflowcheck:ignore
 		if err != nil {
 			return PRStatus{}
 		}
@@ -40,7 +40,7 @@ func ReadBitbucketBuilds(ctx workflow.Context, prURL string) PRStatus {
 // in which case this function discards all previous build statuses.
 func UpdateBitbucketBuilds(ctx workflow.Context, prURL, commitHash, key string, cs CommitStatus) {
 	if ctx == nil { // For unit testing.
-		_ = internal.UpdateBitbucketBuilds(context.Background(), prURL, commitHash, key, cs)
+		_ = internal.UpdateBitbucketBuilds(context.Background(), prURL, commitHash, key, cs) //workflowcheck:ignore
 		return
 	}
 
@@ -52,7 +52,7 @@ func UpdateBitbucketBuilds(ctx workflow.Context, prURL, commitHash, key string, 
 
 func DeleteBitbucketBuilds(ctx workflow.Context, prURL string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.BuildsFileSuffix)
+		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.BuildsFileSuffix) //workflowcheck:ignore
 		return
 	}
 

@@ -24,10 +24,10 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	summary := new(strings.Builder)
 	pr, err := data.LoadPRSnapshot(ctx, url)
 	if err != nil {
-		fmt.Fprintf(summary, "\n\n<%s|*%s*>", url, url)
+		fmt.Fprintf(summary, "\n\n<%s|*%s*>", url, url) //workflowcheck:ignore // Deterministic output, not a file.
 		if selfReport {
 			if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
-				fmt.Fprintf(summary, "\n><#%s>", channelID)
+				fmt.Fprintf(summary, "\n><#%s>", channelID) //workflowcheck:ignore // Deterministic output, not a file.
 			}
 		}
 		summary.WriteString("\n>:warning: Failed to read internal data about this PR")
@@ -45,21 +45,21 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	// Slack channel link (unless this is a status report about other users).
 	if selfReport {
 		if channelID, _ := data.SwitchURLAndID(ctx, url); channelID != "" {
-			fmt.Fprintf(summary, "\n><#%s>", channelID)
+			fmt.Fprintf(summary, "\n><#%s>", channelID) //workflowcheck:ignore // Deterministic output, not a file.
 		}
 	}
 
 	// Timestamps.
 	now := workflow.Now(ctx).UTC()
 	created, updated := times(now, url, pr)
-	fmt.Fprintf(summary, "\n>Created `%s` ago", created)
+	fmt.Fprintf(summary, "\n>Created `%s` ago", created) //workflowcheck:ignore // Deterministic output, not a file.
 	if updated != "" {
-		fmt.Fprintf(summary, ", updated `%s` ago", updated)
+		fmt.Fprintf(summary, ", updated `%s` ago", updated) //workflowcheck:ignore // Deterministic output, not a file.
 	}
 
 	if len(userIDs) == 1 {
 		if activity := data.GetActivityTime(ctx, url, users.SlackIDToEmail(ctx, userIDs[0])); !activity.IsZero() {
-			fmt.Fprintf(summary, ", touched by you `%s` ago", timeSince(now, activity))
+			fmt.Fprintf(summary, ", touched by you `%s` ago", timeSince(now, activity)) //workflowcheck:ignore // Same as above.
 		}
 	}
 
@@ -77,14 +77,14 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 		}
 
 		if owned := files.CountOwnedFiles(ctx, owner, repo, branch, commit, fullNames, paths); owned > 0 {
-			fmt.Fprintf(summary, ", code owners: *%d* file", owned)
+			fmt.Fprintf(summary, ", code owners: *%d* file", owned) //workflowcheck:ignore // Deterministic output, not a file.
 			if owned > 1 {
 				summary.WriteString("s")
 			}
 		}
 
 		if highRisk := files.CountHighRiskFiles(ctx, owner, repo, branch, commit, paths); highRisk > 0 {
-			fmt.Fprintf(summary, ", high risk: *%d* file", highRisk)
+			fmt.Fprintf(summary, ", high risk: *%d* file", highRisk) //workflowcheck:ignore // Deterministic output, not a file.
 			if highRisk > 1 {
 				summary.WriteString("s")
 			}
@@ -108,7 +108,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 		summary.WriteString("\n>")
 	}
 	if tasksCount > 0 {
-		fmt.Fprintf(summary, "Tasks: *%d*", tasksCount)
+		fmt.Fprintf(summary, "Tasks: *%d*", tasksCount) //workflowcheck:ignore // Deterministic output, not a file.
 	}
 	if approversCount > 0 {
 		if tasksCount == 0 {
@@ -116,7 +116,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 		} else {
 			summary.WriteString(", a")
 		}
-		fmt.Fprintf(summary, "pprovals: *%d* (%s)", approversCount, strings.Join(approvers, ", "))
+		fmt.Fprintf(summary, "pprovals: *%d* (%s)", approversCount, strings.Join(approvers, ", ")) //workflowcheck:ignore // Same as above.
 	}
 	if changeRequestsCount > 0 {
 		if tasksCount+approversCount == 0 {
@@ -124,7 +124,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 		} else {
 			summary.WriteString(", c")
 		}
-		fmt.Fprintf(summary, "hange requests: *%d* (%s)", changeRequestsCount, strings.Join(changeRequests, ", "))
+		fmt.Fprintf(summary, "hange requests: *%d* (%s)", changeRequestsCount, strings.Join(changeRequests, ", ")) //workflowcheck:ignore // Same.
 	}
 	if showTasks && tasksCount > 0 {
 		summary.WriteString(strings.Join(tasks, ""))
@@ -312,7 +312,7 @@ const (
 func states(ctx workflow.Context, url string) string {
 	if isBitbucketPR(url) {
 		prStatus := data.ReadBitbucketBuilds(ctx, url)
-		keys := slices.Sorted(maps.Keys(prStatus.Builds))
+		keys := slices.Sorted(maps.Keys(prStatus.Builds)) //workflowcheck:ignore // Sorted for deterministic order.
 		var summary []string
 		for _, k := range keys {
 			switch s := prStatus.Builds[k].State; s {

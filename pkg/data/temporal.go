@@ -26,10 +26,9 @@ func executeLocalActivity(ctx workflow.Context, activity, result any, args ...an
 	fn := runtime.FuncForPC(reflect.ValueOf(activity).Pointer()).Name()
 	ctx = workflow.WithLocalActivityOptions(ctx, localActivityOpts)
 
-	start := time.Now()
 	err := workflow.ExecuteLocalActivity(ctx, activity, args...).Get(ctx, result)
-	logger.From(ctx).Debug("executed Temporal local activity for data access", slog.String("activity", fn),
-		slog.Duration("duration", time.Since(start)), slog.Any("error", err))
+	logger.From(ctx).Debug("executed Temporal local activity for data access",
+		slog.String("activity", fn), slog.Any("error", err))
 
 	return err
 }

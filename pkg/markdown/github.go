@@ -34,7 +34,7 @@ func GitHubToSlack(ctx workflow.Context, text, prURL string) string {
 	// Mentions: "@user" --> "<@U123>" or "<https://github.com/user|@user>",
 	// "@org/team" --> "<https://github.com/org/teams/team|@org/team>".
 	for _, ghRef := range regexp.MustCompile(`@[\w/-]+`).FindAllString(text, -1) {
-		u, err := url.Parse(prURL)
+		u, err := url.Parse(prURL) //workflowcheck:ignore
 		if err != nil {
 			break
 		}

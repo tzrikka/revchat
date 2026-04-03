@@ -100,7 +100,7 @@ func fileLinks(files []File, isBitbucket bool) string {
 	sb := new(strings.Builder)
 	sb.WriteString("\n\nAttached files:\n")
 	for _, f := range files {
-		fmt.Fprintf(sb, "\n- :%s: [%s](%s)", fileTypeEmoji(f, isBitbucket), f.Name, f.Permalink)
+		fmt.Fprintf(sb, "\n- :%s: [%s](%s)", fileTypeEmoji(f, isBitbucket), f.Name, f.Permalink) //workflowcheck:ignore // Deterministic output.
 	}
 
 	return sb.String()

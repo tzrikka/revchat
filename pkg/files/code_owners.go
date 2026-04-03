@@ -201,6 +201,7 @@ func normalizePattern(pattern string) string {
 // It modifies the [CodeOwners.Paths] map in place. This function is idempotent.
 func (c *CodeOwners) expandGroups(ctx workflow.Context) *CodeOwners {
 	expandedPaths := make(map[string][]string, len(c.Paths))
+	//workflowcheck:ignore // Output is sorted, so iteration order doesn't matter.
 	for pathPattern, members := range c.Paths {
 		var expanded []string
 		for _, member := range members {

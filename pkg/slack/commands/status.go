@@ -119,7 +119,7 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bo
 	case reviewers:
 		list.WriteString("These PRs need to be reviewed")
 	}
-	fmt.Fprintf(list, " by <@%s>:", strings.Join(users, ">, <@"))
+	fmt.Fprintf(list, " by <@%s>:", strings.Join(users, ">, <@")) //workflowcheck:ignore // Deterministic output, not a file.
 	header := list.String()
 
 	for _, url := range filteredPRs {

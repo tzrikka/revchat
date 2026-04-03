@@ -141,7 +141,7 @@ func allBuildsSuccessful(ctx workflow.Context, url string) bool {
 		if build.State != "SUCCESSFUL" {
 			return false
 		}
-	}
+	} //workflowcheck:ignore // Iteration order doesn't matter here.
 
 	return true
 }

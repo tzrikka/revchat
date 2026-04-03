@@ -20,8 +20,8 @@ const (
 
 // InitTurns initializes the attention state of a new PR with its author's email address.
 // The initial state has no reviewers; they are added when they are added to the Slack channel.
-// Happens only once per PR, in the beginning, so no need for a Temporal activity, mutex, etc.
 func InitTurns(ctx workflow.Context, prURL, authorEmail string) {
+	//workflowcheck:ignore // Happens only once per PR, in the beginning, so no need for a Temporal activity, mutex, etc.
 	if err := internal.InitTurns(prURL, authorEmail); err != nil {
 		logger.From(ctx).Error("failed to initialize PR attention state", slog.Any("error", err), slog.String("pr_url", prURL))
 	}
@@ -29,7 +29,7 @@ func InitTurns(ctx workflow.Context, prURL, authorEmail string) {
 
 func DeleteTurns(ctx workflow.Context, prURL string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.TurnsFileSuffix)
+		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.TurnsFileSuffix) //workflowcheck:ignore
 		return
 	}
 
@@ -44,7 +44,7 @@ func DeleteTurns(ctx workflow.Context, prURL string) {
 // reviewer has their turn flag set to false, we add the author to the list as well.
 func LoadCurrentTurnEmails(ctx workflow.Context, prURL string) ([]string, error) {
 	if ctx == nil { // For unit testing.
-		return internal.ReadCurrentTurnEmails(context.Background(), prURL)
+		return internal.ReadCurrentTurnEmails(context.Background(), prURL) //workflowcheck:ignore
 	}
 
 	var emails []string
@@ -61,7 +61,7 @@ func LoadCurrentTurnEmails(ctx workflow.Context, prURL string) ([]string, error)
 func ListPRsPerSlackUser(ctx workflow.Context, onlyCurrentTurn, authors, reviewers bool) (users map[string][]string) {
 	var err error
 	if ctx == nil { // For unit testing.
-		users, err = internal.ReadPRsPerSlackUser(context.Background(), onlyCurrentTurn, authors, reviewers)
+		users, err = internal.ReadPRsPerSlackUser(context.Background(), onlyCurrentTurn, authors, reviewers) //workflowcheck:ignore
 	} else {
 		err = executeLocalActivity(ctx, internal.ReadPRsPerSlackUser, &users, onlyCurrentTurn, authors, reviewers)
 	}
@@ -87,7 +87,7 @@ func SetReviewerTurn(ctx workflow.Context, prURL, email string, nudge bool) (don
 	}
 
 	if ctx == nil { // For unit testing.
-		states, err := internal.SetReviewerTurn(context.Background(), prURL, email, nudge)
+		states, err := internal.SetReviewerTurn(context.Background(), prURL, email, nudge) //workflowcheck:ignore
 		return states[0], states[1], err
 	}
 
@@ -113,7 +113,7 @@ func SwitchTurn(ctx workflow.Context, prURL, email string, force bool) error {
 	}
 
 	if ctx == nil { // For unit testing.
-		return internal.SwitchTurn(context.Background(), prURL, email, force)
+		return internal.SwitchTurn(context.Background(), prURL, email, force) //workflowcheck:ignore
 	}
 
 	if err := executeLocalActivity(ctx, internal.SwitchTurn, nil, prURL, email, force); err != nil {
@@ -135,7 +135,7 @@ func RemoveReviewerFromTurns(ctx workflow.Context, prURL, email string, approved
 	}
 
 	if ctx == nil { // For unit testing.
-		return internal.RemoveReviewerFromTurns(context.Background(), prURL, email, approved)
+		return internal.RemoveReviewerFromTurns(context.Background(), prURL, email, approved) //workflowcheck:ignore
 	}
 
 	if err := executeLocalActivity(ctx, internal.RemoveReviewerFromTurns, nil, prURL, email, approved); err != nil {
@@ -156,7 +156,7 @@ func GetActivityTime(ctx workflow.Context, prURL, email string) time.Time {
 	}
 
 	if ctx == nil { // For unit testing.
-		t, _ := internal.GetActivityTime(context.Background(), prURL, email)
+		t, _ := internal.GetActivityTime(context.Background(), prURL, email) //workflowcheck:ignore
 		return t
 	}
 
@@ -181,7 +181,7 @@ func UpdateActivityTime(ctx workflow.Context, prURL, email string) {
 	}
 
 	if ctx == nil { // For unit testing.
-		_ = internal.UpdateActivityTime(context.Background(), prURL, email)
+		_ = internal.UpdateActivityTime(context.Background(), prURL, email) //workflowcheck:ignore
 		return
 	}
 
@@ -201,7 +201,7 @@ func FreezeTurns(ctx workflow.Context, prURL, email string) (bool, error) {
 	}
 
 	if ctx == nil { // For unit testing.
-		return internal.FreezeTurns(context.Background(), prURL, email)
+		return internal.FreezeTurns(context.Background(), prURL, email) //workflowcheck:ignore
 	}
 
 	var frozen bool
@@ -218,7 +218,7 @@ func FreezeTurns(ctx workflow.Context, prURL, email string) (bool, error) {
 // If the turn is not frozen, this function returns false and does nothing.
 func UnfreezeTurns(ctx workflow.Context, prURL string) (bool, error) {
 	if ctx == nil { // For unit testing.
-		return internal.UnfreezeTurns(context.Background(), prURL)
+		return internal.UnfreezeTurns(context.Background(), prURL) //workflowcheck:ignore
 	}
 
 	var unfrozen bool
@@ -235,7 +235,7 @@ func UnfreezeTurns(ctx workflow.Context, prURL string) (bool, error) {
 // a specific PR. If the turn is not frozen, it returns a zero timestamp and an empty string.
 func IsFrozen(ctx workflow.Context, prURL string) (time.Time, string) {
 	if ctx == nil { // For unit testing.
-		frozen, _ := internal.IsFrozen(context.Background(), prURL)
+		frozen, _ := internal.IsFrozen(context.Background(), prURL) //workflowcheck:ignore
 		return frozen.At, frozen.By
 	}
 

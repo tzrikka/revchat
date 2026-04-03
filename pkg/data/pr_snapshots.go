@@ -13,7 +13,7 @@ import (
 // StorePRSnapshot writes a snapshot of a PR, which is used to detect and analyze metadata changes.
 func StorePRSnapshot(ctx workflow.Context, prURL string, pr any) {
 	if ctx == nil { // For unit testing.
-		_ = internal.WritePRSnapshot(context.Background(), prURL, pr)
+		_ = internal.WritePRSnapshot(context.Background(), prURL, pr) //workflowcheck:ignore
 		return
 	}
 
@@ -26,7 +26,7 @@ func StorePRSnapshot(ctx workflow.Context, prURL string, pr any) {
 // changes. If a snapshot doesn't exist, this function returns a nil map and no error.
 func LoadPRSnapshot(ctx workflow.Context, prURL string) (map[string]any, error) {
 	if ctx == nil { // For unit testing.
-		return internal.ReadPRSnapshot(context.Background(), prURL)
+		return internal.ReadPRSnapshot(context.Background(), prURL) //workflowcheck:ignore
 	}
 
 	var pr map[string]any
@@ -41,7 +41,7 @@ func LoadPRSnapshot(ctx workflow.Context, prURL string) (map[string]any, error) 
 // FindPRsByCommit returns all (0 or more) the PR snapshots that are currently associated with the given commit hash.
 func FindPRsByCommit(ctx workflow.Context, hash string) ([]map[string]any, error) {
 	if ctx == nil { // For unit testing.
-		return internal.FindPRsByCommit(context.Background(), hash)
+		return internal.FindPRsByCommit(context.Background(), hash) //workflowcheck:ignore
 	}
 
 	var prs []map[string]any
@@ -55,7 +55,7 @@ func FindPRsByCommit(ctx workflow.Context, hash string) ([]map[string]any, error
 
 func DeletePRSnapshot(ctx workflow.Context, prURL string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.PRSnapshotFileSuffix)
+		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.PRSnapshotFileSuffix) //workflowcheck:ignore
 		return
 	}
 

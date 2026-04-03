@@ -84,7 +84,7 @@ func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, prURL string) 
 		sb.WriteString("no results")
 	}
 
-	keys := slices.Sorted(maps.Keys(prStatus.Builds))
+	keys := slices.Sorted(maps.Keys(prStatus.Builds)) //workflowcheck:ignore // Sorted for deterministic order.
 	for i, k := range keys {
 		if i > 0 {
 			sb.WriteString(" ")
@@ -92,7 +92,7 @@ func UpdateChannelBuildsBookmark(ctx workflow.Context, channelID, prURL string) 
 
 		b := prStatus.Builds[k]
 		desc := regexp.MustCompile(`\.+$`).ReplaceAllString(strings.TrimSpace(b.Desc), "")
-		fmt.Fprintf(sb, "%s %s", buildState(b.State), desc)
+		fmt.Fprintf(sb, "%s %s", buildState(b.State), desc) //workflowcheck:ignore // Deterministic output, not a file.
 	}
 
 	title := sb.String()

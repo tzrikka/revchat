@@ -76,7 +76,7 @@ var (
 func BitbucketToSlackEmoji(text string) string {
 	for from, to := range BitbucketToSlackEmojiTwoWay {
 		text = strings.ReplaceAll(text, from, to)
-	}
+	} //workflowcheck:ignore // Iteration order is irrelevant.
 	return text
 }
 
@@ -86,10 +86,10 @@ func BitbucketToSlackEmoji(text string) string {
 func SlackToBitbucketEmoji(text string) string {
 	for to, from := range BitbucketToSlackEmojiTwoWay {
 		text = strings.ReplaceAll(text, from, to)
-	}
+	} //workflowcheck:ignore // Iteration order is irrelevant.
 	for from, to := range SlackToBitbucketEmojiOneWay {
 		text = strings.ReplaceAll(text, from, to)
-	}
+	} //workflowcheck:ignore // Iteration order is irrelevant.
 	return trimSlackEmojiSkinTones(text)
 }
 
@@ -98,7 +98,7 @@ func SlackToBitbucketEmoji(text string) string {
 func GitHubToSlackEmoji(text string) string {
 	for from, to := range GitHubToSlackEmojiTwoWay {
 		text = strings.ReplaceAll(text, from, to)
-	}
+	} //workflowcheck:ignore // Iteration order is irrelevant.
 
 	// Special cases related to ":ok_woman:": the order matters, so we can't
 	// rely on regular map iteration because it's nondeterministic by design.
@@ -114,7 +114,7 @@ func GitHubToSlackEmoji(text string) string {
 func SlackToGitHubEmoji(text string) string {
 	for to, from := range GitHubToSlackEmojiTwoWay {
 		text = strings.ReplaceAll(text, from, to)
-	}
+	} //workflowcheck:ignore // Iteration order is irrelevant.
 
 	// Special cases related to ":ok_woman:": the order matters, so we can't
 	// rely on regular map iteration because it's nondeterministic by design.
@@ -123,7 +123,7 @@ func SlackToGitHubEmoji(text string) string {
 
 	for from, to := range SlackToGitHubEmojiOneWay {
 		text = strings.ReplaceAll(text, from, to)
-	}
+	} //workflowcheck:ignore // Iteration order is irrelevant.
 	return trimSlackEmojiSkinTones(text)
 }
 

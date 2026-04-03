@@ -12,7 +12,7 @@ import (
 
 func SetSlackBotUserID(ctx workflow.Context, botID, userID string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.SetSlackBotUserID(context.Background(), botID, userID)
+		_ = internal.SetSlackBotUserID(context.Background(), botID, userID) //workflowcheck:ignore
 		return
 	}
 
@@ -24,7 +24,7 @@ func SetSlackBotUserID(ctx workflow.Context, botID, userID string) {
 
 func GetSlackBotUserID(ctx workflow.Context, botID string) string {
 	if ctx == nil { // For unit testing.
-		userID, _ := internal.GetSlackBotUserID(context.Background(), botID)
+		userID, _ := internal.GetSlackBotUserID(context.Background(), botID) //workflowcheck:ignore
 		return userID
 	}
 

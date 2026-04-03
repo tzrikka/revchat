@@ -16,7 +16,7 @@ const (
 
 func StoreDiffstat(ctx workflow.Context, prURL string, files any) {
 	if ctx == nil { // For unit testing.
-		_ = internal.WriteDiffstat(context.Background(), prURL, files)
+		_ = internal.WriteDiffstat(context.Background(), prURL, files) //workflowcheck:ignore
 		return
 	}
 
@@ -27,7 +27,7 @@ func StoreDiffstat(ctx workflow.Context, prURL string, files any) {
 
 func LoadDiffstatPaths(ctx workflow.Context, prURL string) []string {
 	if ctx == nil { // For unit testing.
-		paths, err := internal.ReadDiffstatPaths(context.Background(), prURL)
+		paths, err := internal.ReadDiffstatPaths(context.Background(), prURL) //workflowcheck:ignore
 		if err != nil {
 			return nil
 		}
@@ -46,7 +46,7 @@ func LoadDiffstatPaths(ctx workflow.Context, prURL string) []string {
 
 func DeleteDiffstat(ctx workflow.Context, prURL string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.DiffstatFileSuffix)
+		_ = internal.DeleteGenericPRFile(context.Background(), prURL+internal.DiffstatFileSuffix) //workflowcheck:ignore
 		return
 	}
 

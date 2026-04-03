@@ -12,7 +12,7 @@ import (
 
 func SetScheduledUserReminder(ctx workflow.Context, userID, kitchenTime, tz string) error {
 	if ctx == nil { // For unit testing.
-		return internal.SetReminder(context.Background(), userID, kitchenTime, tz)
+		return internal.SetReminder(context.Background(), userID, kitchenTime, tz) //workflowcheck:ignore
 	}
 
 	if err := executeLocalActivity(ctx, internal.SetReminder, nil, userID, kitchenTime, tz); err != nil {
@@ -26,7 +26,7 @@ func SetScheduledUserReminder(ctx workflow.Context, userID, kitchenTime, tz stri
 
 func DeleteScheduledUserReminder(ctx workflow.Context, userID string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.DeleteReminder(context.Background(), userID)
+		_ = internal.DeleteReminder(context.Background(), userID) //workflowcheck:ignore
 		return
 	}
 
@@ -38,7 +38,7 @@ func DeleteScheduledUserReminder(ctx workflow.Context, userID string) {
 
 func ListScheduledUserReminders(ctx workflow.Context) (map[string]string, error) {
 	if ctx == nil { // For unit testing.
-		return internal.ListReminders(context.Background())
+		return internal.ListReminders(context.Background()) //workflowcheck:ignore
 	}
 
 	var reminders map[string]string

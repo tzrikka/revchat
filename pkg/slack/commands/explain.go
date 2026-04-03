@@ -65,7 +65,7 @@ func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[
 	msg.WriteString(":mag_right: Code owners per file in this PR:")
 
 	for _, p := range paths {
-		fmt.Fprintf(&msg, "\n\n  •   `%s`", p)
+		fmt.Fprintf(&msg, "\n\n  •   `%s`", p) //workflowcheck:ignore // Deterministic output, not a file.
 		fileOwners := owners[p]
 		if len(fileOwners) == 0 {
 			msg.WriteString("\n          ◦   (No code owners found)")
@@ -102,7 +102,7 @@ func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[
 
 		// Second set of bullets: nested groups expanded.
 		for _, group := range nestedOwners {
-			fmt.Fprintf(&msg, "\n          ◦   %s - ", strings.TrimPrefix(group, "@"))
+			fmt.Fprintf(&msg, "\n          ◦   %s - ", strings.TrimPrefix(group, "@")) //workflowcheck:ignore // Same as above.
 			for i, member := range groups[group] {
 				if i > 0 {
 					msg.WriteString(", ")
@@ -117,7 +117,7 @@ func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[
 		if marked {
 			delete(approvers, a)
 		}
-	}
+	} //workflowcheck:ignore // Iteration order doesn't matter here.
 	if len(approvers) == 0 {
 		return msg.String()
 	}
@@ -125,8 +125,7 @@ func explainCodeOwners(ctx workflow.Context, paths []string, owners, groups map[
 	msg.WriteString("\n\n  •   Other approvers who are not code owners")
 	msg.WriteString("\n          ◦   ")
 
-	mentions := slices.Collect(maps.Keys(approvers))
-	slices.Sort(mentions)
+	mentions := slices.Sorted(maps.Keys(approvers)) //workflowcheck:ignore // Sorted for deterministic order.
 	for i, m := range mentions {
 		if i > 0 {
 			msg.WriteString(", ")

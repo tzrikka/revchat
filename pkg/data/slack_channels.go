@@ -21,7 +21,7 @@ func LogSlackChannelCreated(ctx workflow.Context, channelID, prURL, name string)
 
 func appendToCSVFile(ctx workflow.Context, record []string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.AppendToCSVFile(context.Background(), record)
+		_ = internal.AppendToCSVFile(context.Background(), record) //workflowcheck:ignore
 		return
 	}
 
@@ -33,7 +33,7 @@ func appendToCSVFile(ctx workflow.Context, record []string) {
 
 func now(ctx workflow.Context) string {
 	if ctx == nil { // For unit testing.
-		return time.Now().UTC().Format(time.RFC3339)
+		return time.Now().UTC().Format(time.RFC3339) //workflowcheck:ignore
 	}
 	return workflow.Now(ctx).UTC().Format(time.RFC3339)
 }

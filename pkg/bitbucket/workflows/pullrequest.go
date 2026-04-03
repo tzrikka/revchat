@@ -205,7 +205,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		commits = commits[prevCount:]
 
 		msg := new(strings.Builder)
-		fmt.Fprintf(msg, "pushed <%s/commits|%d commit", prURL, len(commits))
+		fmt.Fprintf(msg, "pushed <%s/commits|%d commit", prURL, len(commits)) //workflowcheck:ignore // Deterministic output, not a file.
 		if len(commits) != 1 {
 			msg.WriteString("s")
 		}
@@ -213,7 +213,7 @@ func (c Config) PullRequestUpdatedWorkflow(ctx workflow.Context, event bitbucket
 		msg.WriteString("> to this PR:")
 		for _, c := range commits {
 			title, _, _ := strings.Cut(c.Message, "\n")
-			fmt.Fprintf(msg, "\n  •   <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title)
+			fmt.Fprintf(msg, "\n  •   <%s|`%s`> %s", c.Links["html"].HRef, c.Hash[:7], title) //workflowcheck:ignore // Same as above.
 		}
 
 		bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, "%s "+msg.String())

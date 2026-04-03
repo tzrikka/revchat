@@ -127,11 +127,11 @@ func mapToStruct(m any, pr *PullRequest) error {
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(m); err != nil {
 		return err
-	}
+	} //workflowcheck:ignore // Deterministic output, not a file.
 
 	if err := json.NewDecoder(buf).Decode(pr); err != nil {
 		return err
-	}
+	} //workflowcheck:ignore // Deterministic input, not a file.
 
 	return nil
 }

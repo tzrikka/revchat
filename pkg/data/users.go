@@ -22,7 +22,7 @@ func UpsertUser(ctx workflow.Context, email, realName, bitbucketID, githubID, sl
 	email = strings.ToLower(email)
 
 	if ctx == nil { // For unit tests.
-		_, err := internal.UpsertUser(context.Background(), email, realName, bitbucketID, githubID, slackID, thrippyLink)
+		_, err := internal.UpsertUser(context.Background(), email, realName, bitbucketID, githubID, slackID, thrippyLink) //workflowcheck:ignore
 		if err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ type followUnfollowFunc func(context.Context, string, string) (User, error)
 
 func followOrUnfollowUser(ctx workflow.Context, fn followUnfollowFunc, followerSlackID, followedSlackID string) bool {
 	if ctx == nil { // For unit tests.
-		_, err := fn(context.Background(), followerSlackID, followedSlackID)
+		_, err := fn(context.Background(), followerSlackID, followedSlackID) //workflowcheck:ignore
 		return err == nil
 	}
 
@@ -98,7 +98,7 @@ func followOrUnfollowUser(ctx workflow.Context, fn followUnfollowFunc, followerS
 
 func RemoveFollower(ctx workflow.Context, followerSlackID string) {
 	if ctx == nil { // For unit tests.
-		_ = internal.RemoveFollower(context.Background(), followerSlackID)
+		_ = internal.RemoveFollower(context.Background(), followerSlackID) //workflowcheck:ignore
 		return
 	}
 
@@ -169,7 +169,7 @@ func selectUser(ctx workflow.Context, indexType int, id string, useCache bool) (
 	}
 
 	if ctx == nil { // For unit tests.
-		return internal.SelectUser(context.Background(), indexType, id)
+		return internal.SelectUser(context.Background(), indexType, id) //workflowcheck:ignore
 	}
 
 	if useCache { // Minimize Temporal history without risking staleness or nondeterminism.

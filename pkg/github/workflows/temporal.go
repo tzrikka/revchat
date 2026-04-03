@@ -192,7 +192,7 @@ func childWorkflowID[T any](ctx workflow.Context, signal string, payload *T) str
 }
 
 func trimURLPrefix(rawURL string) string {
-	u, err := url.Parse(rawURL)
+	u, err := url.Parse(rawURL) //workflowcheck:ignore
 	if err != nil {
 		return rawURL
 	}

@@ -36,6 +36,7 @@ func AlertWarn(ctx workflow.Context, channelName, warning string, details ...any
 	_ = alert(ctx, channelName, warning, nil, details...)
 }
 
+//workflowcheck:ignore // [fmt.Fprintf] and [runtime.Callers] are deterministic here.
 func alert(ctx workflow.Context, channelName, text string, err error, details ...any) error {
 	msg := new(strings.Builder)
 	if err != nil {

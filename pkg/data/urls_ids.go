@@ -14,7 +14,7 @@ import (
 // thread IDs. An error in mapping a new Slack channel is critical, but an error in mapping Slack messages isn't.
 func MapURLAndID(ctx workflow.Context, url, ids string) error {
 	if ctx == nil { // For unit testing.
-		return internal.SetURLAndIDMapping(context.Background(), url, ids)
+		return internal.SetURLAndIDMapping(context.Background(), url, ids) //workflowcheck:ignore
 	}
 
 	if err := executeLocalActivity(ctx, internal.SetURLAndIDMapping, nil, url, ids); err != nil {
@@ -29,7 +29,7 @@ func MapURLAndID(ctx workflow.Context, url, ids string) error {
 // SwitchURLAndID converts the URL of a PR or PR comment into the corresponding channel or thread IDs, and vice versa.
 func SwitchURLAndID(ctx workflow.Context, key string) (string, error) {
 	if ctx == nil { // For unit testing.
-		return internal.GetURLAndIDMapping(context.Background(), key)
+		return internal.GetURLAndIDMapping(context.Background(), key) //workflowcheck:ignore
 	}
 
 	var val string
@@ -49,7 +49,7 @@ func SwitchURLAndID(ctx workflow.Context, key string) (string, error) {
 // thread IDs when they become obsolete. Errors here are notable but not critical, so they are logged but not returned.
 func DeleteURLAndIDMapping(ctx workflow.Context, key string) {
 	if ctx == nil { // For unit testing.
-		_ = internal.DelURLAndIDMapping(context.Background(), key)
+		_ = internal.DelURLAndIDMapping(context.Background(), key) //workflowcheck:ignore
 		return
 	}
 

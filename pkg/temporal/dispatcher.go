@@ -99,7 +99,8 @@ func (c *Config) EventDispatcherWorkflow(ctx workflow.Context) error {
 
 // prepareForReset waits for all child workflows to finish and drains all signal channels.
 func (c *Config) prepareForReset(ctx workflow.Context, info *workflow.Info) {
-	startTime := time.Now()
+	var startTime time.Time
+	_ = workflow.SideEffect(ctx, func(_ workflow.Context) any { return time.Now() }).Get(&startTime)
 
 	// https://docs.temporal.io/develop/go/message-passing#wait-for-message-handlers
 	err := workflow.Await(ctx, func() bool {
@@ -119,7 +120,10 @@ func (c *Config) prepareForReset(ctx workflow.Context, info *workflow.Info) {
 	if c.shutdownSignal != "" {
 		msg = "shutting down worker process as requested by OS signal"
 	}
-	logger.From(ctx).Warn(msg, slog.Duration("lead_time", time.Since(startTime)),
+	var leadTime time.Duration
+	_ = workflow.SideEffect(ctx, func(_ workflow.Context) any { return time.Since(startTime) }).Get(&leadTime)
+
+	logger.From(ctx).Warn(msg, slog.Duration("lead_time", leadTime),
 		slog.Int("history_length", info.GetCurrentHistoryLength()),
 		slog.Int("history_size", info.GetCurrentHistorySize()))
 }
