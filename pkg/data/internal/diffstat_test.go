@@ -79,3 +79,69 @@ func TestExtractFilePaths(t *testing.T) {
 		})
 	}
 }
+
+// The unit tests below are the same as in data/diffstat_test.go.
+
+func TestDiffstat(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", d)
+
+	// Initial state.
+	got, err := ReadDiffstatPaths(nil, "url")
+	if err != nil {
+		t.Fatalf("ReadDiffstatPaths() error = %v", err)
+	}
+
+	// New PR.
+	tests := []struct {
+		name  string
+		files []map[string]any
+		want  []string
+	}{
+		{
+			name: "github_pr_created",
+			files: []map[string]any{
+				{"filename": "file1"},
+				{"filename": "file2"},
+			},
+			want: []string{"file1", "file2"},
+		},
+		{
+			name: "github_pr_updated",
+			files: []map[string]any{
+				{"old": map[string]any{"path": "file4"}},
+				{"new": map[string]any{"path": "file3"}},
+			},
+			want: []string{"file3", "file4"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := WriteDiffstat(t.Context(), "url", tt.files); err != nil {
+				t.Fatalf("WriteDiffstat() error = %v", err)
+			}
+
+			got, err := ReadDiffstatPaths(t.Context(), "url")
+			if err != nil {
+				t.Fatalf("ReadDiffstatPaths() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("ReadDiffstatPaths() = %#v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	// PR closed.
+	if err := DeleteGenericPRFile(t.Context(), "url"+DiffstatFileSuffix); err != nil {
+		t.Fatalf("DeleteGenericPRFile() error = %v", err)
+	}
+
+	got, err = ReadDiffstatPaths(t.Context(), "url")
+	if err != nil {
+		t.Fatalf("ReadDiffstatPaths() error = %v", err)
+	}
+	if got != nil {
+		t.Fatalf("ReadDiffstatPaths() = %#v, want %v", got, nil)
+	}
+}

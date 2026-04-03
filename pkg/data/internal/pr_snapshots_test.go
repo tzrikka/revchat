@@ -3,6 +3,7 @@ package internal
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/tzrikka/revchat/pkg/config"
@@ -180,5 +181,64 @@ func TestFindPRsByCommit_pruning(t *testing.T) {
 	}
 	if m["task_count"].(float64) != 2 { //nolint:errcheck // Type conversion always succeeds.
 		t.Errorf("FindPRsByCommit() task_count field = %v, want %v", m["task_count"], 2)
+	}
+}
+
+// The unit tests below are the same as in data/pr_snapshots_test.go.
+
+func TestPRSnapshot(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", d)
+
+	prURL := "https://bitbucket.org/workspace/repo/pull-requests/12345"
+
+	// Initial state.
+	got, err := ReadPRSnapshot(t.Context(), prURL)
+	if err != nil {
+		t.Fatalf("ReadPRSnapshot() error = %v", err)
+	}
+	if got != nil {
+		t.Fatalf("ReadPRSnapshot() = %#v, want %v", got, nil)
+	}
+
+	// Initial snapshot.
+	pr1 := map[string]any{"title": "pr1"}
+	if err := WritePRSnapshot(t.Context(), prURL, pr1); err != nil {
+		t.Fatalf("WritePRSnapshot() error = %v", err)
+	}
+
+	got, err = ReadPRSnapshot(t.Context(), prURL)
+	if err != nil {
+		t.Fatalf("ReadPRSnapshot() error = %v", err)
+	}
+	if !reflect.DeepEqual(got, pr1) {
+		t.Fatalf("ReadPRSnapshot() = %#v, want %#v", got, pr1)
+	}
+
+	// Update snapshot.
+	pr2 := map[string]any{"title": "pr2"}
+	if err := WritePRSnapshot(t.Context(), prURL, pr2); err != nil {
+		t.Fatalf("WritePRSnapshot() error = %v", err)
+	}
+
+	got, err = ReadPRSnapshot(t.Context(), prURL)
+	if err != nil {
+		t.Fatalf("ReadPRSnapshot() error = %v", err)
+	}
+	if !reflect.DeepEqual(got, pr2) {
+		t.Fatalf("ReadPRSnapshot() = %#v, want %#v", got, pr2)
+	}
+
+	// Delete snapshot.
+	if err := DeleteGenericPRFile(t.Context(), prURL+PRSnapshotFileSuffix); err != nil {
+		t.Fatalf("DeleteGenericPRFile() error = %v", err)
+	}
+
+	got, err = ReadPRSnapshot(t.Context(), prURL)
+	if err != nil {
+		t.Fatalf("ReadPRSnapshot() error = %v", err)
+	}
+	if got != nil {
+		t.Fatalf("ReadPRSnapshot() = %#v, want %v", got, nil)
 	}
 }

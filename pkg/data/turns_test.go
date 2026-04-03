@@ -61,7 +61,7 @@ func TestDeleteTurns(t *testing.T) {
 
 	_, err := data.LoadCurrentTurnEmails(nil, url)
 	if err == nil {
-		t.Fatalf("LoadCurrentTurnEmails() error = nil, want = true")
+		t.Fatalf("LoadCurrentTurnEmails() error = nil")
 	}
 }
 
