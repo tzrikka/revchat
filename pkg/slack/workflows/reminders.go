@@ -22,22 +22,7 @@ const (
 
 func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 	startTime := workflow.Now(ctx).UTC().Truncate(time.Minute)
-
-	userPRs := data.ListPRsPerSlackUser(ctx, true, true, true)
-	for user, prs := range userPRs {
-		if strings.HasSuffix(user, data.SlackIDNotFound) {
-			details := make([]any, 0, 2*len(prs)+2)
-			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
-			for i, prURL := range prs {
-				details = append(details, fmt.Sprintf("PR %d", i+1), prURL)
-			}
-			activities.AlertWarn(ctx, c.AlertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
-		}
-	}
-
-	if len(userPRs) == 0 {
-		return nil
-	}
+	var users []string
 
 	reminders, err := data.ListScheduledUserReminders(ctx)
 	if err != nil {
@@ -53,38 +38,50 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 			continue
 		}
 
-		// Send a reminder to the user if their reminder time matches
-		// the current time, and there are reminders to be sent to them.
-		if prs := userPRs[userID]; reminderTime.Equal(now) && len(prs) > 0 {
-			logger.From(ctx).Info("sending scheduled Slack reminder to user",
-				slog.String("user_id", userID), slog.Int("pr_count", len(prs)))
-			slices.Sort(prs)
+		if reminderTime.Equal(now) {
+			users = append(users, userID)
+		}
+	}
 
-			var msg strings.Builder
-			msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
-			singleUser := []string{userID}
+	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, true, true, true, users)
+	for _, details := range userAlerts {
+		activities.AlertWarn(ctx, c.AlertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
+	}
 
-			for _, prURL := range prs {
-				prDetails := slack.PRDetails(ctx, prURL, singleUser, true, c.ReportDrafts, false, "")
+	for user, prs := range userPRs {
+		if len(prs) == 0 {
+			continue
+		}
 
-				// If the message becomes too long, split it into multiple chunks,
-				// even if the Slack API could technically handle a bit more.
-				if msg.Len()+len(prDetails) > 3900 {
-					aggregatedErr = errors.Join(aggregatedErr, activities.PostMessage(ctx, userID, msg.String()))
-					msg.Reset()
-				}
+		logger.From(ctx).Info("sending scheduled Slack reminder to user",
+			slog.String("user_id", user), slog.Int("pr_count", len(prs)))
+		slices.Sort(prs)
 
-				msg.WriteString(prDetails)
+		var msg strings.Builder
+		msg.WriteString(":bell: This is your scheduled daily reminder to take action on these PRs:")
+		singleUser := []string{user}
+
+		for _, prURL := range prs {
+			prDetails := slack.PRDetails(ctx, prURL, singleUser, true, c.ReportDrafts, false, "")
+
+			// If the message becomes too long, split it into multiple chunks,
+			// even if the Slack API could technically handle a bit more.
+			// 325 is a safety margin for the additional text added below.
+			if msg.Len()+len(prDetails) > 4000-325 {
+				aggregatedErr = errors.Join(aggregatedErr, activities.PostMessage(ctx, user, msg.String()))
+				msg.Reset()
 			}
 
-			msg.WriteString("\n\n:information_source: Slack command tips:")
-			msg.WriteString("\n  •   `/revchat status` - updated report at any time")
-			msg.WriteString("\n  •   `/revchat reminder <time in 12h or 24h format>` - change time or timezone")
-			msg.WriteString("\n  •   `/revchat who` / `[not] my turn` / `[un]freeze` - only in PR channels")
-			msg.WriteString("\n  •   `/revchat explain` - who needs to approve each file, and have they?")
-
-			aggregatedErr = errors.Join(aggregatedErr, activities.PostMessage(ctx, userID, msg.String()))
+			msg.WriteString(prDetails)
 		}
+
+		msg.WriteString("\n\n:information_source: Slack command tips:")
+		msg.WriteString("\n  •   `/revchat status` - updated report at any time")
+		msg.WriteString("\n  •   `/revchat reminder <time in 12h or 24h format>` - change time or timezone")
+		msg.WriteString("\n  •   `/revchat who` / `[not] my turn` / `[un]freeze` - only in PR channels")
+		msg.WriteString("\n  •   `/revchat explain` - who needs to approve each file, and have they?")
+
+		aggregatedErr = errors.Join(aggregatedErr, activities.PostMessage(ctx, user, msg.String()))
 	}
 
 	return aggregatedErr

@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -57,22 +58,40 @@ func LoadCurrentTurnEmails(ctx workflow.Context, prURL string) ([]string, error)
 }
 
 // ListPRsPerSlackUser scans all stored PR turn files, and returns a mapping
-// from Slack user IDs to all the PR URLs they need to be reminded about.
-func ListPRsPerSlackUser(ctx workflow.Context, onlyCurrentTurn, authors, reviewers bool) (users map[string][]string) {
+// from Slack user IDs to all the PR URLs they need to be reminded about. It also
+// returns a list of details about user emails without a known Slack ID, for alerting.
+func ListPRsPerSlackUser(ctx workflow.Context, currentTurn, authors, reviewers bool, filter []string) (userPRs map[string][]string, alerts [][]any) {
 	var err error
 	if ctx == nil { // For unit testing.
-		users, err = internal.ReadPRsPerSlackUser(context.Background(), onlyCurrentTurn, authors, reviewers) //workflowcheck:ignore
+		userPRs, err = internal.ReadPRsPerSlackUser(context.Background(), currentTurn, authors, reviewers, filter) //workflowcheck:ignore
 	} else {
-		err = executeLocalActivity(ctx, internal.ReadPRsPerSlackUser, &users, onlyCurrentTurn, authors, reviewers)
+		err = executeLocalActivity(ctx, internal.ReadPRsPerSlackUser, &userPRs, currentTurn, authors, reviewers, filter)
 	}
 
 	if err != nil {
 		logger.From(ctx).Warn("failed to read all PR attention states", slog.Any("error", err),
-			slog.Bool("only_current_turn", onlyCurrentTurn), slog.Bool("authors", authors), slog.Bool("reviewers", reviewers))
-		return nil
+			slog.Bool("only_current_turn", currentTurn), slog.Bool("authors", authors), slog.Bool("reviewers", reviewers))
+		return nil, nil
 	}
 
-	return users
+	// Look for user emails that couldn't be matched to a Slack ID, prepare details
+	// for alerting about them (to be sent by the caller), and ignore their PRs.
+	for user, prs := range userPRs {
+		if !strings.HasSuffix(user, SlackIDNotFound) {
+			continue // Valid Slack user ID, no alert needed.
+		}
+
+		details := make([]any, 0, 2*len(prs)+2)
+		details = append(details, "Email", strings.TrimSuffix(user, SlackIDNotFound))
+		for i, prURL := range prs {
+			details = append(details, fmt.Sprintf("PR %d", i+1), prURL)
+		}
+
+		alerts = append(alerts, details)
+		delete(userPRs, user)
+	}
+
+	return userPRs, alerts
 }
 
 // SetReviewerTurn records that it's a specific user's turn to review a specific PR: either

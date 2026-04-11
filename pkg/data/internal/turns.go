@@ -227,7 +227,7 @@ func readAllParticipantEmails(ctx context.Context, prURL string, authors, review
 
 // ReadPRsPerSlackUser scans all stored PR turn files, and returns a mapping
 // from Slack user IDs to all the PR URLs they need to be reminded about.
-func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewers bool) (map[string][]string, error) {
+func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewers bool, idFilter []string) (map[string][]string, error) {
 	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 			emails, err = readAllParticipantEmails(ctx, prURL, authors, reviewers)
 		}
 		if err != nil {
-			return nil
+			return nil // Skip files with errors, but keep scanning the rest.
 		}
 
 		for _, email := range emails {
@@ -278,7 +278,18 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 		return nil, err
 	}
 
-	return users, nil
+	if len(idFilter) == 0 {
+		return users, nil
+	}
+
+	filteredUserPRs := make(map[string][]string, len(idFilter))
+	for _, userID := range idFilter {
+		if prs, found := users[userID]; found || strings.HasSuffix(userID, SlackIDNotFound) {
+			filteredUserPRs[userID] = prs
+		}
+	}
+
+	return filteredUserPRs, nil
 }
 
 // GetActivityTime returns the last activity timestamp of a specific user in a specific PR.
