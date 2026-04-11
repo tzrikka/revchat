@@ -42,6 +42,9 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 			users = append(users, userID)
 		}
 	}
+	if len(users) == 0 {
+		return aggregatedErr
+	}
 
 	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, true, true, true, users)
 	for _, details := range userAlerts {
