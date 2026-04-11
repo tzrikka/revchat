@@ -16,23 +16,15 @@ import (
 // SelfStatus is similar to [StatusOfOthers] but lists all the PRs that require the calling user's attention,
 // i.e. PRs where it's their turn to review or respond. The user must be opted-in to use this command.
 func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, alertsChannel string) error {
-	users := data.ListPRsPerSlackUser(ctx, true, true, true)
-	for user, prs := range users {
-		if strings.HasSuffix(user, data.SlackIDNotFound) {
-			details := make([]any, 0, 2*len(prs)+2)
-			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
-			for i, prURL := range prs {
-				details = append(details, fmt.Sprintf("PR %d", i+1), prURL)
-			}
-			activities.AlertWarn(ctx, alertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
-		}
+	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, true, true, true, []string{event.UserID})
+	for _, details := range userAlerts {
+		activities.AlertWarn(ctx, alertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
 	}
-
-	if len(users) == 0 {
+	if len(userPRs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
 	}
-	prs := users[event.UserID]
+	prs := userPRs[event.UserID]
 	if len(prs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
@@ -82,26 +74,18 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bo
 	}
 
 	authors, reviewers := statusMode(event.Text)
-	allUserPRs := data.ListPRsPerSlackUser(ctx, false, authors, reviewers)
-	for user, prs := range allUserPRs {
-		if strings.HasSuffix(user, data.SlackIDNotFound) {
-			details := make([]any, 0, 2*len(prs)+2)
-			details = append(details, "Email", strings.TrimSuffix(user, data.SlackIDNotFound))
-			for i, prURL := range prs {
-				details = append(details, fmt.Sprintf("PR %d", i+1), prURL)
-			}
-			activities.AlertWarn(ctx, alertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
-		}
+	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, false, authors, reviewers, users)
+	for _, details := range userAlerts {
+		activities.AlertWarn(ctx, alertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
 	}
-
-	if len(allUserPRs) == 0 {
+	if len(userPRs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
 			":joy: No PRs require your attention at this time!")
 	}
 
 	var filteredPRs []string
 	for _, userID := range users {
-		filteredPRs = append(filteredPRs, allUserPRs[userID]...)
+		filteredPRs = append(filteredPRs, userPRs[userID]...)
 	}
 	if len(filteredPRs) == 0 {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID,
