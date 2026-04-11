@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -51,7 +52,8 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 		activities.AlertWarn(ctx, c.AlertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
 	}
 
-	for user, prs := range userPRs {
+	for _, user := range slices.Sorted(maps.Keys(userPRs)) {
+		prs := userPRs[user]
 		if len(prs) == 0 {
 			continue
 		}

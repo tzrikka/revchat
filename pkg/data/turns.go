@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -76,11 +78,12 @@ func ListPRsPerSlackUser(ctx workflow.Context, currentTurn, authors, reviewers b
 
 	// Look for user emails that couldn't be matched to a Slack ID, prepare details
 	// for alerting about them (to be sent by the caller), and ignore their PRs.
-	for user, prs := range userPRs {
+	for _, user := range slices.Sorted(maps.Keys(userPRs)) {
 		if !strings.HasSuffix(user, SlackIDNotFound) {
 			continue // Valid Slack user ID, no alert needed.
 		}
 
+		prs := userPRs[user]
 		details := make([]any, 0, 2*len(prs)+2)
 		details = append(details, "Email", strings.TrimSuffix(user, SlackIDNotFound))
 		for i, prURL := range prs {
