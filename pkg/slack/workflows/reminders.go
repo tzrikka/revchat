@@ -52,7 +52,8 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 		activities.AlertWarn(ctx, c.AlertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
 	}
 
-	for _, user := range slices.Sorted(maps.Keys(userPRs)) {
+	keys := slices.Sorted(maps.Keys(userPRs)) //workflowcheck:ignore // Sorted for deterministic order.
+	for _, user := range keys {
 		prs := userPRs[user]
 		if len(prs) == 0 {
 			continue

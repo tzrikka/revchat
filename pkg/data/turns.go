@@ -78,7 +78,8 @@ func ListPRsPerSlackUser(ctx workflow.Context, currentTurn, authors, reviewers b
 
 	// Look for user emails that couldn't be matched to a Slack ID, prepare details
 	// for alerting about them (to be sent by the caller), and ignore their PRs.
-	for _, user := range slices.Sorted(maps.Keys(userPRs)) {
+	keys := slices.Sorted(maps.Keys(userPRs)) //workflowcheck:ignore // Sorted for deterministic order.
+	for _, user := range keys {
 		if !strings.HasSuffix(user, SlackIDNotFound) {
 			continue // Valid Slack user ID, no alert needed.
 		}
