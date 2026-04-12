@@ -27,6 +27,8 @@ type Config struct {
 
 	BitbucketWorkspace string
 
+	TemporalOpts client.Options
+
 	ThrippyGRPCAddress        string
 	ThrippyHTTPAddress        string
 	thrippyClientCert         string
@@ -39,7 +41,7 @@ type Config struct {
 	thrippyLinksClientSecret string
 }
 
-func newConfig(cmd *cli.Command) *Config {
+func newConfig(cmd *cli.Command, temporalOpts client.Options) *Config {
 	return &Config{
 		AlertsChannel: cmd.String("slack-alerts-channel"),
 		NudgeChannels: cmd.StringSlice("slack-nudge-channels"),
@@ -47,6 +49,8 @@ func newConfig(cmd *cli.Command) *Config {
 		ReportDrafts:  cmd.Bool("slack-report-drafts"),
 
 		BitbucketWorkspace: cmd.String("bitbucket-workspace"),
+
+		TemporalOpts: temporalOpts,
 
 		ThrippyGRPCAddress:        cmd.String("thrippy-grpc-address"),
 		ThrippyHTTPAddress:        cmd.String("thrippy-http-address"),
@@ -85,8 +89,8 @@ var Schedules = []string{
 }
 
 // RegisterWorkflows maps event-handling workflow functions to [Signals].
-func RegisterWorkflows(ctx context.Context, cmd *cli.Command, w worker.Worker) {
-	c := newConfig(cmd)
+func RegisterWorkflows(ctx context.Context, cmd *cli.Command, temporalOpts client.Options, w worker.Worker) {
+	c := newConfig(cmd, temporalOpts)
 	c.initThrippyLinks(ctx, cmd.String("thrippy-links-template-id"))
 
 	w.RegisterWorkflowWithOptions(c.AppRateLimitedWorkflow, workflow.RegisterOptions{Name: Signals[0]})

@@ -10,6 +10,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"go.temporal.io/api/enums/v1"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 
@@ -26,9 +27,11 @@ type Config struct {
 	SlackChannelsArePrivate   bool
 
 	LinkifyMap map[string]string
+
+	TemporalOpts client.Options
 }
 
-func newConfig(cmd *cli.Command) *Config {
+func newConfig(cmd *cli.Command, temporalOpts client.Options) *Config {
 	return &Config{
 		SlackAlertsChannel:        cmd.String("slack-alerts-channel"),
 		SlackChannelNamePrefix:    cmd.String("slack-channel-name-prefix"),
@@ -36,6 +39,8 @@ func newConfig(cmd *cli.Command) *Config {
 		SlackChannelsArePrivate:   cmd.Bool("slack-private-channels"),
 
 		LinkifyMap: config.KVSliceToMap(cmd.StringSlice("linkification-map")),
+
+		TemporalOpts: temporalOpts,
 	}
 }
 
@@ -56,13 +61,13 @@ var Signals = []string{
 }
 
 // RegisterWorkflows maps event-handling workflow functions to [Signals].
-func RegisterWorkflows(cmd *cli.Command, w worker.Worker) {
-	c := newConfig(cmd)
+func RegisterWorkflows(cmd *cli.Command, temporalOpts client.Options, w worker.Worker) {
+	c := newConfig(cmd, temporalOpts)
 	w.RegisterWorkflowWithOptions(c.PullRequestWorkflow, workflow.RegisterOptions{Name: Signals[0]})
 	w.RegisterWorkflowWithOptions(PullRequestReviewWorkflow, workflow.RegisterOptions{Name: Signals[1]})
 	w.RegisterWorkflowWithOptions(PullRequestReviewCommentWorkflow, workflow.RegisterOptions{Name: Signals[2]})
 	w.RegisterWorkflowWithOptions(PullRequestReviewThreadWorkflow, workflow.RegisterOptions{Name: Signals[3]})
-	w.RegisterWorkflowWithOptions(IssueCommentWorkflow, workflow.RegisterOptions{Name: Signals[4]})
+	w.RegisterWorkflowWithOptions(c.IssueCommentWorkflow, workflow.RegisterOptions{Name: Signals[4]})
 }
 
 // RegisterSignals routes [Signals] to their registered workflows.

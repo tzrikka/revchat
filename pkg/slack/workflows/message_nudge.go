@@ -45,7 +45,7 @@ func (c *Config) triggerNudge(ctx workflow.Context, event messageEventWrapper, s
 
 	var err error
 	for _, prURL := range extractPullRequestURLs(event.InnerEvent.Text) {
-		err = errors.Join(err, nudge(ctx, event.InnerEvent, recipients, senderID, prURL, c.ThrippyHTTPAddress))
+		err = errors.Join(err, c.nudge(ctx, event.InnerEvent, recipients, senderID, prURL, c.ThrippyHTTPAddress))
 	}
 
 	return err
@@ -122,11 +122,11 @@ func extractPullRequestURLs(text string) []string {
 	return slices.Compact(urls)
 }
 
-func nudge(ctx workflow.Context, event MessageEvent, recipients []string, senderID, prURL, imagesHTTPServer string) error {
+func (c *Config) nudge(ctx workflow.Context, event MessageEvent, recipients []string, senderID, prURL, imagesHTTPServer string) error {
 	done := make([]string, 0, len(recipients))
 	for _, userID := range recipients {
 		// Check that the user is eligible to be nudged.
-		if !checkAndNudgeUser(ctx, event, prURL, userID) {
+		if !c.checkAndNudgeUser(ctx, event, prURL, userID) {
 			continue
 		}
 
@@ -155,7 +155,7 @@ func nudge(ctx workflow.Context, event MessageEvent, recipients []string, sender
 
 // checkAndNudgeUser ensures that the recipient exists, is opted-in, and is a reviewer of the PR.
 // It returns true if the attention state was updated. If not, it also posts an explanation.
-func checkAndNudgeUser(ctx workflow.Context, event MessageEvent, prURL, userID string) bool {
+func (c *Config) checkAndNudgeUser(ctx workflow.Context, event MessageEvent, prURL, userID string) bool {
 	// Check other conditions, send error messages as needed.
 	user, optedIn, err := userDetails(ctx, event, userID)
 	if err != nil {
@@ -168,7 +168,7 @@ func checkAndNudgeUser(ctx workflow.Context, event MessageEvent, prURL, userID s
 	}
 
 	// Update the PR's attention state.
-	ok, approved, err := data.SetReviewerTurn(ctx, prURL, user.Email, true)
+	ok, approved, err := data.SetReviewerTurn(ctx, c.TemporalOpts, prURL, user.Email, true)
 	if err != nil {
 		postEphemeralError(ctx, event, userID, fmt.Sprintf("internal data error while nudging <@%s>.", userID))
 		return ok // May be true despite the error: a valid reviewer, but failed to save it.

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/data"
@@ -14,13 +15,13 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []string, data.User, error) {
+func commonTurnData(ctx workflow.Context, opts client.Options, event SlashCommandEvent) (string, []string, data.User, error) {
 	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
 		return "", nil, data.User{}, err // The error may or may not be nil.
 	}
 
-	emails, err := data.LoadCurrentTurnEmails(ctx, url[0])
+	emails, err := data.LoadCurrentTurnEmails(ctx, opts, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about the PR.")
 		return "", nil, data.User{}, err
@@ -34,8 +35,8 @@ func commonTurnData(ctx workflow.Context, event SlashCommandEvent) (string, []st
 	return url[0], emails, user, nil
 }
 
-func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
-	url, emails, user, err := commonTurnData(ctx, event)
+func MyTurn(ctx workflow.Context, opts client.Options, event SlashCommandEvent) error {
+	url, emails, user, err := commonTurnData(ctx, opts, event)
 	if err != nil {
 		return err
 	}
@@ -51,18 +52,18 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 	msg := "Thanks for letting me know!\n\n"
 
-	ok, _, err := data.SetReviewerTurn(ctx, url, user.Email, true)
+	ok, _, err := data.SetReviewerTurn(ctx, opts, url, user.Email, true)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 	}
 	if !ok {
 		msg = ":thinking_face: I didn't think you're supposed to review this PR, thanks for letting me know!\n\n"
-		if _, _, err := data.SetReviewerTurn(ctx, url, user.Email, false); err != nil {
+		if _, _, err := data.SetReviewerTurn(ctx, opts, url, user.Email, false); err != nil {
 			PostEphemeralError(ctx, event, "failed to write internal data about this.")
 		}
 	}
 
-	emails, err = data.LoadCurrentTurnEmails(ctx, url)
+	emails, err = data.LoadCurrentTurnEmails(ctx, opts, url)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
@@ -72,8 +73,8 @@ func MyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
-func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
-	url, currentTurn, user, err := commonTurnData(ctx, event)
+func NotMyTurn(ctx workflow.Context, opts client.Options, event SlashCommandEvent) error {
+	url, currentTurn, user, err := commonTurnData(ctx, opts, event)
 	if err != nil {
 		return err
 	}
@@ -87,12 +88,12 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 		return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 	}
 
-	if err := data.SwitchTurn(ctx, url, user.Email, true); err != nil {
+	if err := data.SwitchTurn(ctx, opts, url, user.Email, true); err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}
 
-	newTurn, err := data.LoadCurrentTurnEmails(ctx, url)
+	newTurn, err := data.LoadCurrentTurnEmails(ctx, opts, url)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read internal data about this PR.")
 		return err
@@ -102,20 +103,20 @@ func NotMyTurn(ctx workflow.Context, event SlashCommandEvent) error {
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
-func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
+func FreezeTurns(ctx workflow.Context, opts client.Options, event SlashCommandEvent) error {
 	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
 		return err // May or may not be nil.
 	}
 
-	ok, err := data.FreezeTurns(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID))
+	ok, err := data.FreezeTurns(ctx, opts, url[0], users.SlackIDToEmail(ctx, event.UserID))
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
 	}
 
 	// Also switch turns to the user who froze them (if possible), but ignore errors.
-	_, _, err = data.SetReviewerTurn(ctx, url[0], users.SlackIDToEmail(ctx, event.UserID), true)
+	_, _, err = data.SetReviewerTurn(ctx, opts, url[0], users.SlackIDToEmail(ctx, event.UserID), true)
 
 	msg := ":snowflake: Turn switching is now frozen in this PR."
 	if !ok {
@@ -124,13 +125,13 @@ func FreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 	return errors.Join(err, activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg))
 }
 
-func UnfreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
+func UnfreezeTurns(ctx workflow.Context, opts client.Options, event SlashCommandEvent) error {
 	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
 		return err // May or may not be nil.
 	}
 
-	ok, err := data.UnfreezeTurns(ctx, url[0])
+	ok, err := data.UnfreezeTurns(ctx, opts, url[0])
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to write internal data about this PR.")
 		return err
@@ -143,8 +144,8 @@ func UnfreezeTurns(ctx workflow.Context, event SlashCommandEvent) error {
 	return activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, msg)
 }
 
-func WhoseTurn(ctx workflow.Context, event SlashCommandEvent) error {
-	url, emails, user, err := commonTurnData(ctx, event)
+func WhoseTurn(ctx workflow.Context, opts client.Options, event SlashCommandEvent) error {
+	url, emails, user, err := commonTurnData(ctx, opts, event)
 	if err != nil {
 		return err
 	}
@@ -154,7 +155,7 @@ func WhoseTurn(ctx workflow.Context, event SlashCommandEvent) error {
 
 	msg := whoseTurnText(ctx, emails, user, "")
 
-	if at, by := data.IsFrozen(ctx, url); !at.IsZero() {
+	if at, by := data.IsFrozen(ctx, opts, url); !at.IsZero() {
 		id := fmt.Sprintf("<@%s>", users.EmailToSlackID(ctx, by))
 		if id == "<@>" {
 			id = by

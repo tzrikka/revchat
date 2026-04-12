@@ -52,6 +52,7 @@ func BitbucketActorToEmail(ctx workflow.Context, actor bitbucket.User) string {
 
 // BitbucketIDToEmail converts a Bitbucket account ID into an email address. This function returns an empty string if the
 // account ID is not found, and "bot" for non-user app accounts. It uses persistent data storage, or API calls as a fallback.
+// If you change anything here, consider also changing [GitHubIDToEmail] and "data.internal.bitbucketIDToEmail".
 func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) string {
 	if accountID == "" {
 		if accountType == "app_user" {

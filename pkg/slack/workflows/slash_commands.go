@@ -33,18 +33,18 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 	case "explain":
 		return commands.Explain(ctx, event)
 	case "stat", "state", "status":
-		return commands.SelfStatus(ctx, event, c.ReportDrafts, c.AlertsChannel)
+		return commands.SelfStatus(ctx, c.TemporalOpts, event, c.AlertsChannel, c.ReportDrafts)
 
 	case "who", "whose", "whose turn":
-		return commands.WhoseTurn(ctx, event)
+		return commands.WhoseTurn(ctx, c.TemporalOpts, event)
 	case "my turn":
-		return commands.MyTurn(ctx, event)
+		return commands.MyTurn(ctx, c.TemporalOpts, event)
 	case "not my turn":
-		return commands.NotMyTurn(ctx, event)
+		return commands.NotMyTurn(ctx, c.TemporalOpts, event)
 	case "freeze", "freeze turn", "freeze turns":
-		return commands.FreezeTurns(ctx, event)
+		return commands.FreezeTurns(ctx, c.TemporalOpts, event)
 	case "unfreeze", "unfreeze turn", "unfreeze turns":
-		return commands.UnfreezeTurns(ctx, event)
+		return commands.UnfreezeTurns(ctx, c.TemporalOpts, event)
 
 	case "approve", "lgtm", "+1":
 		return commands.Approve(ctx, event)
@@ -62,10 +62,10 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		case "invite":
 			return commands.Invite(ctx, event)
 		case "nudge", "ping", "poke":
-			return commands.Nudge(ctx, event, c.ThrippyHTTPAddress)
+			return commands.Nudge(ctx, c.TemporalOpts, event, c.ThrippyHTTPAddress)
 		default:
 			user, _, _ := data.SelectUserBySlackID(ctx, event.UserID)
-			return commands.StatusOfOthers(ctx, event, c.ReportDrafts, user.ThrippyLink, c.AlertsChannel)
+			return commands.StatusOfOthers(ctx, c.TemporalOpts, event, c.ReportDrafts, user.ThrippyLink, c.AlertsChannel)
 		}
 	}
 	if commands.RemindersSyntax.MatchString(event.Text) {

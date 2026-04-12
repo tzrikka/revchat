@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"go.temporal.io/sdk/client"
 )
 
 func TestNormalizeEmailAddresses(t *testing.T) {
@@ -123,7 +125,7 @@ func TestUserActivity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email, approved, ts := userActivity(t.Context(), tt.detailsMap)
+			email, approved, ts := userActivity(t.Context(), client.Options{}, tt.detailsMap)
 			if email != "" {
 				t.Errorf("userActivity() email = %q, want %q", email, "")
 			}
@@ -146,7 +148,7 @@ func TestInitTurns(t *testing.T) {
 	url := "https://bitbucket.org/workspace/repo/pull-requests/1"
 
 	// Pre-initialized state (missing file).
-	got, err := ReadCurrentTurnEmails(t.Context(), url)
+	got, err := ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err == nil {
 		t.Fatal("ReadCurrentTurnEmails() error = nil, want = true")
 	}
@@ -160,7 +162,7 @@ func TestInitTurns(t *testing.T) {
 		t.Fatalf("InitTurns() error = %v", err)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -175,7 +177,7 @@ func TestInitTurns(t *testing.T) {
 		t.Fatalf("InitTurns() error = %v", err)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -198,7 +200,7 @@ func TestDeleteTurns(t *testing.T) {
 		t.Fatalf("DeleteTurns() error = %v", err)
 	}
 
-	if _, err := ReadCurrentTurnEmails(t.Context(), url); err == nil {
+	if _, err := ReadCurrentTurnEmails(t.Context(), client.Options{}, url); err == nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = nil")
 	}
 }
@@ -260,7 +262,7 @@ func TestLoadCurrentTurnEmails(t *testing.T) {
 			}
 
 			if tt.reviewer != "" {
-				gotStates, gotErr := SetReviewerTurn(t.Context(), url, tt.reviewer, false)
+				gotStates, gotErr := SetReviewerTurn(t.Context(), client.Options{}, url, tt.reviewer, false)
 				if gotErr != nil {
 					t.Fatalf("SetReviewerTurn() error = %v", gotErr)
 				}
@@ -272,7 +274,7 @@ func TestLoadCurrentTurnEmails(t *testing.T) {
 				}
 			}
 
-			got, err := ReadCurrentTurnEmails(t.Context(), url)
+			got, err := ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 			if err != nil {
 				t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 			}
@@ -294,7 +296,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("InitTurns() error = %v", err)
 	}
 
-	got, err := ReadCurrentTurnEmails(t.Context(), url)
+	got, err := ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -304,7 +306,7 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Add reviewers.
-	states, err := SetReviewerTurn(t.Context(), url, "rev1", false)
+	states, err := SetReviewerTurn(t.Context(), client.Options{}, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -315,7 +317,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -324,7 +326,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	states, err = SetReviewerTurn(t.Context(), url, "rev2", false)
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -335,7 +337,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -344,7 +346,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	states, err = SetReviewerTurn(t.Context(), url, "rev2", false) // should be a no-op.
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "rev2", false) // should be a no-op.
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -355,7 +357,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -364,7 +366,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	states, err = SetReviewerTurn(t.Context(), url, "author@example.com", false) // should be a no-op.
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "author@example.com", false) // should be a no-op.
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -375,7 +377,7 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -385,11 +387,11 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Update turn states.
-	err = SwitchTurn(t.Context(), url, "rev1", false)
+	err = SwitchTurn(t.Context(), client.Options{}, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -398,11 +400,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	err = SwitchTurn(t.Context(), url, "rev2", false)
+	err = SwitchTurn(t.Context(), client.Options{}, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -411,11 +413,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	err = SwitchTurn(t.Context(), url, "author@example.com", false)
+	err = SwitchTurn(t.Context(), client.Options{}, url, "author@example.com", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -424,14 +426,14 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	ok, err := FreezeTurns(t.Context(), url, "someone")
+	ok, err := FreezeTurns(t.Context(), client.Options{}, url, "someone")
 	if err != nil {
 		t.Fatalf("FreezeTurns() error = %v", err)
 	}
 	if !ok {
 		t.Fatalf("FreezeTurns() = %v, want %v", ok, true)
 	}
-	ok, err = FreezeTurns(t.Context(), url, "someone")
+	ok, err = FreezeTurns(t.Context(), client.Options{}, url, "someone")
 	if err != nil {
 		t.Fatalf("FreezeTurns() error = %v", err)
 	}
@@ -439,15 +441,15 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("FreezeTurns() = %v, want %v", ok, false)
 	}
 
-	err = SwitchTurn(t.Context(), url, "rev1", false)
+	err = SwitchTurn(t.Context(), client.Options{}, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	err = SwitchTurn(t.Context(), url, "rev2", false)
+	err = SwitchTurn(t.Context(), client.Options{}, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -457,11 +459,11 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Force switch while frozen.
-	err = SwitchTurn(t.Context(), url, "rev1", true)
+	err = SwitchTurn(t.Context(), client.Options{}, url, "rev1", true)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -471,11 +473,11 @@ func TestTurns(t *testing.T) {
 	}
 
 	// Add "rev1" back while still frozen.
-	err = SwitchTurn(t.Context(), url, "author@example.com", true)
+	err = SwitchTurn(t.Context(), client.Options{}, url, "author@example.com", true)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -484,11 +486,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	err = RemoveReviewerFromTurns(t.Context(), url, "rev1", false)
+	err = RemoveReviewerFromTurns(t.Context(), client.Options{}, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -497,11 +499,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	err = RemoveReviewerFromTurns(t.Context(), url, "rev1", false) // Should be a no-op.
+	err = RemoveReviewerFromTurns(t.Context(), client.Options{}, url, "rev1", false) // Should be a no-op.
 	if err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -510,14 +512,14 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	ok, err = UnfreezeTurns(t.Context(), url)
+	ok, err = UnfreezeTurns(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("UnfreezeTurns() error = %v", err)
 	}
 	if !ok {
 		t.Fatalf("UnfreezeTurns() = %v, want %v", ok, true)
 	}
-	ok, err = UnfreezeTurns(t.Context(), url)
+	ok, err = UnfreezeTurns(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("UnfreezeTurns() error = %v", err)
 	}
@@ -525,11 +527,11 @@ func TestTurns(t *testing.T) {
 		t.Fatalf("UnfreezeTurns() = %v, want %v", ok, false)
 	}
 
-	err = SwitchTurn(t.Context(), url, "rev2", false)
+	err = SwitchTurn(t.Context(), client.Options{}, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -549,7 +551,7 @@ func TestFrozen(t *testing.T) {
 		t.Fatalf("InitTurns() error = %v", err)
 	}
 
-	frozen, _ := IsFrozen(t.Context(), url)
+	frozen, _ := IsFrozen(t.Context(), client.Options{}, url)
 	if !frozen.At.IsZero() {
 		t.Fatalf("Frozen() at = %v, want zero time", frozen.At)
 	}
@@ -558,12 +560,12 @@ func TestFrozen(t *testing.T) {
 	}
 
 	email := "freezer"
-	_, err := FreezeTurns(t.Context(), url, email)
+	_, err := FreezeTurns(t.Context(), client.Options{}, url, email)
 	if err != nil {
 		t.Fatalf("FreezeTurns() error = %v", err)
 	}
 
-	frozen, _ = IsFrozen(t.Context(), url)
+	frozen, _ = IsFrozen(t.Context(), client.Options{}, url)
 	if frozen.At.IsZero() {
 		t.Fatalf("Frozen() at = zero time, want non-zero time")
 	}
@@ -583,7 +585,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("InitTurns() error = %v", err)
 	}
 
-	states, err := SetReviewerTurn(t.Context(), url, "rev1", false)
+	states, err := SetReviewerTurn(t.Context(), client.Options{}, url, "rev1", false)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -593,7 +595,7 @@ func TestNudge(t *testing.T) {
 	if states[1] {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
-	states, err = SetReviewerTurn(t.Context(), url, "rev2", false)
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "rev2", false)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -604,7 +606,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
 
-	got, err := ReadCurrentTurnEmails(t.Context(), url)
+	got, err := ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -614,7 +616,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Nudge a non-reviewer.
-	states, err = SetReviewerTurn(t.Context(), url, "non-reviewer", true)
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "non-reviewer", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -626,11 +628,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev1 reviews, author nudges rev2.
-	if err := SwitchTurn(t.Context(), url, "rev1", false); err != nil {
+	if err := SwitchTurn(t.Context(), client.Options{}, url, "rev1", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	states, err = SetReviewerTurn(t.Context(), url, "rev2", true)
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "rev2", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -641,7 +643,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -651,11 +653,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev2 reviews -> it's the author's turn --> nudge the author.
-	if err := SwitchTurn(t.Context(), url, "rev2", false); err != nil {
+	if err := SwitchTurn(t.Context(), client.Options{}, url, "rev2", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -664,7 +666,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("ReadCurrentTurnEmails() = %v, want %v", got, want)
 	}
 
-	states, err = SetReviewerTurn(t.Context(), url, "author@example.com", true)
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "author@example.com", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -675,7 +677,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -685,11 +687,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Author responds to comments --> it's rev1 and rev2's turn again.
-	if err := SwitchTurn(t.Context(), url, "author@example.com", false); err != nil {
+	if err := SwitchTurn(t.Context(), client.Options{}, url, "author@example.com", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -700,11 +702,11 @@ func TestNudge(t *testing.T) {
 
 	// Rev1 approves, and gets removed from the turn --> it's rev2's turn
 	// (not the author, because it's currently the turn of "all the remaining reviewers").
-	if err := RemoveReviewerFromTurns(t.Context(), url, "rev1", true); err != nil {
+	if err := RemoveReviewerFromTurns(t.Context(), client.Options{}, url, "rev1", true); err != nil {
 		t.Fatalf("RemoveReviewerFromTurns() error = %v", err)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -714,7 +716,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Can't nudge rev1 anymore (still a reviewer in Bitbucket, but not tracked by RevChat in this PR).
-	states, err = SetReviewerTurn(t.Context(), url, "rev1", true)
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "rev1", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -726,7 +728,7 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev2 nudged the author after some offline discussion.
-	states, err = SetReviewerTurn(t.Context(), url, "author@example.com", true)
+	states, err = SetReviewerTurn(t.Context(), client.Options{}, url, "author@example.com", true)
 	if err != nil {
 		t.Fatalf("SetReviewerTurn() error = %v", err)
 	}
@@ -737,7 +739,7 @@ func TestNudge(t *testing.T) {
 		t.Fatalf("SetReviewerTurn() approved = %v, want %v", states[1], false)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -747,11 +749,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Author responds to comments --> it's rev2's turn again.
-	if err := SwitchTurn(t.Context(), url, "author@example.com", false); err != nil {
+	if err := SwitchTurn(t.Context(), client.Options{}, url, "author@example.com", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}
@@ -761,11 +763,11 @@ func TestNudge(t *testing.T) {
 	}
 
 	// Rev2 approves too --> it's the author's turn again.
-	if err := SwitchTurn(t.Context(), url, "rev2", false); err != nil {
+	if err := SwitchTurn(t.Context(), client.Options{}, url, "rev2", false); err != nil {
 		t.Fatalf("SwitchTurn() error = %v", err)
 	}
 
-	got, err = ReadCurrentTurnEmails(t.Context(), url)
+	got, err = ReadCurrentTurnEmails(t.Context(), client.Options{}, url)
 	if err != nil {
 		t.Fatalf("ReadCurrentTurnEmails() error = %v", err)
 	}

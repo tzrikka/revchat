@@ -6,13 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"maps"
 	"os"
 	"slices"
 	"strings"
 	"time"
 
+	"go.temporal.io/sdk/activity"
+	"go.temporal.io/sdk/client"
+
 	"github.com/tzrikka/revchat/pkg/config"
+	"github.com/tzrikka/timpani-api/pkg/jira"
+	"github.com/tzrikka/timpani-api/pkg/slack"
 	"github.com/tzrikka/xdg"
 )
 
@@ -52,12 +58,12 @@ func InitTurns(prURL, authorEmail string) error {
 // This function is idempotent either way, but the return values indicate the state for nudge calls:
 // The first boolean indicates whether the requested nudge is allowed (the user is tracked as a reviewer),
 // and the second one indicates whether the user already approved the PR (in case the first value is false).
-func SetReviewerTurn(ctx context.Context, prURL, email string, nudge bool) ([2]bool, error) {
+func SetReviewerTurn(ctx context.Context, opts client.Options, prURL, email string, nudge bool) ([2]bool, error) {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return [2]bool{false, false}, err
 	}
@@ -103,12 +109,12 @@ func SetReviewerTurn(ctx context.Context, prURL, email string, nudge bool) ([2]b
 // If turns are frozen and the switch isn't forced, it only records the activity.
 // If the user is the PR author, it adds all reviewers to the attention state.
 // If the user is a reviewer, it adds the author to the attention state.
-func SwitchTurn(ctx context.Context, prURL, email string, force bool) error {
+func SwitchTurn(ctx context.Context, opts client.Options, prURL, email string, force bool) error {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return err
 	}
@@ -137,12 +143,12 @@ func SwitchTurn(ctx context.Context, prURL, email string, force bool) error {
 
 // RemoveReviewerFromTurns completely removes a reviewer from the attention state of a specific PR. This is called when that
 // reviewer approves the PR, or is unassigned from it. This function is idempotent: if the reviewer does not exist, it does nothing.
-func RemoveReviewerFromTurns(ctx context.Context, prURL, email string, approved bool) error {
+func RemoveReviewerFromTurns(ctx context.Context, opts client.Options, prURL, email string, approved bool) error {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return err
 	}
@@ -169,12 +175,12 @@ func RemoveReviewerFromTurns(ctx context.Context, prURL, email string, approved 
 // to pay attention to a specific PR. If the PR has no assigned reviewers, this function
 // returns the PR author (as a reminder for them to assign reviewers). If any assigned
 // reviewer has their turn flag set to false, we add the author to the list as well.
-func ReadCurrentTurnEmails(ctx context.Context, prURL string) ([]string, error) {
+func ReadCurrentTurnEmails(ctx context.Context, opts client.Options, prURL string) ([]string, error) {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return nil, err
 	}
@@ -203,12 +209,12 @@ func ReadCurrentTurnEmails(ctx context.Context, prURL string) ([]string, error) 
 // readAllParticipantEmails is similar to [ReadCurrentTurnEmails] but returns the email addresses of all
 // users that are currently tracked in the attention state of a specific PR, regardless of whether it's their
 // turn or not. This includes the author and all the reviewers, including those who already approved the PR.
-func readAllParticipantEmails(ctx context.Context, prURL string, authors, reviewers bool) ([]string, error) {
+func readAllParticipantEmails(ctx context.Context, opts client.Options, prURL string, authors, reviewers bool) ([]string, error) {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +233,7 @@ func readAllParticipantEmails(ctx context.Context, prURL string, authors, review
 
 // ReadPRsPerSlackUser scans all stored PR turn files, and returns a mapping
 // from Slack user IDs to all the PR URLs they need to be reminded about.
-func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewers bool, idFilter []string) (map[string][]string, error) {
+func ReadPRsPerSlackUser(ctx context.Context, op client.Options, currentTurn, authors, reviewers bool, filter []string) (map[string][]string, error) {
 	root, err := xdg.CreateDir(xdg.DataHome, config.DirName)
 	if err != nil {
 		return nil, err
@@ -245,10 +251,10 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 
 		prURL := "https://" + strings.TrimSuffix(path, TurnsFileSuffix)
 		var emails []string
-		if onlyCurrentTurn {
-			emails, err = ReadCurrentTurnEmails(ctx, prURL)
+		if currentTurn {
+			emails, err = ReadCurrentTurnEmails(ctx, op, prURL)
 		} else {
-			emails, err = readAllParticipantEmails(ctx, prURL, authors, reviewers)
+			emails, err = readAllParticipantEmails(ctx, op, prURL, authors, reviewers)
 		}
 		if err != nil {
 			return nil // Skip files with errors, but keep scanning the rest.
@@ -261,11 +267,11 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 
 			// Valid but unrecognized (and specifically not opted-in) emails - remove from turns.
 			// Example: user deactivated after being added to the PR.
-			id := emailToSlackID(ctx, email)
+			id := emailToSlackID(ctx, op, email)
 			if id == "" {
 				id = email + SlackIDNotFound
 				users[id] = append(users[id], prURL)
-				_ = RemoveReviewerFromTurns(ctx, prURL, email, false)
+				_ = RemoveReviewerFromTurns(ctx, op, prURL, email, false)
 				continue
 			}
 
@@ -278,12 +284,12 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 		return nil, err
 	}
 
-	if len(idFilter) == 0 {
+	if len(filter) == 0 {
 		return users, nil
 	}
 
-	filteredUserPRs := make(map[string][]string, len(idFilter))
-	for _, userID := range idFilter {
+	filteredUserPRs := make(map[string][]string, len(filter))
+	for _, userID := range filter {
 		if prs, found := users[userID]; found || strings.HasSuffix(userID, SlackIDNotFound) {
 			filteredUserPRs[userID] = prs
 		}
@@ -294,12 +300,12 @@ func ReadPRsPerSlackUser(ctx context.Context, onlyCurrentTurn, authors, reviewer
 
 // GetActivityTime returns the last activity timestamp of a specific user in a specific PR.
 // If the user is not found or is a bot, this function returns a zero timestamp.
-func GetActivityTime(ctx context.Context, prURL, email string) (time.Time, error) {
+func GetActivityTime(ctx context.Context, opts client.Options, prURL, email string) (time.Time, error) {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -311,12 +317,12 @@ func GetActivityTime(ctx context.Context, prURL, email string) (time.Time, error
 // specific PR. If the user is not found or is a bot, this function does nothing.
 // This is called when the user interacts with the PR in any way that doesn't
 // change their turn (such as PR edits, commit pushes, and review actions).
-func UpdateActivityTime(ctx context.Context, prURL, email string) error {
+func UpdateActivityTime(ctx context.Context, opts client.Options, prURL, email string) error {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return err
 	}
@@ -333,12 +339,12 @@ func UpdateActivityTime(ctx context.Context, prURL, email string) error {
 // FreezeTurns marks the attention state of a specific PR as frozen by a specific user.
 // This prevents most changes by [SwitchTurn], and only by it, until it is unfrozen.
 // If the turn is already frozen, this function returns false and does nothing.
-func FreezeTurns(ctx context.Context, prURL, email string) (bool, error) {
+func FreezeTurns(ctx context.Context, opts client.Options, prURL, email string) (bool, error) {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return false, err
 	}
@@ -359,12 +365,12 @@ func FreezeTurns(ctx context.Context, prURL, email string) (bool, error) {
 
 // UnfreezeTurns is the inverse of [FreezeTurns].
 // If the turn is not frozen, this function returns false and does nothing.
-func UnfreezeTurns(ctx context.Context, prURL string) (bool, error) {
+func UnfreezeTurns(ctx context.Context, opts client.Options, prURL string) (bool, error) {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return false, err
 	}
@@ -385,12 +391,12 @@ func UnfreezeTurns(ctx context.Context, prURL string) (bool, error) {
 
 // IsFrozen returns the timestamp and user email of when and who froze the attention state of
 // a specific PR. If the turn is not frozen, it returns a zero timestamp and an empty string.
-func IsFrozen(ctx context.Context, prURL string) (Frozen, error) {
+func IsFrozen(ctx context.Context, opts client.Options, prURL string) (Frozen, error) {
 	mu := getDataFileMutex(prURL + TurnsFileSuffix)
 	mu.Lock()
 	defer mu.Unlock()
 
-	t, err := readTurns(ctx, prURL)
+	t, err := readTurns(ctx, opts, prURL)
 	if err != nil {
 		return Frozen{}, err
 	}
@@ -431,7 +437,7 @@ func normalizeEmailAddresses(t *PRTurns) {
 }
 
 // readTurns expects the calling function to hold the appropriate mutex for the given PR URL.
-func readTurns(ctx context.Context, prURL string) (*PRTurns, error) {
+func readTurns(ctx context.Context, opts client.Options, prURL string) (*PRTurns, error) {
 	path, err := dataPath(prURL + TurnsFileSuffix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file path: %w", err)
@@ -440,7 +446,7 @@ func readTurns(ctx context.Context, prURL string) (*PRTurns, error) {
 	f, err := os.Open(path) //gosec:disable G304 // URL received from signature-verified 3rd-party, suffix is hardcoded.
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return resetTurns(ctx, prURL, nil)
+			return resetTurns(ctx, opts, prURL, nil)
 		}
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
@@ -448,12 +454,12 @@ func readTurns(ctx context.Context, prURL string) (*PRTurns, error) {
 
 	t := new(PRTurns)
 	if err := json.NewDecoder(f).Decode(&t); err != nil {
-		return resetTurns(ctx, prURL, nil)
+		return resetTurns(ctx, opts, prURL, nil)
 	}
 
 	// Data sanity checks.
 	if t.Author == "" {
-		return resetTurns(ctx, prURL, t)
+		return resetTurns(ctx, opts, prURL, t)
 	}
 	normalizeEmailAddresses(t)
 	if t.Reviewers == nil {
@@ -471,7 +477,7 @@ func readTurns(ctx context.Context, prURL string) (*PRTurns, error) {
 
 // resetTurns recreates the attention state file for a specific PR, based on the current
 // PR snapshot. This is a fallback for when the turn file is missing or corrupted.
-func resetTurns(ctx context.Context, prURL string, t *PRTurns) (*PRTurns, error) {
+func resetTurns(ctx context.Context, opts client.Options, prURL string, t *PRTurns) (*PRTurns, error) {
 	pr, err := ReadPRSnapshot(ctx, prURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reset turns file due to PR snapshot error: %w", err)
@@ -480,7 +486,7 @@ func resetTurns(ctx context.Context, prURL string, t *PRTurns) (*PRTurns, error)
 		return nil, errors.New("failed to reset turns file due to missing PR snapshot")
 	}
 
-	author, accountType := userEmailAndType(ctx, pr["author"])
+	author, accountType := userEmailAndType(ctx, opts, pr["author"])
 	if author == "" && accountType == "app_user" {
 		author = "bot"
 	}
@@ -508,7 +514,7 @@ func resetTurns(ctx context.Context, prURL string, t *PRTurns) (*PRTurns, error)
 	reviewers := map[string]bool{}
 	jsonList := listOf(pr, "reviewers")
 	for _, reviewer := range jsonList {
-		if email, _ := userEmailAndType(ctx, reviewer); email != "" {
+		if email, _ := userEmailAndType(ctx, opts, reviewer); email != "" {
 			reviewers[email] = true
 		}
 	}
@@ -516,7 +522,7 @@ func resetTurns(ctx context.Context, prURL string, t *PRTurns) (*PRTurns, error)
 	activity, approvers := map[string]time.Time{}, map[string]time.Time{}
 	jsonList = listOf(pr, "participants")
 	for _, participant := range jsonList {
-		if email, approved, timestamp := userActivity(ctx, participant); email != "" {
+		if email, approved, timestamp := userActivity(ctx, opts, participant); email != "" {
 			activity[email] = timestamp
 			if approved {
 				approvers[email] = timestamp
@@ -542,13 +548,13 @@ func listOf(pr map[string]any, key string) []any {
 
 // userActivity extracts a user's email, approval status, and activity
 // time from a JSON block of participant details in a Bitbucket PR snapshot.
-func userActivity(ctx context.Context, detailsMap any) (string, bool, time.Time) {
+func userActivity(ctx context.Context, opts client.Options, detailsMap any) (string, bool, time.Time) {
 	participant, ok := detailsMap.(map[string]any)
 	if !ok {
 		return "", false, time.Time{}
 	}
 
-	email, _ := userEmailAndType(ctx, participant)
+	email, _ := userEmailAndType(ctx, opts, participant)
 	approved, ok := participant["approved"].(bool)
 	if !ok {
 		approved = false
@@ -568,7 +574,7 @@ func userActivity(ctx context.Context, detailsMap any) (string, bool, time.Time)
 
 // userEmailAndType extracts the Bitbucket account ID from user details map, and converts
 // it into the user's email address and account type, based on RevChat's own user database.
-func userEmailAndType(ctx context.Context, detailsMap any) (email, accountType string) {
+func userEmailAndType(ctx context.Context, opts client.Options, detailsMap any) (email, accountType string) {
 	user, ok := detailsMap.(map[string]any)
 	if !ok {
 		return "", ""
@@ -583,13 +589,13 @@ func userEmailAndType(ctx context.Context, detailsMap any) (email, accountType s
 		accountType = ""
 	}
 
-	return bitbucketIDToEmail(ctx, accountID, accountType), accountType
+	return bitbucketIDToEmail(ctx, opts, accountID, accountType), accountType
 }
 
 // bitbucketIDToEmail converts a Bitbucket account ID into an email address. This function returns an empty string if the account ID
 // is not found. It uses persistent data storage, or API calls as a fallback. Compare this function with [users.BitbucketIDToEmail],
 // which receives a [workflow.Context] instead of a [context.Context], and returns "bot" instead of "" for non-user app accounts.
-func bitbucketIDToEmail(ctx context.Context, accountID, accountType string) string {
+func bitbucketIDToEmail(ctx context.Context, opts client.Options, accountID, accountType string) string {
 	if accountID == "" {
 		return "" // Unknown user, so no point to look-up in Jira.
 	}
@@ -598,17 +604,30 @@ func bitbucketIDToEmail(ctx context.Context, accountID, accountType string) stri
 		return user.Email // No need to check for errors here, it's a prerequisite for the result to be non-empty.
 	}
 
-	if accountType == "app_user" {
-		return "" // Not a real user, so no point to look-up in Jira.
+	if accountType == "app_user" || opts.Logger == nil {
+		return "" // Not a real user, or a unit test, so no point to look-up in Jira.
 	}
 
-	return ""
+	// We use the Jira API as a fallback because the Bitbucket API doesn't expose email addresses.
+	req := jira.UsersGetRequest{AccountID: accountID}
+	user := new(jira.User)
+	if err := executeTimpaniActivity(ctx, opts, jira.UsersGetActivityName, accountID, req, user); err != nil {
+		activity.GetLogger(ctx).Warn("failed to retrieve Jira user info",
+			slog.Any("error", err), slog.String("account_id", accountID))
+		return ""
+	}
+
+	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+	email := strings.ToLower(user.Email)
+	_, _ = UpsertUser(ctx, email, "", accountID, "", "", "")
+
+	return email
 }
 
 // emailToSlackID retrieves a Slack user's ID based on their email address. This function returns an
 // empty string if the user ID is not found. It uses persistent data storage, or API calls as a fallback.
 // Compare this function with [users.EmailToSlackID], which receives a [workflow.Context] instead of a [context.Context].
-func emailToSlackID(ctx context.Context, email string) string {
+func emailToSlackID(ctx context.Context, opts client.Options, email string) string {
 	if email == "" || email == "bot" {
 		return ""
 	}
@@ -617,5 +636,20 @@ func emailToSlackID(ctx context.Context, email string) string {
 		return user.SlackID // No need to check for errors here, it's a prerequisite for the result to be non-empty.
 	}
 
-	return ""
+	if opts.Logger == nil {
+		return "" // Unit test, so no point to look-up in Slack.
+	}
+
+	req := slack.UsersLookupByEmailRequest{Email: email}
+	user := new(slack.User)
+	if err := executeTimpaniActivity(ctx, opts, slack.UsersLookupByEmailActivityName, email, req, user); err != nil {
+		activity.GetLogger(ctx).Error("failed to retrieve Slack user info",
+			slog.Any("error", err), slog.String("email", email))
+		return ""
+	}
+
+	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
+	_, _ = UpsertUser(ctx, email, user.RealName, "", "", user.ID, "")
+
+	return user.ID
 }

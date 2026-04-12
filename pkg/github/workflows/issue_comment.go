@@ -16,10 +16,10 @@ import (
 
 // IssueCommentWorkflow is an entrypoint to mirror all GitHub issue comment events in the PR's
 // Slack channel: https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_comment
-func IssueCommentWorkflow(ctx workflow.Context, event github.IssueCommentEvent) error {
+func (c Config) IssueCommentWorkflow(ctx workflow.Context, event github.IssueCommentEvent) error {
 	switch event.Action {
 	case "created":
-		return issueCommentCreated(ctx, event)
+		return c.issueCommentCreated(ctx, event)
 	case "edited":
 		return issueCommentEdited(ctx, event)
 	case "deleted":
@@ -31,7 +31,7 @@ func IssueCommentWorkflow(ctx workflow.Context, event github.IssueCommentEvent) 
 }
 
 // A comment on an issue or pull request was created.
-func issueCommentCreated(ctx workflow.Context, event github.IssueCommentEvent) error {
+func (c Config) issueCommentCreated(ctx workflow.Context, event github.IssueCommentEvent) error {
 	// If we're not tracking this PR, there's no need/way to mirror this event.
 	channelID, found := activities.LookupChannel(ctx, event.Issue.HTMLURL)
 	if !found {
@@ -42,7 +42,7 @@ func issueCommentCreated(ctx workflow.Context, event github.IssueCommentEvent) e
 
 	// Don't abort if this fails - it's more important to post the comment.
 	email := users.GitHubIDToEmail(ctx, event.Sender.Login)
-	_ = data.SwitchTurn(ctx, event.Issue.HTMLURL, email, false)
+	_ = data.SwitchTurn(ctx, c.TemporalOpts, event.Issue.HTMLURL, email, false)
 
 	msg := markdown.GitHubToSlack(ctx, event.Comment.Body, event.Comment.HTMLURL)
 	logger.From(ctx).Warn("MSG", slog.String("MSG", msg))

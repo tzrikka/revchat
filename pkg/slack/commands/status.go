@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/pkg/data"
@@ -15,8 +16,8 @@ import (
 
 // SelfStatus is similar to [StatusOfOthers] but lists all the PRs that require the calling user's attention,
 // i.e. PRs where it's their turn to review or respond. The user must be opted-in to use this command.
-func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, alertsChannel string) error {
-	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, true, true, true, []string{event.UserID})
+func SelfStatus(ctx workflow.Context, opts client.Options, event SlashCommandEvent, alertsChannel string, showDrafts bool) error {
+	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, opts, true, true, true, []string{event.UserID})
 	for _, details := range userAlerts {
 		activities.AlertWarn(ctx, alertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
 	}
@@ -38,7 +39,7 @@ func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, 
 	singleUser := []string{event.UserID}
 
 	for _, url := range prs {
-		prDetails := slack.PRDetails(ctx, url, singleUser, true, showDrafts, false, "")
+		prDetails := slack.PRDetails(ctx, opts, url, singleUser, true, showDrafts, false, "")
 
 		// If the message becomes too long, split it into multiple chunks,
 		// even if the Slack API could technically handle a bit more.
@@ -62,7 +63,7 @@ func SelfStatus(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, 
 
 // StatusOfOthers is similar to [SelfStatus] but lists all the PRs associated with the given users
 // and/or groups. This is the only command that doesn't require the calling user to be opted-in.
-func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bool, thrippyID, alertsChannel string) error {
+func StatusOfOthers(ctx workflow.Context, opts client.Options, event SlashCommandEvent, showDrafts bool, thrippyID, alertsChannel string) error {
 	showDrafts = showDraftsOption(showDrafts, event.Text)
 	showTasks := strings.Contains(event.Text, " tasks")
 
@@ -74,7 +75,7 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bo
 	}
 
 	authors, reviewers := statusMode(event.Text)
-	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, false, authors, reviewers, users)
+	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, opts, false, authors, reviewers, users)
 	for _, details := range userAlerts {
 		activities.AlertWarn(ctx, alertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
 	}
@@ -107,7 +108,7 @@ func StatusOfOthers(ctx workflow.Context, event SlashCommandEvent, showDrafts bo
 	header := list.String()
 
 	for _, url := range filteredPRs {
-		prDetails := slack.PRDetails(ctx, url, users, false, showDrafts, showTasks, thrippyID)
+		prDetails := slack.PRDetails(ctx, opts, url, users, false, showDrafts, showTasks, thrippyID)
 
 		// If the message becomes too long, split it into multiple chunks, even if the Slack API
 		// could technically handle a bit more. Why not 4000? To leave a buffer for encoding.

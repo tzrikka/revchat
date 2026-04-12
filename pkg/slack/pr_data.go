@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
@@ -20,7 +21,14 @@ import (
 // PRDetails returns a summary of a Bitbucket or GitHub PR's metadata and activity.
 // The output is empty if the PR is in draft mode and the "reportDrafts" parameter is false.
 // The "thrippyID" parameter is only used to report Bitbucket PR tasks, and can be left empty otherwise.
-func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, showDrafts, showTasks bool, thrippyID string) string {
+func PRDetails(
+	ctx workflow.Context,
+	opts client.Options,
+	url string,
+	userIDs []string,
+	selfReport, showDrafts, showTasks bool,
+	thrippyID string,
+) string {
 	summary := new(strings.Builder)
 	pr, err := data.LoadPRSnapshot(ctx, url)
 	if err != nil {
@@ -58,7 +66,7 @@ func PRDetails(ctx workflow.Context, url string, userIDs []string, selfReport, s
 	}
 
 	if len(userIDs) == 1 {
-		if activity := data.GetActivityTime(ctx, url, users.SlackIDToEmail(ctx, userIDs[0])); !activity.IsZero() {
+		if activity := data.GetActivityTime(ctx, opts, url, users.SlackIDToEmail(ctx, userIDs[0])); !activity.IsZero() {
 			fmt.Fprintf(summary, ", touched by you `%s` ago", timeSince(now, activity)) //workflowcheck:ignore // Same as above.
 		}
 	}
