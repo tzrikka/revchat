@@ -32,7 +32,7 @@ func CleanPRData(ctx workflow.Context, _ client.Options, event SlashCommandEvent
 }
 
 func isPROpen(ctx workflow.Context, url string) (bool, error) {
-	workflow.Sleep(ctx, 3*time.Second) // Avoid hitting API rate limits when processing many PRs.
+	_ = workflow.Sleep(ctx, 3*time.Second) // Avoid hitting API rate limits when processing many PRs.
 
 	if strings.HasPrefix(url, "https://bitbucket.org/") {
 		pr, err := bitbucket.GetPullRequest(ctx, "", url)
