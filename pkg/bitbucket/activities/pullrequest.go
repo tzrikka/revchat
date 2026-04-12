@@ -53,6 +53,25 @@ func DeletePullRequestComment(ctx workflow.Context, thrippyID, workspace, repo, 
 
 var commentURLPattern = regexp.MustCompile(`^https://[^/]+/([^/]+)/([^/]+)/pull-requests/(\d+)([^\s\d]+(\d+))?`)
 
+// GetPullRequest allows the Thrippy link ID to be empty, even though it is encouraged to specify it.
+func GetPullRequest(ctx workflow.Context, thrippyID, prURL string) (map[string]any, error) {
+	url := commentURLPattern.FindStringSubmatch(prURL)
+	if len(url) < 4 {
+		logger.From(ctx).Error("failed to parse Bitbucket PR's URL", slog.String("url", prURL))
+		return nil, errors.New("invalid Bitbucket PR URL: " + prURL)
+	}
+
+	resp, err := bitbucket.PullRequestsGet(ctx, thrippyID, url[1], url[2], url[3])
+	if err != nil {
+		logger.From(ctx).Error("failed to get Bitbucket PR", slog.Any("error", err),
+			slog.String("thrippy_id", thrippyID), slog.String("workspace", url[1]),
+			slog.String("repo", url[2]), slog.String("pr_id", url[3]))
+		return nil, err
+	}
+
+	return resp, nil
+}
+
 // GetPullRequestComment allows the Thrippy link ID to be empty, even though it is encouraged to specify it.
 func GetPullRequestComment(ctx workflow.Context, thrippyID, commentURL string) (*bitbucket.Comment, error) {
 	url := commentURLPattern.FindStringSubmatch(commentURL)
