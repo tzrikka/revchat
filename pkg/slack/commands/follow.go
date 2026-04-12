@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -64,15 +65,17 @@ func extractFollowedUsers(ctx workflow.Context, event SlashCommandEvent) []strin
 	}
 
 	ids := extractAtLeastOneUserID(ctx, event)
-
-	// Remove the calling user from the list of users to un/follow, if present.
-	for i, id := range ids {
-		if id == event.UserID {
-			ids = append(ids[:i], ids[i+1:]...)
-			break // Unsafe and unnecessary to continue iterating.
-		}
+	i := slices.Index(ids, event.UserID)
+	if i == -1 {
+		return ids
 	}
 
+	// Remove the calling user from the list of users to un/follow.
+	ids = slices.Delete(ids, i, i+1)
+	if len(ids) == 0 {
+		PostEphemeralError(ctx, event, "you can't un/follow yourself.")
+		return nil
+	}
 	return ids
 }
 
