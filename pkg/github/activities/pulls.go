@@ -3,6 +3,8 @@ package activities
 import (
 	"errors"
 	"log/slog"
+	"regexp"
+	"strconv"
 
 	"go.temporal.io/sdk/workflow"
 
@@ -59,6 +61,34 @@ func CreateReviewCommentReply(ctx workflow.Context, thrippyID, owner, repo strin
 	}
 
 	return resp.HTMLURL, nil
+}
+
+var commentURLPattern = regexp.MustCompile(`^https://[^/]+/([^/]+)/([^/]+)/pull/(\d+)([^\s\d]+(\d+))?`)
+
+// GetPullRequest allows the Thrippy link ID to be empty, even though it is encouraged to specify it.
+func GetPullRequest(ctx workflow.Context, thrippyID, prURL string) (*github.PullRequest, error) {
+	url := commentURLPattern.FindStringSubmatch(prURL)
+	if len(url) < 4 {
+		logger.From(ctx).Error("failed to parse GitHub PR's URL", slog.String("url", prURL))
+		return nil, errors.New("invalid GitHub PR URL: " + prURL)
+	}
+
+	id, err := strconv.Atoi(url[3])
+	if err != nil {
+		logger.From(ctx).Error("failed to convert PR ID to integer", slog.Any("error", err),
+			slog.String("thrippy_id", thrippyID), slog.String("pr_id", url[3]))
+		return nil, errors.New("invalid PR ID in GitHub URL: " + url[3])
+	}
+
+	resp, err := github.PullRequestsGet(ctx, thrippyID, url[1], url[2], id)
+	if err != nil {
+		logger.From(ctx).Error("failed to get GitHub PR", slog.Any("error", err),
+			slog.String("thrippy_id", thrippyID), slog.String("owner", url[1]),
+			slog.String("repo", url[2]), slog.String("pr_id", url[3]))
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func ListPullRequestFiles(ctx workflow.Context, thrippyID, owner, repo string, prID int) ([]github.File, error) {

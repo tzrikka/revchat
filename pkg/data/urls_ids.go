@@ -58,3 +58,17 @@ func DeleteURLAndIDMapping(ctx workflow.Context, key string) {
 			slog.Any("error", err), slog.String("key", key))
 	}
 }
+
+const (
+	URLs     = internal.URLs
+	Channels = internal.Channels
+)
+
+func ReadAllURLsOrChannels(ctx workflow.Context, what string) ([]string, error) {
+	var results []string
+	if err := executeLocalActivity(ctx, internal.ReadAllURLsOrChannels, &results, what); err != nil {
+		logger.From(ctx).Error("failed to read all "+what, slog.Any("error", err))
+		return nil, err
+	}
+	return results, nil
+}

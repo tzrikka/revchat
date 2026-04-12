@@ -2,6 +2,8 @@ package internal
 
 import (
 	"context"
+	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -74,4 +76,44 @@ func DelURLAndIDMapping(_ context.Context, key string) error {
 	}
 
 	return writeGenericJSONFile(urlsIDsFile, m)
+}
+
+const (
+	URLs     = "PR URLs"
+	Channels = "Slack channel IDs"
+)
+
+var (
+	PullRequestURLPattern = regexp.MustCompile(`https://[^/]+/[^/]+/[^/]+/pull(-requests)?/\d+`)
+	SlackChannelIDPattern = regexp.MustCompile(`^C[A-Z0-9]+`)
+)
+
+func ReadAllURLsOrChannels(_ context.Context, what string) ([]string, error) {
+	mu := getDataFileMutex(urlsIDsFile)
+	mu.Lock()
+	defer mu.Unlock()
+
+	m, err := readGenericJSONFile(urlsIDsFile)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []string
+	for k, v := range m {
+		prURL := PullRequestURLPattern.FindString(k + v)
+		channel := SlackChannelIDPattern.FindString(k)
+		if channel == "" {
+			channel = SlackChannelIDPattern.FindString(v)
+		}
+
+		switch {
+		case what == URLs && prURL != "":
+			results = append(results, prURL)
+		case what == Channels && channel != "":
+			results = append(results, channel)
+		}
+	}
+
+	slices.Sort(results)
+	return slices.Compact(results), nil
 }

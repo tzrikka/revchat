@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/tzrikka/revchat/pkg/data/internal"
@@ -178,6 +179,56 @@ func TestDeleteURLAndIDMapping(t *testing.T) {
 				if got != "" {
 					t.Errorf("GetURLAndIDMapping(%q) = %q, want empty string", key, got)
 				}
+			}
+		})
+	}
+}
+
+func TestReadAllURLsOrChannels(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", d)
+
+	if err := internal.SetURLAndIDMapping(t.Context(), "https://example.com/foo/bar/pull/123", "C123"); err != nil {
+		t.Fatalf("SetURLAndIDMapping() error = %v", err)
+	}
+	if err := internal.SetURLAndIDMapping(t.Context(), "https://example.com/foo/bar/pull/123/comment1", "C123/456"); err != nil {
+		t.Fatalf("SetURLAndIDMapping() error = %v", err)
+	}
+	if err := internal.SetURLAndIDMapping(t.Context(), "https://example.com/foo/bar/pull/456/comment2", "C456/789"); err != nil {
+		t.Fatalf("SetURLAndIDMapping() error = %v", err)
+	}
+
+	tests := []struct {
+		name string
+		what string
+		want []string
+	}{
+		{
+			name: "urls",
+			what: internal.URLs,
+			want: []string{
+				"https://example.com/foo/bar/pull/123",
+				"https://example.com/foo/bar/pull/456",
+			},
+		},
+		{
+			name: "channels",
+			what: internal.Channels,
+			want: []string{
+				"C123",
+				"C456",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := internal.ReadAllURLsOrChannels(t.Context(), tt.what)
+			if err != nil {
+				t.Fatalf("ReadAllURLsOrChannels(%q) error = %v", tt.what, err)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("ReadAllURLsOrChannels(%q) = %q, want %q", tt.what, got, tt.want)
 			}
 		})
 	}
