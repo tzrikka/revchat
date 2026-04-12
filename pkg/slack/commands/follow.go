@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
@@ -63,7 +64,19 @@ func extractFollowedUsers(ctx workflow.Context, event SlashCommandEvent) []strin
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	return extractAtLeastOneUserID(ctx, event)
+	ids := extractAtLeastOneUserID(ctx, event)
+	i := slices.Index(ids, event.UserID)
+	if i == -1 {
+		return ids
+	}
+
+	// Remove the calling user from the list of users to un/follow.
+	ids = slices.Delete(ids, i, i+1)
+	if len(ids) == 0 {
+		PostEphemeralError(ctx, event, "you can't un/follow yourself.")
+		return nil
+	}
+	return ids
 }
 
 func checkFollowedUser(ctx workflow.Context, event SlashCommandEvent, userID string) bool {
