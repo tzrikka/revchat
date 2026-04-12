@@ -60,15 +60,14 @@ func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel stri
 
 	cleaned, failed := 0, 0
 	for _, url := range results {
-		var open bool
-		open, err = isPROpen(ctx, url)
-		if err != nil {
-			err = errors.Join(err, slack.AlertError(ctx, alertsChannel, "failed to fetch the state of a PR", err,
-				"URL", url, "Initiator", fmt.Sprintf("<@%s>", event.UserID)))
+		isOpen, openErr := isPROpen(ctx, url)
+		if openErr != nil {
+			err = errors.Join(err, slack.AlertError(ctx, alertsChannel, "failed to fetch the state of a PR",
+				openErr, "URL", url, "Initiator", fmt.Sprintf("<@%s>", event.UserID)))
 			failed++
 			continue
 		}
-		if open {
+		if isOpen {
 			continue
 		}
 
