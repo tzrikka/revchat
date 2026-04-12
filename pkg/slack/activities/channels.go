@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
@@ -61,7 +62,7 @@ func CreateChannel(ctx workflow.Context, name, prURL string, private bool) (id s
 // InviteUsersToChannel adds up to 1,000 users to the given Slack channel
 // and PR attention state (the given users are expected to be opted-in).
 // This is an idempotent function, unlike the underlying Slack API call.
-func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, participantIDs, followerIDs []string) error {
+func InviteUsersToChannel(ctx workflow.Context, opts client.Options, channelID, prURL string, participantIDs, followerIDs []string) error {
 	// API limitation, but we don't split into multiple API calls because that many reviewers is undesirable anyway.
 	if len(participantIDs) > 1000 {
 		logger.From(ctx).Warn("trying to add more than 1000 users to Slack channel - truncating",
@@ -76,7 +77,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, partici
 			dontInvite = append(dontInvite, id)
 			continue
 		}
-		if _, _, err := data.SetReviewerTurn(ctx, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
+		if _, _, err := data.SetReviewerTurn(ctx, opts, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
 			dontInvite = append(dontInvite, id)
 			errs = append(errs, err)
 		}
@@ -117,7 +118,7 @@ func InviteUsersToChannel(ctx workflow.Context, channelID, prURL string, partici
 
 // KickUsersFromChannel removes the given users from the given Slack channel and PR
 // attention state. This is an idempotent function, unlike the underlying Slack API call.
-func KickUsersFromChannel(ctx workflow.Context, channelID, prURL string, userIDs []string) error {
+func KickUsersFromChannel(ctx workflow.Context, opts client.Options, channelID, prURL string, userIDs []string) error {
 	var errs []error
 	for _, id := range userIDs {
 		if id == "" {
@@ -140,7 +141,7 @@ func KickUsersFromChannel(ctx workflow.Context, channelID, prURL string, userIDs
 			}
 		}
 
-		if err := data.RemoveReviewerFromTurns(ctx, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
+		if err := data.RemoveReviewerFromTurns(ctx, opts, prURL, users.SlackIDToEmail(ctx, id), false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -165,8 +166,8 @@ func RenameChannel(ctx workflow.Context, channelID, name string) (bool, error) {
 	return false, nil
 }
 
-func SetChannelDescription(ctx workflow.Context, channelID, title, prURL, email string) {
-	data.UpdateActivityTime(ctx, prURL, email)
+func SetChannelDescription(ctx workflow.Context, opts client.Options, channelID, title, prURL, email string) {
+	data.UpdateActivityTime(ctx, opts, prURL, email)
 
 	desc := fmt.Sprintf("`%s`", title)
 	if len(desc) > channelMetadataMaxLen {

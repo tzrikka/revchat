@@ -28,11 +28,11 @@ type Config struct {
 
 	LinkifyMap map[string]string
 
-	Opts      client.Options
-	TaskQueue string
+	TemporalOpts client.Options
+	TaskQueue    string
 }
 
-func newConfig(cmd *cli.Command, opts client.Options, taskQueue string) *Config {
+func newConfig(cmd *cli.Command, temporalOpts client.Options, taskQueue string) *Config {
 	return &Config{
 		SlackAlertsChannel:        cmd.String("slack-alerts-channel"),
 		SlackChannelNamePrefix:    cmd.String("slack-channel-name-prefix"),
@@ -41,8 +41,8 @@ func newConfig(cmd *cli.Command, opts client.Options, taskQueue string) *Config 
 
 		LinkifyMap: config.KVSliceToMap(cmd.StringSlice("linkification-map")),
 
-		Opts:      opts,
-		TaskQueue: taskQueue,
+		TemporalOpts: temporalOpts,
+		TaskQueue:    taskQueue,
 	}
 }
 
@@ -99,8 +99,8 @@ var Schedules = []string{
 }
 
 // RegisterPullRequestWorkflows maps event-handling workflow functions to [PullRequestSignals].
-func RegisterPullRequestWorkflows(cmd *cli.Command, opts client.Options, taskQueue string, w worker.Worker) {
-	c := newConfig(cmd, opts, taskQueue)
+func RegisterPullRequestWorkflows(cmd *cli.Command, temporalOpts client.Options, taskQueue string, w worker.Worker) {
+	c := newConfig(cmd, temporalOpts, taskQueue)
 	funcs := []prWorkflowFunc{
 		c.PullRequestCreatedWorkflow,
 		c.PullRequestUpdatedWorkflow,
@@ -114,8 +114,8 @@ func RegisterPullRequestWorkflows(cmd *cli.Command, opts client.Options, taskQue
 		c.CommentCreatedWorkflow,
 		c.CommentUpdatedWorkflow,
 		c.CommentDeletedWorkflow,
-		CommentResolvedWorkflow,
-		CommentReopenedWorkflow,
+		c.CommentResolvedWorkflow,
+		c.CommentReopenedWorkflow,
 	}
 	for i, f := range funcs {
 		w.RegisterWorkflowWithOptions(f, workflow.RegisterOptions{Name: PullRequestSignals[i]})
@@ -127,8 +127,8 @@ func RegisterPullRequestWorkflows(cmd *cli.Command, opts client.Options, taskQue
 }
 
 // RegisterRepositoryWorkflows maps event-handling workflow functions to [RepositorySignals].
-func RegisterRepositoryWorkflows(cmd *cli.Command, opts client.Options, taskQueue string, w worker.Worker) {
-	c := newConfig(cmd, opts, taskQueue)
+func RegisterRepositoryWorkflows(cmd *cli.Command, temporalOpts client.Options, taskQueue string, w worker.Worker) {
+	c := newConfig(cmd, temporalOpts, taskQueue)
 	funcs := []repoWorkflowFunc{
 		CommitCommentCreatedWorkflow,
 		c.CommitStatusWorkflow,

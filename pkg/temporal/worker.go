@@ -32,12 +32,12 @@ func Run(ctx context.Context, cmd *cli.Command, bi *debug.BuildInfo) error {
 	addr := cmd.String("temporal-address")
 	l.Info("Temporal server address: " + addr)
 
-	copts := client.Options{
+	dialOpts := client.Options{
 		HostPort:  addr,
 		Namespace: cmd.String("temporal-namespace"),
 		Logger:    log.NewStructuredLogger(l),
 	}
-	cli, err := client.Dial(copts)
+	cli, err := client.Dial(dialOpts)
 	if err != nil {
 		return fmt.Errorf("failed to dial Temporal: %w", err)
 	}
@@ -54,10 +54,10 @@ func Run(ctx context.Context, cmd *cli.Command, bi *debug.BuildInfo) error {
 			DefaultVersioningBehavior: workflow.VersioningBehaviorAutoUpgrade,
 		},
 	})
-	bitbucketwf.RegisterPullRequestWorkflows(cmd, copts, taskQueue, w)
-	bitbucketwf.RegisterRepositoryWorkflows(cmd, copts, taskQueue, w)
-	githubwf.RegisterWorkflows(cmd, w)
-	slackwf.RegisterWorkflows(ctx, cmd, w)
+	bitbucketwf.RegisterPullRequestWorkflows(cmd, dialOpts, taskQueue, w)
+	bitbucketwf.RegisterRepositoryWorkflows(cmd, dialOpts, taskQueue, w)
+	githubwf.RegisterWorkflows(cmd, dialOpts, w)
+	slackwf.RegisterWorkflows(ctx, cmd, dialOpts, w)
 
 	bitbucketwf.CreateSchedule(ctx, cli, taskQueue)
 	slackwf.CreateSchedule(ctx, cli, taskQueue)

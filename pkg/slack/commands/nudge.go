@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/tzrikka/revchat/internal/logger"
@@ -16,7 +17,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/users"
 )
 
-func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer string) error {
+func Nudge(ctx workflow.Context, opts client.Options, event SlashCommandEvent, imagesHTTPServer string) error {
 	url, err := prDetailsFromChannel(ctx, event)
 	if url == nil {
 		return err // May or may not be nil.
@@ -31,7 +32,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 	if len(users) == 1 && users[0] == event.UserID {
 		msg := ":confused: Why are you trying to %s yourself? Treating this as a `%s my turn` command..."
 		_ = activities.PostEphemeralMessage(ctx, event.ChannelID, event.UserID, fmt.Sprintf(msg, cmd[0], event.Command))
-		return MyTurn(ctx, event)
+		return MyTurn(ctx, opts, event)
 	}
 
 	// Also ignore the PR's author when there are additional users. The likely scenario is
@@ -50,7 +51,7 @@ func Nudge(ctx workflow.Context, event SlashCommandEvent, imagesHTTPServer strin
 	done := make([]string, 0, len(users))
 	for _, userID := range users {
 		// Check that the user is eligible to be nudged.
-		if !checkAndNudgeUser(ctx, event, url[0], userID) {
+		if !checkAndNudgeUser(ctx, opts, event, url[0], userID) {
 			continue
 		}
 
@@ -99,7 +100,7 @@ func authorSlackID(ctx workflow.Context, prURL string) string {
 // It returns true if the attention state was updated. If not, it also posts an explanation,
 // with the exception of self-nudges which are silently ignored (the user is nudging a group
 // that they are also part of, when the user nudges only themselves this function isn't called).
-func checkAndNudgeUser(ctx workflow.Context, event SlashCommandEvent, url, userID string) bool {
+func checkAndNudgeUser(ctx workflow.Context, opts client.Options, event SlashCommandEvent, url, userID string) bool {
 	// Silently ignore self-nudges.
 	if userID == event.UserID {
 		return false
@@ -117,7 +118,7 @@ func checkAndNudgeUser(ctx workflow.Context, event SlashCommandEvent, url, userI
 	}
 
 	// Update the PR's attention state.
-	ok, approved, err := data.SetReviewerTurn(ctx, url, user.Email, true)
+	ok, approved, err := data.SetReviewerTurn(ctx, opts, url, user.Email, true)
 	if err != nil {
 		PostEphemeralError(ctx, event, fmt.Sprintf("internal data error while nudging <@%s>.", userID))
 		return ok // May be true despite the error: a valid reviewer, but failed to save it.

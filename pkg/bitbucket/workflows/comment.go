@@ -36,7 +36,7 @@ func (c Config) CommentCreatedWorkflow(ctx workflow.Context, event bitbucket.Pul
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	// Don't abort if this fails - it's more important to post the comment.
-	_ = data.SwitchTurn(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor), false)
+	_ = data.SwitchTurn(ctx, c.TemporalOpts, prURL, users.BitbucketActorToEmail(ctx, event.Actor), false)
 
 	// If the comment was created by RevChat, i.e. mirrored from Slack, don't repost it.
 	// Also, don't poll Bitbucket for updates because we expect them to come from Slack.
@@ -159,7 +159,7 @@ func (c Config) CommentDeletedWorkflow(ctx workflow.Context, event bitbucket.Pul
 
 // CommentResolvedWorkflow mirrors the resolution of a PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-resolved
-func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
+func (c Config) CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
 	channelID, found := slack.LookupChannel(ctx, prURL)
@@ -167,7 +167,7 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
-	data.UpdateActivityTime(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
+	data.UpdateActivityTime(ctx, c.TemporalOpts, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
@@ -178,7 +178,7 @@ func CommentResolvedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 
 // CommentReopenedWorkflow mirrors the reopening of a resolved PR comment in the PR's Slack channel:
 // https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-reopened
-func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
+func (c Config) CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	prURL := bitbucket.HTMLURL(event.PullRequest.Links)
 	channelID, found := slack.LookupChannel(ctx, prURL)
@@ -186,7 +186,7 @@ func CommentReopenedWorkflow(ctx workflow.Context, event bitbucket.PullRequestEv
 		return nil
 	}
 
-	data.UpdateActivityTime(ctx, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
+	data.UpdateActivityTime(ctx, c.TemporalOpts, prURL, users.BitbucketActorToEmail(ctx, event.Actor))
 	defer bitbucket.UpdateChannelBookmarks(ctx, event.PullRequest, prURL, channelID)
 
 	url := bitbucket.HTMLURL(event.Comment.Links)
@@ -236,7 +236,7 @@ func (c Config) pollCommentForUpdates(ctx workflow.Context, accountID, commentUR
 // [10-minute window]: https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Comment-updated
 func (c Config) setScheduleActivity(ctx context.Context, req PollCommentRequest) error {
 	l := activity.GetLogger(ctx)
-	cli, err := client.Dial(c.Opts)
+	cli, err := client.Dial(c.TemporalOpts)
 	if err != nil {
 		l.Error("failed to dial Temporal", slog.Any("error", err))
 		return err
@@ -337,7 +337,7 @@ func (c Config) stopPollingComment(ctx workflow.Context, commentURL string) erro
 
 func (c Config) unsetScheduleActivity(ctx context.Context, commentURL string) error {
 	l := activity.GetLogger(ctx)
-	cli, err := client.Dial(c.Opts)
+	cli, err := client.Dial(c.TemporalOpts)
 	if err != nil {
 		l.Error("failed to dial Temporal", slog.Any("error", err))
 		return err
@@ -368,7 +368,7 @@ func (c Config) PollingCleanupWorkflow(ctx workflow.Context) error {
 
 func (c Config) deleteSchedulesActivity(ctx context.Context) error {
 	l := activity.GetLogger(ctx)
-	cli, err := client.Dial(c.Opts)
+	cli, err := client.Dial(c.TemporalOpts)
 	if err != nil {
 		l.Error("failed to dial Temporal", slog.Any("error", err))
 		return err

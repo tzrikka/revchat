@@ -47,7 +47,7 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 		return aggregatedErr
 	}
 
-	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, true, true, true, users)
+	userPRs, userAlerts := data.ListPRsPerSlackUser(ctx, c.TemporalOpts, true, true, true, users)
 	for _, details := range userAlerts {
 		activities.AlertWarn(ctx, c.AlertsChannel, "Slack email lookup failed - removed email from turn(s)", details...)
 	}
@@ -68,7 +68,7 @@ func (c *Config) RemindersWorkflow(ctx workflow.Context) error {
 		singleUser := []string{user}
 
 		for _, prURL := range prs {
-			prDetails := slack.PRDetails(ctx, prURL, singleUser, true, c.ReportDrafts, false, "")
+			prDetails := slack.PRDetails(ctx, c.TemporalOpts, prURL, singleUser, true, c.ReportDrafts, false, "")
 
 			// If the message becomes too long, split it into multiple chunks,
 			// even if the Slack API could technically handle a bit more.

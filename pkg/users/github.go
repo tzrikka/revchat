@@ -14,6 +14,7 @@ import (
 
 // GitHubIDToEmail converts a GitHub username into an email address. This function returns an empty
 // string if the username is not found. It uses persistent data storage, or API calls as a fallback.
+// If you change anything here, consider also changing [BitbucketIDToEmail].
 func GitHubIDToEmail(ctx workflow.Context, username string) string {
 	if username == "" {
 		return ""

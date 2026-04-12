@@ -28,19 +28,19 @@ func (c Config) PullRequestWorkflow(ctx workflow.Context, event github.PullReque
 		return c.prClosed(ctx, event)
 
 	case "converted_to_draft":
-		return prConvertedToDraft(ctx, event)
+		return c.prConvertedToDraft(ctx, event)
 	case "ready_for_review":
-		return prReadyForReview(ctx, event)
+		return c.prReadyForReview(ctx, event)
 
 	case "assigned", "unassigned":
 		fallthrough
 	case "review_requested", "review_request_removed":
-		return prReviewRequests(ctx, event)
+		return c.prReviewRequests(ctx, event)
 
 	case "edited": // Title, body, base branch.
 		return c.prEdited(ctx, event)
 	case "synchronize": // Head branch.
-		return prSynchronized(ctx, event)
+		return c.prSynchronized(ctx, event)
 
 	case "locked", "unlocked":
 		return prLocked(ctx, event)
@@ -84,7 +84,7 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 
 	// Channel cosmetics.
 	activities.SetChannelTopic(ctx, channelID, pr.HTMLURL)
-	activities.SetChannelDescription(ctx, channelID, pr.Title, pr.HTMLURL, "")
+	activities.SetChannelDescription(ctx, c.TemporalOpts, channelID, pr.Title, pr.HTMLURL, "")
 	github.SetChannelBookmarks(ctx, channelID, pr.HTMLURL, pr)
 
 	msg := "%s created this PR: " + markdown.LinkifyTitle(ctx, c.LinkifyMap, pr.HTMLURL, pr.Title)
@@ -97,7 +97,7 @@ func (c Config) prOpened(ctx workflow.Context, event github.PullRequestEvent) er
 	github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
 	followerIDs := data.SelectUserByGitHubID(ctx, pr.User.Login).Followers
-	err = activities.InviteUsersToChannel(ctx, channelID, pr.HTMLURL, github.ChannelMembers(ctx, pr), followerIDs)
+	err = activities.InviteUsersToChannel(ctx, c.TemporalOpts, channelID, pr.HTMLURL, github.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send an error DM only if the user is opted-in.
 		if userID := users.GitHubIDToSlackID(ctx, event.Sender.Login, true); userID != "" {
@@ -145,7 +145,7 @@ func (c Config) prClosed(ctx workflow.Context, event github.PullRequestEvent) er
 // prConvertedToDraft announces that a PR was converted to a draft.
 // For more information, see "Changing the stage of a pull request":
 // https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request
-func prConvertedToDraft(ctx workflow.Context, event github.PullRequestEvent) error {
+func (c Config) prConvertedToDraft(ctx workflow.Context, event github.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := activities.LookupChannel(ctx, event.PullRequest.HTMLURL)
 	if !found {
@@ -153,14 +153,15 @@ func prConvertedToDraft(ctx workflow.Context, event github.PullRequestEvent) err
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as a draft. :construction:")
-	_, _, err := data.SetReviewerTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.PullRequest.User.Login), true)
+	email := users.GitHubIDToEmail(ctx, event.PullRequest.User.Login)
+	_, _, err := data.SetReviewerTurn(ctx, c.TemporalOpts, event.PullRequest.HTMLURL, email, true)
 	return err
 }
 
 // prReadyForReview announces that a draft PR was marked as ready for review.
 // For more information, see "Changing the stage of a pull request":
 // https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request
-func prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error {
+func (c Config) prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := activities.LookupChannel(ctx, event.PullRequest.HTMLURL)
 	if !found {
@@ -168,9 +169,10 @@ func prReadyForReview(ctx workflow.Context, event github.PullRequestEvent) error
 	}
 
 	github.MentionUserInMsg(ctx, channelID, event.Sender, "%s marked this PR as ready for review. :eyes:")
-	err1 := data.SwitchTurn(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
-	err2 := activities.InviteUsersToChannel(ctx, channelID, event.PullRequest.HTMLURL, github.ChannelMembers(ctx, event.PullRequest), nil)
-	return errors.Join(err1, err2)
+	err := data.SwitchTurn(ctx, c.TemporalOpts, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login), true)
+
+	members := github.ChannelMembers(ctx, event.PullRequest)
+	return errors.Join(err, activities.InviteUsersToChannel(ctx, c.TemporalOpts, channelID, event.PullRequest.HTMLURL, members, nil))
 }
 
 // lookupChannel returns the ID of a Slack channel associated with the given PR, if it exists.
@@ -185,7 +187,7 @@ func lookupChannel(ctx workflow.Context, pr github.PullRequest) (string, bool) {
 // Review by a person or team was requested for or removed from a PR, or un/assigned
 // to/from a specific person. For more information, see "Requesting a pull request review":
 // https://docs.github.com/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/requesting-a-pull-request-review
-func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error {
+func (c Config) prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.PullRequest)
 	if !found {
@@ -205,7 +207,7 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 			if !event.PullRequest.Draft {
 				id := github.LoginsToSlackIDs(ctx, []string{user.Login})
-				errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, id, nil))
+				errs = append(errs, activities.InviteUsersToChannel(ctx, c.TemporalOpts, channelID, prURL, id, nil))
 			}
 		case "unassigned":
 			msg := github.ReviewerMentions(ctx, "removed", "assignee", []github.User{*user})
@@ -222,12 +224,12 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 			msg := github.ReviewerMentions(ctx, "added", "reviewer", []github.User{*user})
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 			if !event.PullRequest.Draft {
-				errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, ids, nil))
+				errs = append(errs, activities.InviteUsersToChannel(ctx, c.TemporalOpts, channelID, prURL, ids, nil))
 			}
 		case "review_request_removed":
 			msg := github.ReviewerMentions(ctx, "removed", "reviewer", []github.User{*user})
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
-			errs = append(errs, activities.KickUsersFromChannel(ctx, channelID, prURL, ids))
+			errs = append(errs, activities.KickUsersFromChannel(ctx, c.TemporalOpts, channelID, prURL, ids))
 		}
 	}
 
@@ -241,13 +243,13 @@ func prReviewRequests(ctx workflow.Context, event github.PullRequestEvent) error
 			msg = fmt.Sprintf("%s <%s?preview=no|%s>.", msg, team.HTMLURL, team.Name)
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 			if !event.PullRequest.Draft {
-				errs = append(errs, activities.InviteUsersToChannel(ctx, channelID, prURL, ids, nil))
+				errs = append(errs, activities.InviteUsersToChannel(ctx, c.TemporalOpts, channelID, prURL, ids, nil))
 			}
 		case "review_request_removed":
 			msg := ":bust_in_silhouette: %s removed this team as reviewers: "
 			msg = fmt.Sprintf("%s <%s?preview=no|%s>.", msg, team.HTMLURL, team.Name)
 			github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
-			errs = append(errs, activities.KickUsersFromChannel(ctx, channelID, prURL, ids))
+			errs = append(errs, activities.KickUsersFromChannel(ctx, c.TemporalOpts, channelID, prURL, ids))
 		}
 	}
 
@@ -273,7 +275,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 		msg := ":pencil2: %s edited the PR title: " + markdown.LinkifyTitle(ctx, c.LinkifyMap, pr.HTMLURL, pr.Title)
 		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
 
-		activities.SetChannelDescription(ctx, channelID, pr.Title, pr.HTMLURL, email)
+		activities.SetChannelDescription(ctx, c.TemporalOpts, channelID, pr.Title, pr.HTMLURL, email)
 
 		maxLen, prefix := c.SlackChannelNameMaxLength, c.SlackChannelNamePrefix
 		err = slack.RenameChannel(ctx, pr.Number, pr.Title, pr.HTMLURL, channelID, maxLen, prefix)
@@ -286,7 +288,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 			msg = ":pencil2: %s edited the PR description:\n\n" + markdown.GitHubToSlack(ctx, body, pr.HTMLURL)
 		}
 		github.MentionUserInMsg(ctx, channelID, event.Sender, msg)
-		data.UpdateActivityTime(ctx, pr.HTMLURL, email)
+		data.UpdateActivityTime(ctx, c.TemporalOpts, pr.HTMLURL, email)
 	}
 
 	// Base branch was changed.
@@ -295,7 +297,7 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 		repoURL, oldBranch, newBranch := pr.Base.Repo.HTMLURL, event.Changes.Base.Ref, pr.Base.Ref
 		msg = fmt.Sprintf(msg, repoURL, oldBranch, oldBranch, repoURL, newBranch, newBranch)
 		github.MentionUserInMsg(ctx, channelID, event.Sender, "%s "+msg)
-		data.UpdateActivityTime(ctx, pr.HTMLURL, email)
+		data.UpdateActivityTime(ctx, c.TemporalOpts, pr.HTMLURL, email)
 	}
 
 	return err
@@ -303,14 +305,15 @@ func (c Config) prEdited(ctx workflow.Context, event github.PullRequestEvent) er
 
 // prSynchronized announces that a PR's head branch was updated. For example, the head
 // branch was updated from the base branch or new commits were pushed to the head branch.
-func prSynchronized(ctx workflow.Context, event github.PullRequestEvent) error {
+func (c Config) prSynchronized(ctx workflow.Context, event github.PullRequestEvent) error {
 	// If we're not tracking this PR, there's no need/way to announce this event.
 	channelID, found := lookupChannel(ctx, event.PullRequest)
 	if !found {
 		return nil
 	}
 
-	data.UpdateActivityTime(ctx, event.PullRequest.HTMLURL, users.GitHubIDToEmail(ctx, event.Sender.Login))
+	email := users.GitHubIDToEmail(ctx, event.Sender.Login)
+	data.UpdateActivityTime(ctx, c.TemporalOpts, event.PullRequest.HTMLURL, email)
 	defer github.UpdateChannelBookmarks(ctx, &event.PullRequest, nil, channelID)
 
 	if event.After == nil {
