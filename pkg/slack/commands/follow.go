@@ -63,7 +63,17 @@ func extractFollowedUsers(ctx workflow.Context, event SlashCommandEvent) []strin
 		return nil // Not a server error as far as we're concerned.
 	}
 
-	return extractAtLeastOneUserID(ctx, event)
+	ids := extractAtLeastOneUserID(ctx, event)
+
+	// Remove the calling user from the list of users to un/follow, if present.
+	for i, id := range ids {
+		if id == event.UserID {
+			ids = append(ids[:i], ids[i+1:]...)
+			break // Unsafe and unnecessary to continue iterating.
+		}
+	}
+
+	return ids
 }
 
 func checkFollowedUser(ctx workflow.Context, event SlashCommandEvent, userID string) bool {
