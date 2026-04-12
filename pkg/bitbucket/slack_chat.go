@@ -46,7 +46,7 @@ func MentionUserInReply(ctx workflow.Context, parentURL string, user Account, ms
 // to their Slack profile if possible. We use this instead of [users.BitbucketIDToSlackRef] in cases
 // where we want to mention the user without actually spamming them with echoes of their own actions.
 func SlackDisplayName(ctx workflow.Context, user Account) string {
-	slackUserID := users.BitbucketIDToSlackID(ctx, user.AccountID, false)
+	slackUserID := users.BitbucketActorToSlackID(ctx, user, false)
 	displayName := users.SlackIDToDisplayName(ctx, slackUserID)
 	if displayName == "" {
 		displayName = user.DisplayName

@@ -30,7 +30,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	channelID, err := slack.CreateChannel(ctx, pr.ID, pr.Title, prURL, maxLen, prefix, private)
 	if err != nil {
 		// True = send an error DM only if the user is opted-in.
-		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
+		if userID := users.BitbucketActorToSlackID(ctx, event.Actor, true); userID != "" {
 			err = errors.Join(err, activities.PostMessage(ctx, userID, "Failed to create a Slack channel for "+prURL))
 		}
 		return activities.AlertError(ctx, c.SlackAlertsChannel, "failed to create Slack channel for "+prURL, err)
@@ -53,7 +53,7 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	err = activities.InviteUsersToChannel(ctx, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send an error DM only if the user is opted-in.
-		if userID := users.BitbucketIDToSlackID(ctx, event.Actor.AccountID, true); userID != "" {
+		if userID := users.BitbucketActorToSlackID(ctx, event.Actor, true); userID != "" {
 			err = errors.Join(err, activities.PostMessage(ctx, userID, "Failed to initialize a Slack channel for "+prURL))
 		}
 		// Undo channel creation and PR data initialization.
