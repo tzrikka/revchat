@@ -7,7 +7,12 @@ import (
 // CleanupPRData deletes all the data associated with a PR. If there are errors,
 // they are logged but ignored, as they do not affect the overall need to clean up.
 func CleanupPRData(ctx workflow.Context, channelID, prURL string) {
-	LogSlackChannelArchived(ctx, channelID, prURL)
+	if channelID != "" {
+		LogSlackChannelArchived(ctx, channelID, prURL)
+		if prURL == "" {
+			DeleteURLAndIDMapping(ctx, channelID)
+		}
+	}
 	if prURL == "" {
 		return
 	}

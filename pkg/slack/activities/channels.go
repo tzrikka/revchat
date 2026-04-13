@@ -40,6 +40,16 @@ func ArchiveChannel(ctx workflow.Context, channelID, prURL string) error {
 	return nil
 }
 
+func ChannelInfo(ctx workflow.Context, channelID string, locale, numMembers bool) (map[string]any, error) {
+	info, err := slack.ConversationsInfo(ctx, channelID, locale, numMembers)
+	if err != nil {
+		logger.From(ctx).Error("failed to get Slack channel info",
+			slog.Any("error", err), slog.String("channel_id", channelID))
+		return nil, err
+	}
+	return info, nil
+}
+
 func CreateChannel(ctx workflow.Context, name, prURL string, private bool) (id string, retry bool, err error) {
 	id, err = slack.ConversationsCreate(ctx, name, private)
 	if err != nil {
