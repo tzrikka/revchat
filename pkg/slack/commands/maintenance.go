@@ -16,21 +16,21 @@ import (
 // CleanPRData is a hidden (but perfectly safe) maintenance command that deletes outdated PR data.
 // This is not needed under normal operation, only after outages that caused the system to miss PR closure events.
 func CleanPRData(ctx workflow.Context, event SlashCommandEvent, alertsChannel string) error {
-	if err := cleanChannels(ctx, event, alertsChannel); err != nil {
+	if err := cleanChannels(ctx, &event, alertsChannel); err != nil {
 		return err
 	}
 
-	if err := cleanURLs(ctx, event, alertsChannel); err != nil {
+	if err := cleanURLs(ctx, &event, alertsChannel); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func cleanChannels(ctx workflow.Context, event SlashCommandEvent, alertsChannel string) error {
+func cleanChannels(ctx workflow.Context, event *SlashCommandEvent, alertsChannel string) error {
 	results, err := data.ReadAllURLsOrChannels(ctx, data.Channels)
 	if err != nil {
-		PostEphemeralError(ctx, event, "failed to read all "+data.Channels)
+		PostEphemeralError(ctx, *event, "failed to read all "+data.Channels)
 		return err
 	}
 
@@ -109,10 +109,10 @@ func cleanChannels(ctx workflow.Context, event SlashCommandEvent, alertsChannel 
 	return contErr
 }
 
-func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel string) error {
+func cleanURLs(ctx workflow.Context, event *SlashCommandEvent, alertsChannel string) error {
 	results, err := data.ReadAllURLsOrChannels(ctx, data.URLs)
 	if err != nil {
-		PostEphemeralError(ctx, event, "failed to read all "+data.URLs)
+		PostEphemeralError(ctx, *event, "failed to read all "+data.URLs)
 		return err
 	}
 
@@ -160,10 +160,10 @@ func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel stri
 
 // continueAsNew helps the [CleanPRData] slash command, as a potentially long-running
 // workflow, to play nicely with Temporal's history limits, as well as API rate limits.
-func continueAsNew(ctx workflow.Context, event SlashCommandEvent, next string) (bool, error) {
+func continueAsNew(ctx workflow.Context, event *SlashCommandEvent, next string) (bool, error) {
 	if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
 		event.Command = next // See the comments below for the rationale behind this change.
-		return false, workflow.NewContinueAsNewError(ctx, "slack.events.slash_command", event)
+		return false, workflow.NewContinueAsNewError(ctx, "slack.events.slash_command", *event)
 	}
 
 	if !strings.HasPrefix(event.Command, "/") {
