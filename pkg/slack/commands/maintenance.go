@@ -139,8 +139,11 @@ func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel stri
 
 // takingTooLong helps the [CleanPRData] workflow to play nicely with API rate limits and Temporal's history limits.
 func takingTooLong(ctx workflow.Context) bool {
+	if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
+		return true
+	}
 	_ = workflow.Sleep(ctx, 3*time.Second)
-	return workflow.GetInfo(ctx).GetContinueAsNewSuggested()
+	return false
 }
 
 func determineChannel(ctx workflow.Context, alertsChannel, userID, prURL string) (string, error) {
