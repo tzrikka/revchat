@@ -16,19 +16,19 @@ import (
 
 // CleanPRData is a hidden (but perfectly safe) maintenance command that deletes outdated PR data.
 // This is not needed under normal operation, only after outages that caused the system to miss PR closure events.
-func CleanPRData(ctx workflow.Context, _ client.Options, event SlashCommandEvent, alertsChannel string) error {
-	if err := cleanChannels(ctx, event, alertsChannel); err != nil {
+func CleanPRData(ctx workflow.Context, opts client.Options, event SlashCommandEvent, alertsChannel string) error {
+	if err := cleanChannels(ctx, opts, event, alertsChannel); err != nil {
 		return err
 	}
 
-	if err := cleanURLs(ctx, event, alertsChannel); err != nil {
+	if err := cleanURLs(ctx, opts, event, alertsChannel); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func cleanChannels(ctx workflow.Context, event SlashCommandEvent, alertsChannel string) error {
+func cleanChannels(ctx workflow.Context, opts client.Options, event SlashCommandEvent, alertsChannel string) error {
 	results, err := data.ReadAllURLsOrChannels(ctx, data.Channels)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read all "+data.Channels)
@@ -36,8 +36,10 @@ func cleanChannels(ctx workflow.Context, event SlashCommandEvent, alertsChannel 
 	}
 
 	cleaned, failed := 0, 0
+	var contErr error
 	for _, channelID := range results {
-		if takingTooLong(ctx) {
+		contErr = continueAsNew(ctx, opts, event, alertsChannel)
+		if contErr != nil {
 			break
 		}
 
@@ -57,7 +59,7 @@ func cleanChannels(ctx workflow.Context, event SlashCommandEvent, alertsChannel 
 
 		// Scenario 1: channel is archived - no need to check PR state.
 		if isArchived, ok := info["is_archived"].(bool); ok && isArchived {
-			msg := fmt.Sprintf("Deleting outdated data for archived Slack channel: `%s`", channelID)
+			msg := fmt.Sprintf("Deleting outdated data for already-archived Slack channel: `%s`", channelID)
 			if prURL != "" {
 				msg = fmt.Sprintf("%s (%s)", msg, prURL)
 			}
@@ -87,18 +89,21 @@ func cleanChannels(ctx workflow.Context, event SlashCommandEvent, alertsChannel 
 			_ = slack.AlertError(ctx, alertsChannel, "failed to archive zombie Slack channel for closed PR", err, "Channel",
 				fmt.Sprintf("`%s` (<#%s>)", channelID, channelID), "PR", prURL, "Initiator", fmt.Sprintf("<@%s>", event.UserID))
 			failed++
+			continue
 		}
 
+		_ = slack.PostMessage(ctx, alertsChannel, fmt.Sprintf("Archived zombie Slack channel: `%s`", channelID))
 		_ = slack.PostMessage(ctx, alertsChannel, "Deleting outdated data for closed PR: "+prURL)
 		data.CleanupPRData(ctx, channelID, prURL)
 		cleaned++
 	}
 
 	msg := "Summary: deleted outdated data for `%d` Slack channels, failed to check/archive/clean-up `%d`"
-	return slack.PostMessage(ctx, alertsChannel, fmt.Sprintf(msg, cleaned, failed))
+	_ = slack.PostMessage(ctx, alertsChannel, fmt.Sprintf(msg, cleaned, failed))
+	return contErr
 }
 
-func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel string) error {
+func cleanURLs(ctx workflow.Context, opts client.Options, event SlashCommandEvent, alertsChannel string) error {
 	results, err := data.ReadAllURLsOrChannels(ctx, data.URLs)
 	if err != nil {
 		PostEphemeralError(ctx, event, "failed to read all "+data.URLs)
@@ -106,8 +111,10 @@ func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel stri
 	}
 
 	cleaned, failed := 0, 0
+	var contErr error
 	for _, prURL := range results {
-		if takingTooLong(ctx) {
+		contErr = continueAsNew(ctx, opts, event, alertsChannel)
+		if contErr != nil {
 			break
 		}
 
@@ -134,16 +141,19 @@ func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel stri
 	}
 
 	msg := "Summary: deleted outdated data for `%d` closed PRs, failed to check/clean-up `%d`"
-	return slack.PostMessage(ctx, alertsChannel, fmt.Sprintf(msg, cleaned, failed))
+	_ = slack.PostMessage(ctx, alertsChannel, fmt.Sprintf(msg, cleaned, failed))
+	return contErr
 }
 
-// takingTooLong helps the [CleanPRData] workflow to play nicely with API rate limits and Temporal's history limits.
-func takingTooLong(ctx workflow.Context) bool {
+// continueAsNew helps [CleanPRData], as a potentially long-running workflow,
+// to play nicely with Temporal's history limits, as well as API rate limits.
+func continueAsNew(ctx workflow.Context, opts client.Options, event SlashCommandEvent, alertsChannel string) error {
 	if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
-		return true
+		return workflow.NewContinueAsNewError(ctx, CleanPRData, opts, event, alertsChannel)
 	}
+
 	_ = workflow.Sleep(ctx, 3*time.Second)
-	return false
+	return nil
 }
 
 func determineChannel(ctx workflow.Context, alertsChannel, userID, prURL string) (string, error) {
