@@ -161,8 +161,8 @@ func determineChannel(ctx workflow.Context, alertsChannel, userID, prURL string)
 
 func determineURL(ctx workflow.Context, alertsChannel, userID, channelID string, info map[string]any) (string, error) {
 	if topic, ok := info["topic"].(map[string]any); ok {
-		if prURL, ok := topic["value"].(string); ok {
-			if prURL := PullRequestURLPattern.FindString(prURL); prURL != "" {
+		if value, ok := topic["value"].(string); ok {
+			if prURL := PullRequestURLPattern.FindString(value); prURL != "" {
 				return prURL, nil
 			}
 		}
