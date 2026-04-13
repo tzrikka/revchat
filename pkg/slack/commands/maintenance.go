@@ -34,10 +34,15 @@ func cleanChannels(ctx workflow.Context, event SlashCommandEvent, alertsChannel 
 		return err
 	}
 
-	cleaned, failed := 0, 0
+	var cleaned, failed int
 	var contErr error
+	var skip bool
+
 	for _, channelID := range results {
-		contErr = continueAsNew(ctx, event)
+		skip, contErr = continueAsNew(ctx, event, channelID)
+		if skip {
+			continue
+		}
 		if contErr != nil {
 			break
 		}
@@ -97,8 +102,10 @@ func cleanChannels(ctx workflow.Context, event SlashCommandEvent, alertsChannel 
 		cleaned++
 	}
 
-	msg := "Summary: deleted outdated data for `%d` Slack channels, failed to check/archive/clean-up `%d`"
-	_ = slack.PostMessage(ctx, alertsChannel, fmt.Sprintf(msg, cleaned, failed))
+	if !skip {
+		msg := "Summary: deleted outdated data for `%d` Slack channels, failed to check/archive/clean-up `%d`"
+		_ = slack.PostMessage(ctx, alertsChannel, fmt.Sprintf(msg, cleaned, failed))
+	}
 	return contErr
 }
 
@@ -109,10 +116,15 @@ func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel stri
 		return err
 	}
 
-	cleaned, failed := 0, 0
+	var cleaned, failed int
 	var contErr error
+	var skip bool
+
 	for _, prURL := range results {
-		contErr = continueAsNew(ctx, event)
+		skip, contErr = continueAsNew(ctx, event, prURL)
+		if skip {
+			continue
+		}
 		if contErr != nil {
 			break
 		}
@@ -139,20 +151,39 @@ func cleanURLs(ctx workflow.Context, event SlashCommandEvent, alertsChannel stri
 		cleaned++
 	}
 
-	msg := "Summary: deleted outdated data for `%d` closed PRs, failed to check/clean-up `%d`"
-	_ = slack.PostMessage(ctx, alertsChannel, fmt.Sprintf(msg, cleaned, failed))
+	if !skip {
+		msg := "Summary: deleted outdated data for `%d` closed PRs, failed to check/clean-up `%d`"
+		_ = slack.PostMessage(ctx, alertsChannel, fmt.Sprintf(msg, cleaned, failed))
+	}
 	return contErr
 }
 
 // continueAsNew helps the [CleanPRData] slash command, as a potentially long-running
 // workflow, to play nicely with Temporal's history limits, as well as API rate limits.
-func continueAsNew(ctx workflow.Context, event SlashCommandEvent) error {
+func continueAsNew(ctx workflow.Context, event SlashCommandEvent, next string) (bool, error) {
 	if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
-		return workflow.NewContinueAsNewError(ctx, "slack.events.slash_command", event)
+		event.Command = next // See the comments below for the rationale behind this change.
+		return false, workflow.NewContinueAsNewError(ctx, "slack.events.slash_command", event)
 	}
 
+	if !strings.HasPrefix(event.Command, "/") {
+		// We are in a restarted workflow (after continue-as-new): the event's "Command" field contains the
+		// channel ID or PR URL that we didn't process in the terminated workflow (before continue-as-new),
+		// instead of the slash command name (which is redundant at this point).
+		skip := event.Command != next
+		if !skip {
+			// We have reached again (after continue-as-new) the value we need to process next,
+			// so we should stop skipping from now on (until the next continue-as-new, if any).
+			event.Command = "/" + "finished skipping within loop"
+		}
+		return skip, nil
+	}
+
+	// Either we're in the original workflow (before continue-as-new), or we're in a restarted
+	// workflow (after continue-as-new) and have already reached the value we were looking for.
+	// Either way, we process each value slowly in order to avoid API rate limits.
 	_ = workflow.Sleep(ctx, 3*time.Second)
-	return nil
+	return false, nil
 }
 
 func determineChannel(ctx workflow.Context, alertsChannel, userID, prURL string) (string, error) {
