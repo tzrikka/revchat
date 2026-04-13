@@ -52,7 +52,7 @@ func (c *Config) SlashCommandWorkflow(ctx workflow.Context, event commands.Slash
 		return commands.Unapprove(ctx, event)
 
 	case "clean-pr-data":
-		return commands.CleanPRData(ctx, c.TemporalOpts, event, c.AlertsChannel)
+		return commands.CleanPRData(ctx, event, c.AlertsChannel)
 	}
 
 	// Commands with 1 or more user and/or group mentions.
