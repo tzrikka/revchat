@@ -641,15 +641,15 @@ func emailToSlackID(ctx context.Context, opts client.Options, email string) stri
 	}
 
 	req := slack.UsersLookupByEmailRequest{Email: email}
-	user := new(slack.User)
-	if err := executeTimpaniActivity(ctx, opts, slack.UsersLookupByEmailActivityName, email, req, user); err != nil {
+	resp := new(slack.UsersLookupByEmailResponse)
+	if err := executeTimpaniActivity(ctx, opts, slack.UsersLookupByEmailActivityName, email, req, resp); err != nil {
 		activity.GetLogger(ctx).Error("failed to retrieve Slack user info",
 			slog.Any("error", err), slog.String("email", email))
 		return ""
 	}
 
 	// Don't return an error here (i.e. abort the calling workflow) - we have a result, even if we failed to save it.
-	_, _ = UpsertUser(ctx, email, user.RealName, "", "", user.ID, "")
+	_, _ = UpsertUser(ctx, email, resp.User.RealName, "", "", resp.User.ID, "")
 
-	return user.ID
+	return resp.User.ID
 }
