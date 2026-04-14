@@ -12,6 +12,9 @@ import (
 
 // executeTimpaniActivity starts a Timpani activity via a Temporal client instead of calling the Timpani API.
 // The Timpani API is meant for Temporal workflows, but this package uses nondeterministic Temporal activities.
+// Attention: is requires the Temporal server to support [standalone activities]!
+//
+// [standalone activities]: https://docs.temporal.io/standalone-activity
 func executeTimpaniActivity(ctx context.Context, opts client.Options, activity, userID string, req, result any) error {
 	c, err := client.Dial(opts)
 	if err != nil {
