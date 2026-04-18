@@ -65,10 +65,11 @@ func BitbucketIDToEmail(ctx workflow.Context, accountID, accountType string) str
 		return user.Email
 	}
 
+	if accountType == "app_user" {
+		return "bot" // Not a real user, so no point to look-up in Jira.
+	}
+
 	if ctx == nil { // For unit testing.
-		if accountType == "app_user" {
-			return "bot" // Not a real user, so no point to look-up in Jira.
-		}
 		return "" // Unknown user, so no point to look-up in Jira.
 	}
 
