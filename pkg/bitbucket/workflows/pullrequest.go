@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/tzrikka/revchat/pkg/slack"
 	"github.com/tzrikka/revchat/pkg/slack/activities"
 	"github.com/tzrikka/revchat/pkg/users"
+	timpani "github.com/tzrikka/timpani-api/pkg/bitbucket"
 )
 
 // PullRequestCreatedWorkflow initializes a new Slack channel for a newly-created PR:
@@ -50,6 +52,8 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	bitbucket.MentionUserInMsg(ctx, channelID, event.Actor, msg)
 
 	followerIDs := data.SelectUserByBitbucketID(ctx, pr.Author.AccountID).Followers
+	followerIDs = discardUsersWithoutAccess(ctx, followerIDs, pr.Destination.Repository.FullName, pr.ID)
+
 	err = activities.InviteUsersToChannel(ctx, c.TemporalOpts, channelID, prURL, bitbucket.ChannelMembers(ctx, pr), followerIDs)
 	if err != nil {
 		// True = send an error DM only if the user is opted-in.
@@ -63,6 +67,37 @@ func (c Config) PullRequestCreatedWorkflow(ctx workflow.Context, event bitbucket
 	}
 
 	return nil
+}
+
+// discardUsersWithoutAccess ensures that each Slack user (a follower of the
+// PR author) has access to the PR before adding them to the PR's Slack channel.
+func discardUsersWithoutAccess(ctx workflow.Context, slackUserIDs []string, repoFullName string, prID int) []string {
+	workspace, repo, found := strings.Cut(repoFullName, "/")
+	if !found {
+		return nil // "Fail closed".
+	}
+	id := strconv.Itoa(prID)
+
+	filtered := make([]string, 0, len(slackUserIDs))
+	for _, slackUserID := range slackUserIDs {
+		if userHasAccess(ctx, slackUserID, workspace, repo, id) {
+			filtered = append(filtered, slackUserID)
+		}
+	}
+	return filtered
+}
+
+func userHasAccess(ctx workflow.Context, slackUserID, workspace, repo, prID string) bool {
+	// No need error checking here: if there's an error here, optedIn will be false anyway.
+	user, optedIn, _ := data.SelectUserBySlackID(ctx, slackUserID)
+	if !optedIn {
+		return false
+	}
+
+	// We use the [timpani] repo, instead of the [activities] package, because
+	// we don't want to treat (i.e. log) API call failures here as server errors.
+	resp, _ := timpani.PullRequestsGet(ctx, user.ThrippyLink, workspace, repo, prID)
+	return len(resp) > 0
 }
 
 // PullRequestClosedWorkflow archives a PR's Slack channel when the PR is merged or declined/rejected:
