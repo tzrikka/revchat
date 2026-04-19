@@ -64,6 +64,15 @@ func SelfStatus(ctx workflow.Context, opts client.Options, event SlashCommandEve
 // StatusOfOthers is similar to [SelfStatus] but lists all the PRs associated with the given users
 // and/or groups. This is the only command that doesn't require the calling user to be opted-in.
 func StatusOfOthers(ctx workflow.Context, opts client.Options, event SlashCommandEvent, showDrafts bool, thrippyID, alertsChannel string) error {
+	// Sanity check: Slack can send the app an event from a channel that the app can't access.
+	if _, err := activities.ChannelInfo(ctx, event.ChannelID, false, false); err != nil {
+		_ = activities.AlertError(ctx, alertsChannel, "received status command from inaccessible channel", err,
+			"Channel", fmt.Sprintf("`%s` (<#%s>)", event.ChannelID, event.ChannelID), "Initiator", fmt.Sprintf("<@%s>", event.UserID))
+		msg := fmt.Sprintf(":warning: Received a `status` command from you in an inaccessible channel: <#%s>.", event.ChannelID)
+		msg += "\n\nPlease add this app to that channel, or run your command here."
+		return activities.PostMessage(ctx, event.UserID, msg)
+	}
+
 	showDrafts = showDraftsOption(showDrafts, event.Text)
 	showTasks := strings.Contains(event.Text, " tasks")
 
